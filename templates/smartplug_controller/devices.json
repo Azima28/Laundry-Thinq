@@ -1,0 +1,254 @@
+{
+    "api_credentials": {
+        "access_id": "gst7mf5yytp73c9cvqjq",
+        "access_secret": "3d909f01f5ad4d96aae95a7b454d8957",
+        "app_uid": "az1733062861059ZHSHA"
+    },
+    "devices": [
+        {
+            "active_time": 1783655821,
+            "biz_type": 18,
+            "category": "cz",
+            "create_time": 1780822272,
+            "icon": "smart/icon/bay1640070959719kmeK/9bfb84b060b043dc2e075c2249d6c8e7.jpg",
+            "id": "eb5e226d14e09b3603cevj",
+            "ip": "103.105.82.7",
+            "lat": "-5.36",
+            "local_key": "{7tMZrC&Lmo4mw0M",
+            "lon": "105.28",
+            "model": "EU02A-Bardi",
+            "name": "Pengering 4",
+            "online": true,
+            "owner_id": "223782894",
+            "product_id": "tun1vciy8rtdamdv",
+            "product_name": "EU02A-Bardi",
+            "status": [
+                {
+                    "code": "switch_1",
+                    "value": false
+                },
+                {
+                    "code": "countdown_1",
+                    "value": 0
+                },
+                {
+                    "code": "add_ele",
+                    "value": 17
+                },
+                {
+                    "code": "cur_current",
+                    "value": 0
+                },
+                {
+                    "code": "cur_power",
+                    "value": 0
+                },
+                {
+                    "code": "cur_voltage",
+                    "value": 2192
+                },
+                {
+                    "code": "voltage_coe",
+                    "value": 582
+                },
+                {
+                    "code": "electric_coe",
+                    "value": 28333
+                },
+                {
+                    "code": "power_coe",
+                    "value": 15484
+                },
+                {
+                    "code": "electricity_coe",
+                    "value": 2700
+                },
+                {
+                    "code": "fault",
+                    "value": 0
+                },
+                {
+                    "code": "relay_status",
+                    "value": "last"
+                },
+                {
+                    "code": "overcharge_switch",
+                    "value": false
+                },
+                {
+                    "code": "light_mode",
+                    "value": "relay"
+                },
+                {
+                    "code": "child_lock",
+                    "value": false
+                },
+                {
+                    "code": "cycle_time",
+                    "value": ""
+                },
+                {
+                    "code": "random_time",
+                    "value": ""
+                },
+                {
+                    "code": "switch_inching",
+                    "value": ""
+                }
+            ],
+            "sub": false,
+            "time_zone": "+07:00",
+            "uid": "az1733062861059ZHSHA",
+            "update_time": 1783655823,
+            "uuid": "d54b89c0bd0e4938"
+        },
+        {
+            "active_time": 1733063416,
+            "biz_type": 18,
+            "category": "rqbj",
+            "create_time": 1731559560,
+            "icon": "smart/icon/ay15500268672065IQ53/7d084370ca8c674965e3c6e27bea1374.png",
+            "id": "eb81e69ad4372afc68wobk",
+            "ip": "182.253.63.1",
+            "lat": "-5.41",
+            "local_key": "4^^Wtw6?l$cE;MVt",
+            "lon": "105.26",
+            "model": "PA-210WV",
+            "name": "Gas sensor 2",
+            "online": true,
+            "owner_id": "223782894",
+            "product_id": "sclatjo1jqscmwwe",
+            "product_name": "Gas sensor",
+            "status": [
+                {
+                    "code": "gas_sensor_state",
+                    "value": "2"
+                },
+                {
+                    "code": "gas_sensor_value",
+                    "value": 0
+                },
+                {
+                    "code": "muffling",
+                    "value": false
+                }
+            ],
+            "sub": false,
+            "time_zone": "+07:00",
+            "uid": "az1733062861059ZHSHA",
+            "update_time": 1783619802,
+            "uuid": "55f4e48aa762c8c7"
+        },
+        {
+            "active_time": 1733063441,
+            "biz_type": 18,
+            "category": "rqbj",
+            "create_time": 1731559609,
+            "icon": "smart/icon/ay15500268672065IQ53/7d084370ca8c674965e3c6e27bea1374.png",
+            "id": "eb7930462595d2b711i27g",
+            "ip": "182.253.63.1",
+            "lat": "-5.41",
+            "local_key": "v@*:LUc{UXwRT]DR",
+            "lon": "105.26",
+            "model": "PA-210WV",
+            "name": "Gas sensor 4",
+            "online": true,
+            "owner_id": "223782894",
+            "product_id": "sclatjo1jqscmwwe",
+            "product_name": "Gas sensor",
+            "status": [
+                {
+                    "code": "gas_sensor_state",
+                    "value": "2"
+                },
+                {
+                    "code": "gas_sensor_value",
+                    "value": 0
+                },
+                {
+                    "code": "muffling",
+                    "value": false
+                }
+            ],
+            "sub": false,
+            "time_zone": "+07:00",
+            "uid": "az1733062861059ZHSHA",
+            "update_time": 1783619763,
+            "uuid": "fd62a09587d57a36"
+        },
+        {
+            "active_time": 1733062948,
+            "biz_type": 18,
+            "category": "rqbj",
+            "create_time": 1731559576,
+            "icon": "smart/icon/ay15500268672065IQ53/7d084370ca8c674965e3c6e27bea1374.png",
+            "id": "eb2604544ab5fb9623dbs6",
+            "ip": "182.253.63.1",
+            "lat": "0",
+            "local_key": ".j3+ncbSEkV141[d",
+            "lon": "0",
+            "model": "PA-210WV",
+            "name": "Gas sensor",
+            "online": true,
+            "owner_id": "223782894",
+            "product_id": "sclatjo1jqscmwwe",
+            "product_name": "Gas sensor",
+            "status": [
+                {
+                    "code": "gas_sensor_state",
+                    "value": "2"
+                },
+                {
+                    "code": "gas_sensor_value",
+                    "value": 0
+                },
+                {
+                    "code": "muffling",
+                    "value": false
+                }
+            ],
+            "sub": false,
+            "time_zone": "+07:00",
+            "uid": "az1733062861059ZHSHA",
+            "update_time": 1783619754,
+            "uuid": "471f0c3b3f701efa"
+        },
+        {
+            "active_time": 1733063433,
+            "biz_type": 18,
+            "category": "rqbj",
+            "create_time": 1731559539,
+            "icon": "smart/icon/ay15500268672065IQ53/7d084370ca8c674965e3c6e27bea1374.png",
+            "id": "eb7ae36d68f73dc5fc4ufi",
+            "ip": "182.253.63.1",
+            "lat": "-5.41",
+            "local_key": "F<61&+uJ+qF.9:kg",
+            "lon": "105.26",
+            "model": "PA-210WV",
+            "name": "Gas sensor 3",
+            "online": true,
+            "owner_id": "223782894",
+            "product_id": "sclatjo1jqscmwwe",
+            "product_name": "Gas sensor",
+            "status": [
+                {
+                    "code": "gas_sensor_state",
+                    "value": "2"
+                },
+                {
+                    "code": "gas_sensor_value",
+                    "value": 0
+                },
+                {
+                    "code": "muffling",
+                    "value": false
+                }
+            ],
+            "sub": false,
+            "time_zone": "+07:00",
+            "uid": "az1733062861059ZHSHA",
+            "update_time": 1783619750,
+            "uuid": "4aef1dc4e413dd1a"
+        }
+    ]
+}

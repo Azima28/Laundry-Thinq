@@ -1,0 +1,48 @@
+# WhatsApp session
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Databases & local configs
+laundry.db
+laundry.db-journal
+config.json
+smartplug_controller/devices.json
+
+# Node dependencies
+node_modules/
+npm-debug.log*
+
+# Python env and cache
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Nuitka build artifacts
+*.build/
+*.dist/
+*.onefile-build/
+main.exe
+main.exe.bak
+
+# Log files
+*.log
+flutter_run_v.log
+log.txt
+
+# Flutter / Dart specific (nested under LaundryApps(Upgrade))
+LaundryApps(Upgrade)/.dart_tool/
+LaundryApps(Upgrade)/.flutter-plugins
+LaundryApps(Upgrade)/.flutter-plugins-dependencies
+LaundryApps(Upgrade)/.metadata
+LaundryApps(Upgrade)/build/
+LaundryApps(Upgrade)/windows/flutter/ephemeral/
+LaundryApps(Upgrade)/windows/flutter/windir/
+LaundryApps(Upgrade)/*.log
+
+# OS files
+.DS_Store
+Thumbs.db

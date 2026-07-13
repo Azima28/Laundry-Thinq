@@ -1,0 +1,16 @@
+{
+  "name": "laundry-wa-service",
+  "version": "1.0.0",
+  "description": "WhatsApp notification service for Smart Laundry v2",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "whatsapp-web.js": "^1.26.1-alpha.3",
+    "qrcode-terminal": "^0.12.0",
+    "qrcode": "^1.5.3"
+  }
+}

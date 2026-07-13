@@ -1,0 +1,520 @@
+<div class="app-container">
+    <!-- GLOBAL ALERT BANNER -->
+    <div id="global-error-banner" class="global-alert">
+        <span class="alert-icon"><i data-lucide="zap"></i></span>
+        <span class="alert-message">Peringatan: Terdapat mesin yang mengalami gangguan!</span>
+        <button class="alert-close" onclick="this.parentElement.style.display='none'">×</button>
+    </div>
+
+    <!-- MONITORING VIEW -->
+    <section id="monitoring-view" class="dashboard-view active">
+        <header class="monitoring-header">
+            <div class="header-text">
+                <h1>Kontrol LG ThinQ</h1>
+                <p class="subtitle">Status mesin laundry real-time (Direct Integration)</p>
+            </div>
+            <div class="monitoring-filters">
+                <button class="filter-chip active" data-filter="cuci">Mesin Cuci</button>
+                <button class="filter-chip" data-filter="pengering">Pengering</button>
+            </div>
+        </header>
+
+        <div id="sensor-container">
+            {% for sensor in sensors %}
+            <div class="machine-card" id="{{sensor}}">
+                {% set parts = latest_state.get(sensor, sensor + "|Ready|Idle|--:--|Unknown|-|-|-").split("|") %}
+                <h2 class="machine-id">{{ parts[0] }}</h2>
+                <span class="status-badge status-{{ parts[1]|lower }}">{{ parts[1] }}</span>
+                <div class="detail-grid">
+                    <span class="label">Siklus:</span><span class="value cycle">{{ parts[2] }}</span>
+                    <span class="label">Program:</span><span class="value course">{{ parts[4] }}</span>
+                    <span class="label">Tersisa:</span><span class="value time">{{ parts[3] }}</span>
+                    {% if parts|length > 7 and parts[7] != '-' and parts[7] != '' %}
+                    <span class="label">Control:</span><span class="value control" style="color: #f59e0b;">{{ parts[7]
+                        }}</span>
+                    {% endif %}
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar" style="width: 0%;"></div>
+                </div>
+                <div
+                    class="error-msg-container {% if (parts|length > 5 and parts[5] != '-' and parts[5] != '') %}visible{% endif %}">
+                    <span class="error-icon"><i data-lucide="alert-triangle"></i></span>
+                    <span class="error-text">{{ parts[5] if parts|length > 5 else '-' }}</span>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% for dryer in dryers %}
+            <div class="machine-card" id="{{dryer}}">
+                {% set parts = latest_state.get(dryer, dryer + "|Ready|Idle|--:--|Unknown|-").split("|") %}
+                <h2 class="machine-id">{{ parts[0] }}</h2>
+                <span class="status-badge status-{{ parts[1]|lower }}">{{ parts[1] }}</span>
+                <div class="detail-grid">
+                    <span class="label">Durasi:</span><span class="value cycle">{{ parts[2] }}</span>
+                    <span class="label">Tersisa:</span><span class="value time">{{ parts[3] }}</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar" style="width: 0%;"></div>
+                </div>
+                <div
+                    class="error-msg-container {% if (parts|length > 5 and parts[5] != '-' and parts[5] != '') %}visible{% endif %}">
+                    <span class="error-icon"><i data-lucide="alert-triangle"></i></span>
+                    <span class="error-text">{{ parts[5] if parts|length > 5 else '-' }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- HISTORY VIEW -->
+    <section id="history-view" class="dashboard-view">
+        <header class="history-header">
+            <div class="header-text">
+                <h1>Riwayat Penggunaan</h1>
+                <p class="subtitle">Catatan aktivitas mesin terbaru</p>
+            </div>
+            <button id="refresh-logs" class="refresh-btn">
+                <i data-lucide="refresh-cw" style="width: 16px; height: 16px; margin-right: 8px;"></i> Refresh
+            </button>
+        </header>
+        <div class="filter-container">
+            <div class="filter-group">
+                <label>Mesin:</label>
+                <select id="filter-machine">
+                    <option value="all">Semua Mesin</option>
+                    {% for sensor in sensors %}<option value="{{ sensor }}">{{ sensor }}</option>{% endfor %}
+                    {% for dryer in dryers %}<option value="{{ dryer }}">{{ dryer }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Aksi:</label>
+                <select id="filter-action">
+                    <option value="all">Semua Aksi</option>
+                    <option value="on">HIDUP (ON)</option>
+                    <option value="off">MATI (OFF)</option>
+                    <option value="error">ERROR</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Tanggal:</label><input type="date" id="filter-date">
+            </div>
+            <div class="filter-group">
+                <label>Source:</label>
+                <select id="filter-source">
+                    <option value="all">Semua</option>
+                    <option value="customer">Customer</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-card stat-on">
+                <div class="stat-icon"><i data-lucide="play-circle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Dihidupkan</div>
+                    <div class="stat-value" id="stat-on">0</div>
+                </div>
+            </div>
+            <div class="stat-card stat-off">
+                <div class="stat-icon"><i data-lucide="stop-circle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Dimatikan</div>
+                    <div class="stat-value" id="stat-off">0</div>
+                </div>
+            </div>
+            <div class="stat-card stat-error">
+                <div class="stat-icon"><i data-lucide="alert-octagon"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Error</div>
+                    <div class="stat-value" id="stat-error">0</div>
+                </div>
+            </div>
+            <div class="stat-card stat-total">
+                <div class="stat-icon"><i data-lucide="bar-chart-3"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Aktivitas</div>
+                    <div class="stat-value" id="stat-total">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="table-card">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Waktu</th>
+                            <th>Mesin</th>
+                            <th>Aksi</th>
+                            <th class="hide-mobile">Source</th>
+                            <th class="hide-mobile">Entity ID</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ANALYTICS VIEW -->
+    <section id="analytics-view" class="dashboard-view">
+        <header>
+            <h1>Statistik & Analytik</h1>
+            <p class="subtitle">Analisis penggunaan mesin laundry</p>
+        </header>
+        <div class="analytics-grid">
+            <div class="chart-card">
+                <h3>Tren Penggunaan (30 Hari Terakhir)</h3><canvas id="dailyUsageChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Mesin Paling Sering Digunakan</h3><canvas id="machineUsageChart"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- CONTROL VIEW (ADMIN) -->
+    <section id="control-view" class="dashboard-view">
+        <header>
+            <h1><i data-lucide="sliders-horizontal"
+                    style="width: 28px; height: 28px; vertical-align: middle; margin-right: 12px;"></i>Admin Control
+                Panel</h1>
+            <p class="subtitle">Kontrol manual mesin dengan pengaturan khusus</p>
+        </header>
+        <div class="control-options">
+            <label class="bypass-toggle"><input type="checkbox" id="bypass-cooldown"><span><i data-lucide="zap"
+                        style="width: 16px; height: 16px; vertical-align: middle; margin-right: 6px;"></i>Force Control
+                    (Bypass Cooldown)</span></label>
+        </div>
+        <div class="control-grid">
+            {% for sensor in sensors %}
+            <div class="control-card" data-entity="{{ sensor }}">
+                <h3 class="control-machine-name">{{ sensor }}</h3>
+                <div class="control-live-info">
+                    <div class="info-item"><span class="info-label">State:</span><span class="info-value state-text"
+                            id="control-state-{{ sensor }}">OFF</span></div>
+                    <div class="info-item"><span class="info-label">Remaining:</span><span class="info-value time-text"
+                            id="control-time-{{ sensor }}">0:00:00</span></div>
+                </div>
+                <div class="control-status" id="control-status-{{ sensor }}">Ready</div>
+                <div class="duration-control"><label>Durasi (menit):</label><input type="number" class="duration-input"
+                        min="1" max="60" value="5" id="duration-{{ sensor }}"></div>
+                <div class="control-buttons">
+                    <button class="btn-on" onclick="adminControl('{{ sensor }}', 'on')"><i data-lucide="play"
+                            style="width: 14px; height: 14px; margin-right: 6px;"></i>HIDUP</button>
+                    <button class="btn-off" onclick="adminControl('{{ sensor }}', 'off')"><i data-lucide="square"
+                            style="width: 14px; height: 14px; margin-right: 6px;"></i>MATI</button>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% for dryer in dryers %}
+            <div class="control-card" data-entity="{{ dryer }}">
+                <h3 class="control-machine-name">{{ dryer }}</h3>
+                <div class="control-live-info">
+                    <div class="info-item"><span class="info-label">State:</span><span class="info-value state-text"
+                            id="control-state-{{ dryer }}">OFF</span></div>
+                    <div class="info-item"><span class="info-label">Remaining:</span><span class="info-value time-text"
+                            id="control-time-{{ dryer }}">0:00:00</span></div>
+                </div>
+                <div class="control-status" id="control-status-{{ dryer }}">Ready</div>
+                <div class="duration-control"><label>Durasi (menit):</label><input type="number" class="duration-input"
+                        min="1" max="60" value="5" id="duration-{{ dryer }}"></div>
+                <div class="control-buttons">
+                    <button class="btn-on" onclick="adminControl('{{ dryer }}', 'on')"><i data-lucide="play"
+                            style="width: 14px; height: 14px; margin-right: 6px;"></i>HIDUP</button>
+                    <button class="btn-off" onclick="adminControl('{{ dryer }}', 'off')"><i data-lucide="square"
+                            style="width: 14px; height: 14px; margin-right: 6px;"></i>MATI</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- MACHINE LOGS VIEW -->
+    <section id="machine-logs-view" class="dashboard-view">
+        <header class="history-header">
+            <div class="header-text">
+                <h1><i data-lucide="file-text"
+                        style="width: 24px; height: 24px; vertical-align: middle; margin-right: 12px;"></i>Logs Mesin
+                </h1>
+                <p class="subtitle">Riwayat penyelesaian siklus cuci</p>
+            </div>
+            <button onclick="refreshMachineLogs()" class="refresh-btn" style="background: #10b981;"><i
+                    data-lucide="refresh-cw" style="width: 16px; height: 16px; margin-right: 8px;"></i> Refresh</button>
+        </header>
+        <div class="stats-grid" style="margin-bottom: 25px;">
+            <div class="stat-card stat-total">
+                <div class="stat-icon"><i data-lucide="clock"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Siklus Hari Ini</div>
+                    <div class="stat-value" id="ml-stat-today">0</div>
+                </div>
+            </div>
+            <div class="stat-card stat-on">
+                <div class="stat-icon"><i data-lucide="calendar"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Siklus Minggu Ini</div>
+                    <div class="stat-value" id="ml-stat-week">0</div>
+                </div>
+            </div>
+            <div class="stat-card stat-off">
+                <div class="stat-icon"><i data-lucide="trending-up"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Siklus Bulan Ini</div>
+                    <div class="stat-value" id="ml-stat-month">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="filter-container">
+            <div class="filter-group"><label>Mesin:</label><select id="ml-filter-machine"
+                    onchange="refreshMachineLogs()">
+                    <option value="all">Semua Mesin</option>
+                </select></div>
+            <div class="filter-group"><label>Tanggal:</label><input type="date" id="ml-filter-date"
+                    onchange="refreshMachineLogs()"></div>
+            <div class="filter-group" style="justify-content: flex-end; flex: 1;"><button onclick="clearMlFilters()"
+                    class="btn-secondary"
+                    style="margin-top: auto; padding: 10px 20px; border-radius: 12px; border: none; background: var(--border-color); color: white; cursor: pointer; transition: 0.3s; height: 45px;">Reset
+                    Filter</button></div>
+        </div>
+        <div class="table-card">
+            <div class="table-container">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Mesin</th>
+                            <th>Waktu Selesai</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ml-table-body">
+                        <tr>
+                            <td colspan="2" style="text-align: center; padding: 30px;">
+                                <div class="loading-spinner" style="margin-bottom: 10px;"><i data-lucide="loader-2"></i>
+                                </div>Memuat data log mesin...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- SETTINGS VIEW -->
+    <section id="settings-view" class="dashboard-view">
+        <header>
+            <div class="settings-header-content" style="display: flex; align-items: center; gap: 15px;"><button
+                    id="btn-settings-back" class="back-btn"
+                    style="display: none; background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; padding: 0 10px;"
+                    onclick="showSettingsMain()"><i data-lucide="arrow-left"></i></button>
+                <div>
+                    <h1 id="settings-title"><i data-lucide="settings"
+                            style="width: 24px; height: 24px; vertical-align: middle; margin-right: 12px;"></i>Pengaturan
+                    </h1>
+                    <p id="settings-subtitle" class="subtitle">Konfigurasi dan preferensi sistem</p>
+                </div>
+            </div>
+        </header>
+        <div class="settings-container">
+            <div id="settings-main" class="settings-subview active">
+                <div class="settings-menu">
+                    <div class="menu-item" onclick="showSettingsLg()">
+                        <div class="menu-icon"><i data-lucide="wifi"></i></div>
+                        <div class="menu-info">
+                            <div class="menu-title">LG ThinQ Connection</div>
+                            <div class="menu-desc" id="menu-lg-status">Checking status...</div>
+                        </div>
+                        <div class="menu-arrow">❯</div>
+                    </div>
+                    <div class="menu-item" onclick="showSettingsConfig()">
+                        <div class="menu-icon"><i data-lucide="settings"></i></div>
+                        <div class="menu-info">
+                            <div class="menu-title">Konfigurasi Sistem</div>
+                            <div class="menu-desc">Pengaturan polling, timeout, dan trigger</div>
+                        </div>
+                        <div class="menu-arrow">❯</div>
+                    </div>
+                    <div class="menu-item" onclick="showSettingsAbout()">
+                        <div class="menu-icon"><i data-lucide="info"></i></div>
+                        <div class="menu-info">
+                            <div class="menu-title">Tentang Sistem</div>
+                            <div class="menu-desc">Versi 2.1.0 - Smart Laundry</div>
+                        </div>
+                        <div class="menu-arrow">❯</div>
+                    </div>
+                </div>
+            </div>
+            <div id="settings-lg" class="settings-subview" style="display: none;">
+                <div class="settings-card">
+                    <div class="card-header">
+                        <div class="lg-logo">LG ThinQ</div>
+                        <div id="lg-status-badge" class="status-badge status-offline">Unknown</div>
+                    </div>
+                    <div class="settings-group">
+                        <h3>Konfigurasi Wilayah</h3>
+                        <div class="input-row">
+                            <div class="input-field"><label>Negara (Country Code)</label><input type="text"
+                                    id="lg-country" placeholder="contoh: ID"></div>
+                            <div class="input-field"><label>Bahasa (Language Code)</label><input type="text"
+                                    id="lg-language" placeholder="contoh: id-ID"></div>
+                        </div>
+                        <button class="btn-save-settings" onclick="saveLgSettings()">Simpan Wilayah</button>
+                    </div>
+                    <hr class="settings-divider">
+                    <div id="lg-state-connected" style="display: none; text-align: center; padding: 20px 0;">
+                        <div class="connected-info">
+                            <div class="connected-icon" style="margin-bottom: 15px; color: var(--color-success);"><i
+                                    data-lucide="check-circle-2" style="width: 48px; height: 48px;"></i></div>
+                            <p style="margin-bottom: 20px; color: var(--text-main);">Sistem Anda sudah terhubung dengan
+                                akun LG ThinQ.</p><button class="btn-reconnect-lg"
+                                style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); color: white; padding: 10px 20px; border-radius: 10px; cursor: pointer;"
+                                onclick="showLgAuthSteps()">🔄 Perbarui / Ganti Akun Token</button>
+                        </div>
+                    </div>
+                    <div id="lg-state-disconnected">
+                        <div class="settings-group">
+                            <h3>Autentikasi Token</h3>
+                            <p class="settings-help">Login ke akun LG ThinQ Anda untuk mendapatkan refresh token
+                                terbaru.</p>
+                            <div id="lg-auth-steps">
+                                <div class="auth-step"><span class="step-num">1</span>
+                                    <div class="step-content">
+                                        <p>Buka halaman login resmi LG.</p><button class="btn-login-lg"
+                                            onclick="getLgLoginUrl()">Buka Halaman Login LG</button>
+                                    </div>
+                                </div>
+                                <div class="auth-step"><span class="step-num">2</span>
+                                    <div class="step-content">
+                                        <p>Salin <strong>URL lengkap</strong> setelah login berhasil.</p>
+                                    </div>
+                                </div>
+                                <div class="auth-step"><span class="step-num">3</span>
+                                    <div class="step-content"><textarea id="lg-callback-url"
+                                            style="width: 100%; min-height: 80px; margin-bottom: 10px;"
+                                            placeholder="Tempel URL redirect (https://...) di sini"></textarea><button
+                                            class="btn-verify-token" onclick="saveCallbackUrl()">Verifikasi & Sinkronkan
+                                            Token</button></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="settings-about" class="settings-subview" style="display: none;">
+                <div class="settings-card">
+                    <div class="card-header">
+                        <div class="lg-logo"><i data-lucide="info"
+                                style="width: 20px; height: 20px; vertical-align: middle; margin-right: 8px;"></i>Tentang
+                            Sistem</div>
+                    </div>
+                    <div class="settings-group">
+                        <h3>Informasi Server</h3>
+                        <div class="detail-grid" style="margin-top: 15px;">
+                            <span class="label">Dashboard Port:</span><span class="value"
+                                id="sys-dashboard-port">-</span>
+                            <span class="label">API Port:</span><span class="value" id="sys-api-port">-</span>
+                            <span class="label">Local IP:</span><span class="value" id="sys-local-ip">-</span>
+                            <span class="label">Discoverable URL:</span><span class="value"><a id="sys-local-url"
+                                    href="#" target="_blank"
+                                    style="color: #10b981; text-decoration: none; font-weight: 600;">-</a></span>
+                            <span class="label">Hostname:</span><span class="value" id="sys-hostname">-</span>
+                            <span class="label">Host Binding:</span><span class="value" id="sys-host">-</span>
+                            <span class="label">Database Path:</span><span class="value" id="sys-db-path">-</span>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <h3>Daftar Mesin Terdeteksi</h3>
+                        <ul id="sys-device-list"
+                            style="margin-top: 10px; padding-left: 20px; color: var(--text-muted);">
+                            <li>Menunggu sinkronisasi...</li>
+                        </ul>
+                    </div>
+                    <div class="settings-divider"></div>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center;">Smart Laundry v2.1.0 -
+                        Direct LG ThinQ Integration</p>
+                </div>
+            </div>
+            <div id="settings-config" class="settings-subview" style="display: none;">
+                <div class="settings-card">
+                    <div class="card-header">
+                        <div class="lg-logo"><i data-lucide="settings"
+                                style="width: 20px; height: 20px; vertical-align: middle; margin-right: 8px;"></i>Konfigurasi
+                            Sistem</div>
+                    </div>
+                    <div class="settings-group">
+                        <h3>Pengaturan Polling & Timeout</h3>
+                        <div class="input-row">
+                            <div class="input-field"><label>Monitoring Interval (detik)</label><input type="number"
+                                    id="cfg-monitoring-interval" min="1" max="300"></div>
+                            <div class="input-field"><label>Request Timeout (detik)</label><input type="number"
+                                    id="cfg-request-timeout" min="1" max="60"></div>
+                        </div>
+                        <div class="input-row">
+                            <div class="input-field"><label>Worker Threads</label><input type="number"
+                                    id="cfg-worker-threads" min="1" max="128"></div>
+                            <div class="input-field"><label>SSE Keep-Alive (detik)</label><input type="number"
+                                    id="cfg-sse-timeout" min="5" max="60"></div>
+                        </div>
+                    </div>
+                    <div class="settings-divider"></div>
+                    <div class="settings-group">
+                        <h3>Machine Trigger URLs</h3>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 15px;">Isi URL base untuk
+                            trigger eksternal. Sistem akan menambahkan /on atau /off.</p>
+                        <div id="cfg-triggers-container"></div>
+                    </div>
+                    <div class="settings-divider"></div>
+                    <div class="settings-group">
+                        <h3 style="margin-bottom: 15px;">Tambah Pengering Manual</h3>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 15px;">Tambahkan mesin
+                            pengering baru dengan nama dan URL pemicu.</p>
+                        <div class="input-row" style="margin-bottom: 15px; align-items: flex-end;">
+                            <div class="input-field" style="flex: 1;">
+                                <label>Nama Pengering</label>
+                                <input type="text" id="new-dryer-name" placeholder="misal: Pengering_2">
+                            </div>
+                            <div class="input-field" style="flex: 2;">
+                                <label>URL Base</label>
+                                <input type="text" id="new-dryer-url" placeholder="http://...">
+                            </div>
+                            <button class="btn-primary" onclick="addNewDryerFromForm()"
+                                style="height: 45px; padding: 0 20px;">
+                                <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 4px;"></i> TAMBAH
+                            </button>
+                        </div>
+                        <div id="cfg-dryers-list"></div>
+                    </div>
+                    <div class="settings-divider"></div>
+                    <div class="settings-group">
+                        <h3>🔍 Cetak Atribut Mesin (Debug)</h3>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 15px;">Pilih mesin untuk
+                            melihat semua atribut raw dari LG ThinQ.</p>
+                        <div class="input-row" style="align-items: flex-end;">
+                            <div class="input-field" style="flex: 1;"><label>Pilih Mesin</label><select
+                                    id="attr-machine-select"
+                                    style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: white; appearance: none; -webkit-appearance: none;">
+                                    <option value="" style="background: #1e293b; color: white;">-- Pilih Mesin --
+                                    </option>
+                                </select></div><button class="btn-save-settings" onclick="printMachineAttributes()"
+                                style="width: auto; height: 45px; margin-bottom: 0;">📄 Cetak Atribut</button>
+                        </div>
+                        <div id="attr-display-area" style="display: none; margin-top: 20px;">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <h4 style="margin: 0;">Hasil Raw Data:</h4><button onclick="copyAttrToClipboard()"
+                                    style="background: none; border: 1px solid var(--glass-border); color: var(--text-muted); cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; display: flex; align-items: center; gap: 5px;"><i
+                                        data-lucide="copy" style="width: 14px; height: 14px;"></i> Copy</button>
+                            </div>
+                            <pre id="attr-output"
+                                style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; max-height: 400px; overflow: auto; font-size: 0.8rem; color: #10b981; border: 1px solid var(--glass-border); font-family: 'JetBrains Mono', monospace;"></pre>
+                        </div>
+                    </div>
+                    <div class="settings-divider"></div>
+                    <button class="btn-save-settings" onclick="saveConfigSettings()"
+                        style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;"><i
+                            data-lucide="save" style="width: 18px; height: 18px;"></i> Simpan Konfigurasi</button>
+                    <p id="cfg-save-status" style="text-align: center; margin-top: 10px; color: var(--text-muted);"></p>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>

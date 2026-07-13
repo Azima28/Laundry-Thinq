@@ -1,0 +1,10 @@
+{
+    "monitoring_interval": 1,
+    "show_unmapped_data": true,
+    "clear_screen_on_refresh": true,
+    "enable_beep_on_complete": true,
+    "notify_only_once": true,
+    "web_server_port": 4000,
+    "language": "id-ID",
+    "country": "ID"
+}
