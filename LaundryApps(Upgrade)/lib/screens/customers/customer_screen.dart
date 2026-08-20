@@ -321,7 +321,9 @@ class _CustomerScreenState extends State<CustomerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final bool canPop = Navigator.canPop(context);
+
+    final Widget content = Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 1. Left Panel: Customer search & list (Master: 340px)
@@ -417,6 +419,30 @@ class _CustomerScreenState extends State<CustomerScreen> {
         ),
       ],
     );
+
+    if (canPop) {
+      return Scaffold(
+        backgroundColor: StyleConstants.backgroundColor,
+        appBar: AppBar(
+          title: const Text('Database & Manajemen CRM Pelanggan', style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.white,
+          foregroundColor: StyleConstants.textHeading,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: StyleConstants.textHeading),
+            tooltip: 'Kembali',
+            onPressed: () => Navigator.pop(context),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(color: StyleConstants.borderLight, height: 1),
+          ),
+        ),
+        body: content,
+      );
+    }
+
+    return content;
   }
 
   Widget _buildCustomerListTile(Customer customer, bool isSelected) {

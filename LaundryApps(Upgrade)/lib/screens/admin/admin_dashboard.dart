@@ -301,7 +301,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
+              color: color.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -346,6 +346,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF0F172A),
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: StyleConstants.textHeading),
+          tooltip: 'Kembali ke Dashboard Kasir',
+          onPressed: () => Navigator.pop(context),
+        ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(color: StyleConstants.borderLight, height: 1),
@@ -361,7 +366,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
             tooltip: 'Keluar Sistem',
-            style: IconButton.styleFrom(hoverColor: Colors.red.withOpacity(0.05)),
+            style: IconButton.styleFrom(hoverColor: Colors.red.withValues(alpha: 0.05)),
             onPressed: _logout,
           ),
           const SizedBox(width: 16),

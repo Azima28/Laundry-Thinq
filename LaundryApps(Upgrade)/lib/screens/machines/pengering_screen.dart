@@ -23,8 +23,26 @@ class PengeringScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.canPop(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: StyleConstants.backgroundColor,
+      appBar: canPop
+          ? AppBar(
+              title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.white,
+              foregroundColor: StyleConstants.textHeading,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: StyleConstants.textHeading),
+                tooltip: 'Kembali',
+                onPressed: () => Navigator.pop(context),
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(color: StyleConstants.borderLight, height: 1),
+              ),
+            )
+          : null,
       body: PengeringContent(items: items, title: title),
     );
   }

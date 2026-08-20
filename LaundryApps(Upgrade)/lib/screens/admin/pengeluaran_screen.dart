@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../database/models/database_helper.dart';
+import '../../utils/style_constants.dart';
 
 class PengeluaranScreen extends StatefulWidget {
   const PengeluaranScreen({Key? key}) : super(key: key);
@@ -20,8 +21,8 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
 
-  final Color primaryColor = const Color(0xFF4E80EE);
-  final Color backgroundColor = const Color(0xFFF8FAFC);
+  final Color primaryColor = StyleConstants.primaryColor;
+  final Color backgroundColor = StyleConstants.backgroundColor;
 
   @override
   void initState() {
@@ -174,8 +175,9 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
   Widget build(BuildContext context) {
     final dateStr = DateFormat('dd MMM yyyy').format(_selectedDate);
     final isToday = DateFormat('yyyy-MM-dd').format(_selectedDate) == DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final bool canPop = Navigator.canPop(context);
 
-    return Row(
+    final Widget content = Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 1. Left Sidebar: Date picker, summary, and direct input form (340px)
@@ -199,7 +201,7 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
                     style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor.withOpacity(0.06),
+                    backgroundColor: primaryColor.withValues(alpha: 0.08),
                     foregroundColor: primaryColor,
                     elevation: 0,
                     shadowColor: Colors.transparent,
@@ -221,7 +223,7 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFEF4444).withOpacity(0.2),
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.2),
                         blurRadius: 16,
                         offset: const Offset(0, 8),
                       )
@@ -314,7 +316,7 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
                 border: Border.all(color: const Color(0xFFE2E8F0)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
+                    color: Colors.black.withValues(alpha: 0.02),
                     blurRadius: 16,
                     offset: const Offset(0, 8),
                   )
@@ -391,8 +393,8 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
                                 itemCount: _expenses.length,
                                 itemBuilder: (context, index) {
                                   final exp = _expenses[index];
-                                  final createdAt = exp['created_at'] != null 
-                                      ? DateTime.parse(exp['created_at']) 
+                                  final createdAt = exp['created_at'] != null
+                                      ? DateTime.parse(exp['created_at'])
                                       : DateTime.now();
                                   final timeStr = DateFormat('HH:mm').format(createdAt);
 
@@ -441,7 +443,7 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
                                           onPressed: () => _deleteExpense(exp['id']),
                                           tooltip: 'Hapus pengeluaran',
                                           style: IconButton.styleFrom(
-                                            hoverColor: Colors.red.withOpacity(0.05),
+                                            hoverColor: Colors.red.withValues(alpha: 0.05),
                                             foregroundColor: Colors.red,
                                           ),
                                         ),
@@ -458,5 +460,29 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
         ),
       ],
     );
+
+    if (canPop) {
+      return Scaffold(
+        backgroundColor: StyleConstants.backgroundColor,
+        appBar: AppBar(
+          title: const Text('Catatan Pengeluaran & Kas Kecil', style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.white,
+          foregroundColor: StyleConstants.textHeading,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: StyleConstants.textHeading),
+            tooltip: 'Kembali',
+            onPressed: () => Navigator.pop(context),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(color: StyleConstants.borderLight, height: 1),
+          ),
+        ),
+        body: content,
+      );
+    }
+
+    return content;
   }
 }

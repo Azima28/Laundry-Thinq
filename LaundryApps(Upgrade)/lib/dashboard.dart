@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../database/models/user_model.dart';
@@ -24,6 +25,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
+  final List<int> _navHistory = [];
   bool _isSidebarExpanded = true;
   final MachineStatusService _statusService = MachineStatusService.instance;
   final DatabaseHelper _db = DatabaseHelper.instance;
@@ -82,6 +84,23 @@ class _DashboardPageState extends State<DashboardPage> {
 
   void _navigate(BuildContext context, String route) {
     Navigator.pushNamed(context, route).then((_) => _loadDailyMetrics());
+  }
+
+  void _selectTab(int index) {
+    if (index == _selectedIndex) return;
+    setState(() {
+      _navHistory.add(_selectedIndex);
+      _selectedIndex = index;
+    });
+  }
+
+  void _goBack() {
+    if (_navHistory.isNotEmpty) {
+      final prev = _navHistory.removeLast();
+      setState(() => _selectedIndex = prev);
+    } else {
+      setState(() => _selectedIndex = 0);
+    }
   }
 
   Future<void> _logout(BuildContext context) async {
@@ -186,35 +205,45 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     final String displayName = widget.user?.username ?? 'Kasir';
 
-    return Scaffold(
-      backgroundColor: StyleConstants.backgroundColor,
-      body: Row(
-        children: [
-          // 1. Adaptive Collapsible Sidebar (Left Rail)
-          _buildSidebar(displayName),
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          if (_selectedIndex != 0) _goBack();
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          backgroundColor: StyleConstants.backgroundColor,
+          body: Row(
+            children: [
+              // 1. Adaptive Collapsible Sidebar (Left Rail)
+              _buildSidebar(displayName),
 
-          // 2. Main Workspace (Right Side)
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Top Universal Command Bar
-                _buildTopBar(displayName),
+              // 2. Main Workspace (Right Side)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Top Universal Command Bar
+                    _buildTopBar(displayName),
 
-                // Main Scrollable / Viewport Workspace Body
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(StyleConstants.densePadding),
-                    child: _buildBodyContent(displayName),
-                  ),
+                    // Main Scrollable / Viewport Workspace Body
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(StyleConstants.densePadding),
+                        child: _buildBodyContent(displayName),
+                      ),
+                    ),
+
+                    // Bottom Status Utility Bar (Enterprise POS Style)
+                    _buildBottomUtilityBar(),
+                  ],
                 ),
-
-                // Bottom Status Utility Bar (Enterprise POS Style)
-                _buildBottomUtilityBar(),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -412,7 +441,7 @@ class _DashboardPageState extends State<DashboardPage> {
       message: !_isSidebarExpanded ? label : '',
       preferBelow: false,
       child: InkWell(
-        onTap: () => setState(() => _selectedIndex = index),
+        onTap: () => _selectTab(index),
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: EdgeInsets.symmetric(
@@ -484,18 +513,78 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       child: Row(
         children: [
-          // Breadcrumb / Page Title
-          Row(
-            children: [
-              const Text(
-                'POS Desktop',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: StyleConstants.textMuted,
+          // 1. Back / Return Button (Active whenever not on Dashboard Home)
+          if (_selectedIndex != 0) ...[
+            Tooltip(
+              message: 'Kembali ke Beranda (Esc)',
+              child: InkWell(
+                onTap: _goBack,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: StyleConstants.borderLight),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.arrow_back_rounded,
+                        size: 16,
+                        color: StyleConstants.textHeading,
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'Kembali',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: StyleConstants.textHeading,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
+            ),
+            const SizedBox(width: 14),
+          ],
+
+          // 2. Interactive Breadcrumb Navigation
+          Row(
+            children: [
+              MouseRegion(
+                cursor: _selectedIndex != 0 ? SystemMouseCursors.click : SystemMouseCursors.basic,
+                child: GestureDetector(
+                  onTap: _selectedIndex != 0 ? () => _selectTab(0) : null,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.dashboard_rounded,
+                        size: 14,
+                        color: _selectedIndex != 0 ? StyleConstants.primaryColor : StyleConstants.textMuted,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'POS Desktop',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: _selectedIndex != 0 ? FontWeight.w700 : FontWeight.w600,
+                          color: _selectedIndex != 0 ? StyleConstants.primaryColor : StyleConstants.textMuted,
+                          decoration: _selectedIndex != 0 ? TextDecoration.underline : TextDecoration.none,
+                          decorationColor: StyleConstants.primaryColor.withValues(alpha: 0.3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
               const Icon(Icons.chevron_right_rounded, size: 16, color: StyleConstants.textMuted),
+              const SizedBox(width: 6),
               Text(
                 _getPageTitle(),
                 style: const TextStyle(
@@ -697,21 +786,21 @@ class _DashboardPageState extends State<DashboardPage> {
                             desc: 'Kelola kontak CRM & WhatsApp',
                             icon: Icons.people_alt_rounded,
                             color: const Color(0xFF6366F1),
-                            onTap: () => setState(() => _selectedIndex = 3),
+                            onTap: () => _selectTab(3),
                           ),
                           _buildQuickNavTile(
                             title: 'Broadcast WhatsApp',
                             desc: 'Kirim notifikasi & promo massal',
                             icon: Icons.chat_rounded,
                             color: const Color(0xFF10B981),
-                            onTap: () => setState(() => _selectedIndex = 4),
+                            onTap: () => _selectTab(4),
                           ),
                           _buildQuickNavTile(
                             title: 'Catat Pengeluaran',
                             desc: 'Kas kecil beli deterjen & operasional',
                             icon: Icons.account_balance_wallet_rounded,
                             color: const Color(0xFFE11D48),
-                            onTap: () => setState(() => _selectedIndex = 6),
+                            onTap: () => _selectTab(6),
                           ),
                         ],
                       ),

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/models/database_helper.dart';
 import '../../database/models/order_model.dart';
 import '../../database/models/db_encryption_helper.dart';
 import '../../transactions/order_repository.dart';
 import '../../services/machine_status_service.dart';
+import '../../utils/style_constants.dart';
 import 'dart:async';
 
 class HubungiPelangganScreen extends StatefulWidget {
@@ -25,8 +25,8 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
-  final Color primaryColor = const Color(0xFF4E80EE);
-  final Color backgroundColor = const Color(0xFFF8FAFC);
+  final Color primaryColor = StyleConstants.primaryColor;
+  final Color backgroundColor = StyleConstants.backgroundColor;
 
   @override
   void initState() {
@@ -260,33 +260,19 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
       return true;
     }).toList();
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        title: const Text('Hubungi Pelanggan', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
-        elevation: 0,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFE2E8F0), height: 1),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // 1. Left Panel: Filters & Statistics (340px)
-          Container(
-            width: 340,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(right: BorderSide(color: Color(0xFFE2E8F0))),
-            ),
-            child: SingleChildScrollView(
+    final bool canPop = Navigator.canPop(context);
+
+    final Widget content = Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 1. Left Panel: Filters & Statistics (340px)
+        Container(
+          width: 340,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(right: BorderSide(color: Color(0xFFE2E8F0))),
+          ),
+          child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -570,6 +556,30 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
         ],
       ),
     );
+
+    if (canPop) {
+      return Scaffold(
+        backgroundColor: backgroundColor,
+        appBar: AppBar(
+          title: const Text('Hubungi Pelanggan & Broadcast WhatsApp', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF0F172A),
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: StyleConstants.textHeading),
+            tooltip: 'Kembali',
+            onPressed: () => Navigator.pop(context),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(color: const Color(0xFFE2E8F0), height: 1),
+          ),
+        ),
+        body: content,
+      );
+    }
+
+    return content;
   }
 
   Widget _buildFilterButton(String label, IconData icon) {
@@ -584,7 +594,7 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
         boxShadow: isSelected
             ? [
                 BoxShadow(
-                  color: primaryColor.withOpacity(0.15),
+                  color: primaryColor.withValues(alpha: 0.15),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 )

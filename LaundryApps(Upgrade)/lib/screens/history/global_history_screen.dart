@@ -279,7 +279,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
 
     final filteredList = _getFilteredList();
 
-    return Column(
+    final Widget content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 1. Top Control Bar (Date Range & PDF Actions)
@@ -310,6 +310,33 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         ),
       ],
     );
+
+    if (Navigator.canPop(context)) {
+      return Scaffold(
+        backgroundColor: StyleConstants.backgroundColor,
+        appBar: AppBar(
+          title: const Text('Buku Besar, Kas & Riwayat Global', style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.white,
+          foregroundColor: StyleConstants.textHeading,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: StyleConstants.textHeading),
+            tooltip: 'Kembali',
+            onPressed: () => Navigator.pop(context),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(color: StyleConstants.borderLight, height: 1),
+          ),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(StyleConstants.densePadding),
+          child: content,
+        ),
+      );
+    }
+
+    return content;
   }
 
   Widget _buildControlHeader() {
