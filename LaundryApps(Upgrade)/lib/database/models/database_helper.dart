@@ -1090,4 +1090,38 @@ class DatabaseHelper {
     final db = await database;
     return await db.delete('expenses', where: 'id = ?', whereArgs: [id]);
   }
+
+  Future<List<Map<String, dynamic>>> getExpensesByDateRange(String start, String end) async {
+    final db = await database;
+    return await db.query(
+      'expenses',
+      where: 'date >= ? AND date <= ?',
+      whereArgs: [start, end],
+      orderBy: 'date DESC, id DESC'
+    );
+  }
+
+  Future<List<Order>> getOrdersByDateRange(String start, String end) async {
+    final db = await database;
+    final List<Map<String, dynamic>> orderMaps = await db.query(
+      'orders',
+      where: "date(order_date) >= ? AND date(order_date) <= ?",
+      whereArgs: [start, end],
+      orderBy: 'order_date DESC',
+    );
+
+    return Future.wait(
+      orderMaps.map((orderMap) async {
+        final List<Map<String, dynamic>> itemMaps = await db.rawQuery('''
+          SELECT oi.*, t.machine_type 
+          FROM order_items oi 
+          LEFT JOIN transactions t ON oi.item_id = t.id 
+          WHERE oi.order_id = ?
+        ''', [orderMap['id']]);
+
+        final items = itemMaps.map((item) => OrderItem.fromMap(item)).toList();
+        return Order.fromMap(orderMap, items);
+      }),
+    );
+  }
 }

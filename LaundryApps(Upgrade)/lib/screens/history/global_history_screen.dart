@@ -4,6 +4,7 @@ import '../../database/models/database_helper.dart';
 import '../../database/models/transaction_model.dart';
 import '../../transactions/transaction_repository.dart';
 import '../../utils/currency_format.dart';
+import '../../utils/pdf_export_helper.dart';
 
 class GlobalHistoryScreen extends StatefulWidget {
   const GlobalHistoryScreen({Key? key}) : super(key: key);
@@ -142,6 +143,84 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       setState(() => _selectedDate = picked);
       _loadData();
     }
+  }
+
+  Future<void> _showExportPdfDialog() async {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.picture_as_pdf_rounded, color: Colors.red),
+              SizedBox(width: 10),
+              Text('Ekspor Laporan PDF', style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Pilih jangka waktu laporan yang ingin Kakak ekspor ke berkas PDF:',
+                style: TextStyle(fontSize: 13, color: Colors.black87),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: Colors.blue.shade50,
+                  child: const Icon(Icons.today_rounded, color: Colors.blue),
+                ),
+                title: const Text('Laporan Harian', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: Text(DateFormat('dd MMMM yyyy').format(_selectedDate), style: const TextStyle(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(context);
+                  PdfExportHelper.exportLedgerToPdf(
+                    context: context,
+                    startDate: _selectedDate,
+                    endDate: _selectedDate,
+                  );
+                },
+              ),
+              const Divider(),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: Colors.purple.shade50,
+                  child: const Icon(Icons.date_range_rounded, color: Colors.purple),
+                ),
+                title: const Text('Pilih Rentang Tanggal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: const Text('Kustom (Mingguan, Bulanan, dll.)', style: TextStyle(fontSize: 11)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final pickedRange = await showDateRangePicker(
+                    context: this.context,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                    saveText: 'PILIH',
+                  );
+                  if (pickedRange != null) {
+                    PdfExportHelper.exportLedgerToPdf(
+                      context: this.context,
+                      startDate: pickedRange.start,
+                      endDate: pickedRange.end,
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // ──────────── UI WIDGETS ────────────
@@ -662,6 +741,12 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         foregroundColor: Colors.black,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.redAccent),
+            tooltip: 'Ekspor ke PDF',
+            onPressed: () => _showExportPdfDialog(),
+          ),
+          const SizedBox(width: 8),
           TextButton.icon(
             onPressed: _selectDate,
             icon: const Icon(Icons.calendar_today, size: 18),

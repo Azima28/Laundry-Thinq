@@ -321,13 +321,25 @@ class _PesanPageState extends State<PesanPage> {
 
       // === BELUM BAYAR ===
       if (mode == 'belum_bayar') {
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const _LoadingOverlay(message: 'Menyimpan pesanan...'),
+          );
+        }
+
         final partialOrder = order.copyWith(id: orderId, isPaid: false, paymentMethod: 'Belum Lunas');
         await _databaseHelper.updateOrder(partialOrder);
-        if (!await _updateStocks(orderId)) return;
+        if (!await _updateStocks(orderId)) {
+          if (mounted) Navigator.of(context, rootNavigator: true).pop();
+          return;
+        }
         
-        await _sendWaReceipt(partialOrder, 'belum_bayar', 0);
+        _sendWaReceipt(partialOrder, 'belum_bayar', 0); // No await!
 
         if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop(); // close loading
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => ReceiptScreen(
@@ -344,10 +356,21 @@ class _PesanPageState extends State<PesanPage> {
 
       // === BAYAR SETENGAH (DP) ===
       if (mode == 'bayar_setengah') {
-        final paidAmount = await _showPartialPaymentDialog(total);
-        if (paidAmount == null) {
+        final result = await _showPartialPaymentDialog(total);
+        if (result == null) {
           await _orderRepository.deleteOrder(orderId);
           return;
+        }
+        final paidAmount = result['amount'] as int;
+        final paymentMethod = result['method'] as String;
+
+        // Show loading overlay BEFORE heavy async work
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const _LoadingOverlay(message: 'Memproses pembayaran...'),
+          );
         }
 
         final updatedOrder = await _orderRepository.getOrder(orderId);
@@ -355,20 +378,24 @@ class _PesanPageState extends State<PesanPage> {
           isPaid: false,
           paidAmount: paidAmount,
           totalAmount: total,
-          paymentMethod: 'Bayar Setengah',
+          paymentMethod: paymentMethod == 'qris' ? 'QRIS (DP)' : 'Tunai (DP)',
         );
         await _databaseHelper.updateOrder(finalOrder);
-        if (!await _updateStocks(orderId)) return;
+        if (!await _updateStocks(orderId)) {
+          if (mounted) Navigator.of(context, rootNavigator: true).pop();
+          return;
+        }
 
-        await _sendWaReceipt(finalOrder, 'bayar_setengah', paidAmount);
+        _sendWaReceipt(finalOrder, 'bayar_setengah', paidAmount); // No await!
 
         if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop(); // close loading
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => ReceiptScreen(
                 order: finalOrder,
                 isPaid: false,
-                paymentMethod: 'Bayar Setengah',
+                paymentMethod: paymentMethod == 'qris' ? 'QRIS (DP)' : 'Tunai (DP)',
                 paidAmount: paidAmount,
               ),
             ),
@@ -393,19 +420,33 @@ class _PesanPageState extends State<PesanPage> {
         return;
       }
 
+      // Show loading overlay
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const _LoadingOverlay(message: 'Memproses pembayaran...'),
+        );
+      }
+
       final paidOrder = await _orderRepository.getOrder(orderId);
       if (paidOrder == null) {
+        if (mounted) Navigator.of(context, rootNavigator: true).pop();
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal mendapatkan data pesanan')));
         return;
       }
 
       final fullPaidOrder = paidOrder.copyWith(isPaid: true, paidAmount: total);
       await _databaseHelper.updateOrder(fullPaidOrder);
-      if (!await _updateStocks(orderId)) return;
+      if (!await _updateStocks(orderId)) {
+        if (mounted) Navigator.of(context, rootNavigator: true).pop();
+        return;
+      }
 
-      await _sendWaReceipt(fullPaidOrder, 'bayar_lunas', total);
+      _sendWaReceipt(fullPaidOrder, 'bayar_lunas', total); // No await!
 
       if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // close loading
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => ReceiptScreen(
@@ -442,53 +483,97 @@ class _PesanPageState extends State<PesanPage> {
     return allOk;
   }
 
-  Future<int?> _showPartialPaymentDialog(int total) {
+  Future<Map<String, dynamic>?> _showPartialPaymentDialog(int total) {
     final controller = TextEditingController();
-    return showDialog<int>(
+    String selectedMethod = 'cash';
+    return showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Bayar Setengah'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Total: ${formatRp(total)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'Jumlah yang dibayar',
-                prefixText: 'Rp ',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Bayar Setengah (DP)', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total Tagihan:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    Text(formatRp(total), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange)),
+                  ],
+                ),
               ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Jumlah yang dibayar (DP)',
+                  prefixText: 'Rp ',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  hintText: 'Contoh: 50000',
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Metode Pembayaran DP:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Radio<String>(
+                    value: 'cash',
+                    groupValue: selectedMethod,
+                    onChanged: (val) => setStateDialog(() => selectedMethod = val!),
+                    activeColor: Colors.green,
+                  ),
+                  const Icon(Icons.payments_rounded, color: Colors.green, size: 18),
+                  const SizedBox(width: 4),
+                  const Text('Tunai / Cash'),
+                  const SizedBox(width: 20),
+                  Radio<String>(
+                    value: 'qris',
+                    groupValue: selectedMethod,
+                    onChanged: (val) => setStateDialog(() => selectedMethod = val!),
+                    activeColor: Colors.blue,
+                  ),
+                  const Icon(Icons.qr_code_scanner_rounded, color: Colors.blue, size: 18),
+                  const SizedBox(width: 4),
+                  const Text('QRIS'),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final amount = int.tryParse(controller.text) ?? 0;
+                if (amount <= 0) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Masukkan jumlah yang valid')));
+                  return;
+                }
+                if (amount >= total) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Untuk bayar penuh, gunakan tombol "Bayar Lunas"')));
+                  return;
+                }
+                Navigator.pop(ctx, {'amount': amount, 'method': selectedMethod});
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              child: const Text('Lanjut', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, null),
-            child: const Text('Batal', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final amount = int.tryParse(controller.text) ?? 0;
-              if (amount <= 0) {
-                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Masukkan jumlah yang valid')));
-                return;
-              }
-              if (amount >= total) {
-                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Untuk bayar penuh, gunakan tombol "Bayar Lunas"')));
-                return;
-              }
-              Navigator.pop(ctx, amount);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            child: const Text('Lanjut Bayar', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
@@ -803,9 +888,9 @@ class _PesanPageState extends State<PesanPage> {
 
     final buffer = StringBuffer();
     buffer.writeln("=========================");
-    buffer.writeln("   🧾 *AZIMA LAUNDRY* 🧾");
+    buffer.writeln("   🧾 *AZIMA LAUNDRY (CUCI & KERING)* 🧾");
     buffer.writeln("=========================");
-    buffer.writeln("Halo Kak *${name}*, berikut adalah rincian pesanan Anda:\n");
+    buffer.writeln("Halo Kak *${name}*, berikut adalah rincian pesanan cuci Kakak:\n");
     buffer.writeln("📌 *Nota #${orderId}* - _(${dateStr})_");
     buffer.writeln("---------------------------------");
     buffer.writeln("🛒 *DETAIL LAYANAN:*");
@@ -858,5 +943,82 @@ class _PesanPageState extends State<PesanPage> {
     } catch (e) {
       print("Error sending checkout WA receipt: $e");
     }
+  }
+}
+
+/// Full-screen loading overlay with spinning animation
+class _LoadingOverlay extends StatefulWidget {
+  final String message;
+  const _LoadingOverlay({required this.message});
+
+  @override
+  State<_LoadingOverlay> createState() => _LoadingOverlayState();
+}
+
+class _LoadingOverlayState extends State<_LoadingOverlay> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
+    _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnim,
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 30, spreadRadius: 2),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 56,
+                height: 56,
+                child: CircularProgressIndicator(
+                  strokeWidth: 4,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4E80EE)),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                widget.message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF334155),
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Mohon tunggu sebentar...',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

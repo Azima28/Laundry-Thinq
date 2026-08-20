@@ -21,7 +21,8 @@ class PaymentScreen extends StatefulWidget {
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
-  PaymentMethod _selectedMethod = PaymentMethod.cash;
+  String _paymentStatus = 'lunas'; // 'lunas', 'dp', 'piutang'
+  String _paymentMethod = 'cash';  // 'cash', 'qris'
   bool _isProcessing = false;
   bool _paymentCompleted = false;
   String? _qrisUrl;
@@ -49,7 +50,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
     super.initState();
     _loadPaymentCredentials();
     _cashController.addListener(() {
-      final parsed = int.tryParse(_cashController.text.replaceAll('.', '')) ?? 0;
+      final text = _cashController.text.replaceAll('.', '');
+      final parsed = int.tryParse(text) ?? 0;
       setState(() {
         _cashReceived = parsed;
       });
@@ -80,19 +82,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
     } else if (val == 'back') {
       if (currentText.isNotEmpty) {
         currentText = currentText.substring(0, currentText.length - 1);
-        _cashController.text = _formatCashText(currentText);
+        _cashController.text = currentText;
       }
     } else {
       currentText += val;
-      _cashController.text = _formatCashText(currentText);
+      _cashController.text = currentText;
     }
-  }
-
-  String _formatCashText(String text) {
-    if (text.isEmpty) return '';
-    final val = int.tryParse(text) ?? 0;
-    if (val == 0) return '';
-    return val.toString();
   }
 
   void _setQuickCash(int amount) {
@@ -100,30 +95,60 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Future<void> _processPayment() async {
-    if (_selectedMethod == PaymentMethod.cash) {
-      if (_cashReceived < widget.order.totalAmount) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('⚠️ Uang tunai yang diterima kurang dari total tagihan!'), backgroundColor: Colors.orange),
-        );
-        return;
-      }
-      _completePayment(true);
-      return;
-    }
-
-    // QRIS Payment Process
     setState(() {
       _isProcessing = true;
       _lastError = null;
     });
 
+    if (_paymentStatus == 'piutang') {
+      await _completePayment(true);
+      return;
+    }
+
+    if (_paymentMethod == 'cash') {
+      if (_paymentStatus == 'lunas') {
+        if (_cashReceived < widget.order.totalAmount) {
+          setState(() => _isProcessing = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('⚠️ Uang tunai yang diterima kurang dari total tagihan!'), backgroundColor: Colors.orange),
+          );
+          return;
+        }
+        await _completePayment(true);
+        return;
+      } else if (_paymentStatus == 'dp') {
+        if (_cashReceived <= 0 || _cashReceived >= widget.order.totalAmount) {
+          setState(() => _isProcessing = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('⚠️ Jumlah DP harus lebih besar dari 0 dan kurang dari total tagihan!'), backgroundColor: Colors.orange),
+          );
+          return;
+        }
+        await _completePayment(true);
+        return;
+      }
+    }
+
+    // QRIS Payment Process (Lunas or DP)
     try {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final orderId = 'ORDER-${widget.order.id ?? timestamp}-$timestamp';
 
+      final double trxAmount = _paymentStatus == 'lunas'
+          ? widget.order.totalAmount.toDouble()
+          : _cashReceived.toDouble();
+
+      if (trxAmount <= 0) {
+        setState(() {
+          _lastError = 'Jumlah pembayaran QRIS harus lebih besar dari 0';
+          _isProcessing = false;
+        });
+        return;
+      }
+
       final response = await MidtransService.createQRISTransaction(
         orderId: orderId,
-        amount: widget.order.totalAmount.toDouble(),
+        amount: trxAmount,
         customerName: widget.order.customerName,
         overrideServerKey: _midtransServerKey,
       );
@@ -212,10 +237,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
 
     try {
+      bool isPaidFlag = false;
+      int paidAmt = 0;
+      String methodStr = 'cash';
+
+      if (_paymentStatus == 'lunas') {
+        isPaidFlag = true;
+        paidAmt = widget.order.totalAmount;
+        methodStr = _paymentMethod;
+      } else if (_paymentStatus == 'dp') {
+        isPaidFlag = false;
+        paidAmt = _cashReceived;
+        methodStr = _paymentMethod == 'cash' ? 'Bayar Setengah' : 'qris';
+      } else if (_paymentStatus == 'piutang') {
+        isPaidFlag = false;
+        paidAmt = 0;
+        methodStr = 'Belum Lunas';
+      }
+
       final updatedOrder = widget.order.copyWith(
-        isPaid: true,
-        paidAmount: widget.order.totalAmount,
-        paymentMethod: _selectedMethod == PaymentMethod.cash ? 'cash' : 'qris',
+        isPaid: isPaidFlag,
+        paidAmount: paidAmt,
+        paymentMethod: methodStr,
         qrisUrl: _qrisUrl,
         qrisId: _qrisId,
         paymentTimestamp: DateTime.now(),
@@ -294,12 +337,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   const SizedBox(height: 28),
 
                   const Text(
-                    'Pilih Metode Pembayaran',
+                    'Pilih Status Pembayaran',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
                   ),
                   const SizedBox(height: 12),
 
-                  // Radio buttons container
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -308,34 +350,114 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ),
                     child: Column(
                       children: [
-                        RadioListTile<PaymentMethod>(
+                        RadioListTile<String>(
                           title: const Row(
                             children: [
-                              Icon(Icons.payments_rounded, color: Colors.green),
+                              Icon(Icons.check_circle_rounded, color: Colors.green),
                               SizedBox(width: 12),
-                              Text('Tunai / Cash', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              Text('Lunas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                             ],
                           ),
-                          value: PaymentMethod.cash,
-                          groupValue: _selectedMethod,
-                          onChanged: _isProcessing ? null : (val) => setState(() => _selectedMethod = val!),
+                          value: 'lunas',
+                          groupValue: _paymentStatus,
+                          onChanged: _isProcessing ? null : (val) {
+                            setState(() {
+                              _paymentStatus = val!;
+                            });
+                          },
                         ),
                         const Divider(height: 1),
-                        RadioListTile<PaymentMethod>(
+                        RadioListTile<String>(
                           title: const Row(
                             children: [
-                              Icon(Icons.qr_code_scanner_rounded, color: Colors.blue),
+                              Icon(Icons.payment_rounded, color: Colors.orange),
                               SizedBox(width: 12),
-                              Text('Scan QRIS Midtrans', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              Text('Bayar Setengah / DP (Cicilan)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                             ],
                           ),
-                          value: PaymentMethod.qris,
-                          groupValue: _selectedMethod,
-                          onChanged: _isProcessing ? null : (val) => setState(() => _selectedMethod = val!),
+                          value: 'dp',
+                          groupValue: _paymentStatus,
+                          onChanged: _isProcessing ? null : (val) {
+                            setState(() {
+                              _paymentStatus = val!;
+                              _cashController.clear();
+                            });
+                          },
+                        ),
+                        const Divider(height: 1),
+                        RadioListTile<String>(
+                          title: const Row(
+                            children: [
+                              Icon(Icons.pending_actions_rounded, color: Colors.red),
+                              SizedBox(width: 12),
+                              Text('Belum Bayar (Piutang / Tempo)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            ],
+                          ),
+                          value: 'piutang',
+                          groupValue: _paymentStatus,
+                          onChanged: _isProcessing ? null : (val) {
+                            setState(() {
+                              _paymentStatus = val!;
+                              _cashController.text = '0';
+                            });
+                          },
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 24),
+
+                  if (_paymentStatus != 'piutang') ...[
+                    const Text(
+                      'Pilih Metode Pembayaran',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.grey[200]!),
+                      ),
+                      child: Column(
+                        children: [
+                          RadioListTile<String>(
+                            title: const Row(
+                              children: [
+                                Icon(Icons.payments_rounded, color: Colors.green),
+                                SizedBox(width: 12),
+                                Text('Tunai / Cash', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              ],
+                            ),
+                            value: 'cash',
+                            groupValue: _paymentMethod,
+                            onChanged: _isProcessing ? null : (val) {
+                              setState(() {
+                                _paymentMethod = val!;
+                              });
+                            },
+                          ),
+                          const Divider(height: 1),
+                          RadioListTile<String>(
+                            title: const Row(
+                              children: [
+                                Icon(Icons.qr_code_scanner_rounded, color: Colors.blue),
+                                SizedBox(width: 12),
+                                Text('Scan QRIS Midtrans', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              ],
+                            ),
+                            value: 'qris',
+                            groupValue: _paymentMethod,
+                            onChanged: _isProcessing ? null : (val) {
+                              setState(() {
+                                _paymentMethod = val!;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -350,9 +472,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
             child: Container(
               color: Colors.white,
               padding: const EdgeInsets.all(28.0),
-              child: _selectedMethod == PaymentMethod.cash
-                  ? _buildCashPane(change)
-                  : _buildQrisPane(),
+              child: (_paymentStatus == 'piutang')
+                  ? _buildUnpaidPane()
+                  : (_paymentMethod == 'cash')
+                      ? _buildCashPane(change)
+                      : _buildQrisPane(),
             ),
           ),
         ],
@@ -362,65 +486,103 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   // --- CASH PAYMENT PANE (POS STYLE) ---
   Widget _buildCashPane(int change) {
+    final isLunasMode = _paymentStatus == 'lunas';
+    final isButtonEnabled = isLunasMode 
+        ? _cashReceived >= widget.order.totalAmount 
+        : (_cashReceived > 0 && _cashReceived < widget.order.totalAmount);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Input Pembayaran Tunai',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        Text(
+          isLunasMode ? 'Input Pembayaran Tunai (Lunas)' : 'Input Pembayaran Tunai (DP / Setengah)',
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
         ),
         const SizedBox(height: 20),
 
-        // Cash Input Field Display
+        // Cash Input Field Display (Real TextField for physical keyboard input)
+        TextFormField(
+          controller: _cashController,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+          decoration: InputDecoration(
+            prefixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Padding(
+                  padding: EdgeInsets.only(left: 20, right: 12),
+                  child: Text(
+                    'Rp',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                  ),
+                ),
+              ],
+            ),
+            prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+            filled: true,
+            fillColor: Colors.grey[50],
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: Colors.grey[200]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: Colors.grey[200]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0xFF4E80EE), width: 2),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Return Change Output Display (Only relevant for lunas mode, or shows remaining target for DP)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: isLunasMode
+                ? (change >= 0 ? const Color(0xFFDCFCE7) : Colors.orange.withOpacity(0.08))
+                : const Color(0xFFEFF6FF), // Light blue for DP info
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey[200]!),
+            border: Border.all(
+              color: isLunasMode
+                  ? (change >= 0 ? const Color(0xFFBBF7D0) : Colors.orange.withOpacity(0.2))
+                  : const Color(0xFFBFDBFE),
+            ),
           ),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Rp', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  _cashReceived > 0 ? formatRp(_cashReceived).replaceAll('Rp', '').trim() : '0',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              Text(
+                isLunasMode 
+                    ? (change >= 0 ? 'Kembalian:' : 'Uang Kurang:')
+                    : 'Sisa Pembayaran (Piutang):',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold, 
+                  color: isLunasMode 
+                      ? (change >= 0 ? const Color(0xFF15803D) : Colors.orange[800])
+                      : const Color(0xFF1E40AF),
+                ),
+              ),
+              Text(
+                isLunasMode 
+                    ? formatRp(change.abs())
+                    : formatRp((widget.order.totalAmount - _cashReceived).clamp(0, widget.order.totalAmount)),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isLunasMode 
+                      ? (change >= 0 ? const Color(0xFF15803D) : Colors.orange[800])
+                      : const Color(0xFF1E40AF),
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 16),
-
-        // Return Change Output Display
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: change >= 0 ? const Color(0xFFDCFCE7) : Colors.orange.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: change >= 0 ? const Color(0xFFBBF7D0) : Colors.orange.withOpacity(0.2)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                change >= 0 ? 'Kembalian:' : 'Uang Kurang:',
-                style: TextStyle(fontWeight: FontWeight.bold, color: change >= 0 ? const Color(0xFF15803D) : Colors.orange[800]),
-              ),
-              Text(
-                formatRp(change.abs()),
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: change >= 0 ? const Color(0xFF15803D) : Colors.orange[800],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
 
         // Quick cash choices
         Row(
@@ -437,15 +599,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
             _quickCashBtn(100000, '100k'),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
 
-        // Numeric Keypad Grid
+        // Numeric Keypad Grid (With childAspectRatio increased to 2.8 so row 4 fits)
         Expanded(
           child: GridView.count(
             crossAxisCount: 3,
             mainAxisSpacing: 8,
             crossAxisSpacing: 8,
-            childAspectRatio: 2.2,
+            childAspectRatio: 2.8,
             physics: const NeverScrollableScrollPhysics(),
             children: [
               for (var i = 1; i <= 9; i++) _padBtn(i.toString()),
@@ -455,20 +617,31 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 12),
 
         // Checkout Trigger
         ElevatedButton(
-          onPressed: _cashReceived >= widget.order.totalAmount ? _processPayment : null,
+          onPressed: (isButtonEnabled && !_isProcessing) ? _processPayment : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
+            backgroundColor: isLunasMode ? Colors.green : Colors.orange,
             disabledBackgroundColor: Colors.grey[200],
             padding: const EdgeInsets.symmetric(vertical: 18),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          child: const Text(
-            'Konfirmasi Pembayaran Lunas',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-          ),
+          child: _isProcessing
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                )
+              : Text(
+                  isLunasMode ? 'Konfirmasi Pembayaran Lunas' : 'Konfirmasi Pembayaran DP (Cicilan)',
+                  style: TextStyle(
+                    color: isButtonEnabled ? Colors.white : Colors.grey[500], 
+                    fontWeight: FontWeight.bold, 
+                    fontSize: 14,
+                  ),
+                ),
         ),
       ],
     );
@@ -514,6 +687,73 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
+  Widget _buildUnpaidPane() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Icon(Icons.pending_actions_rounded, size: 80, color: Colors.redAccent),
+        const SizedBox(height: 16),
+        const Text(
+          'Konfirmasi Pembayaran Piutang (Tempo)',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Pesanan atas nama "${widget.order.customerName}" akan dicatat ke database sebagai pesanan Belum Bayar (Piutang).',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.red.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.red.shade100),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Total Pemasukan Tunai:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+              ),
+              Text(
+                formatRp(0),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Spacer(),
+        ElevatedButton(
+          onPressed: !_isProcessing ? _processPayment : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.redAccent,
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: _isProcessing
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                )
+              : const Text(
+                  'Konfirmasi Simpan sebagai Piutang',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+        ),
+      ],
+    );
+  }
+
   Widget _quickCashBtn(int amount, String label) {
     return Expanded(
       child: OutlinedButton(
@@ -533,6 +773,132 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   // --- QRIS PAYMENT PANE ---
   Widget _buildQrisPane() {
+    final isDpMode = _paymentStatus == 'dp';
+
+    // If DP mode, and no QRIS generated yet, show the input screen first
+    if (isDpMode && _qrisUrl == null) {
+      final isButtonEnabled = _cashReceived > 0 && _cashReceived < widget.order.totalAmount;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Input Nominal DP untuk QRIS',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 12),
+
+          // Cash Input Field Display (Real TextField)
+          TextFormField(
+            controller: _cashController,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            decoration: InputDecoration(
+              prefixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Padding(
+                    padding: EdgeInsets.only(left: 20, right: 12),
+                    child: Text(
+                      'Rp',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                    ),
+                  ),
+                ],
+              ),
+              prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+              filled: true,
+              fillColor: Colors.grey[50],
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: Colors.grey[200]!),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: Colors.grey[200]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: Color(0xFF4E80EE), width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Info remaining debt
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Sisa Pembayaran (Piutang):',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E40AF)),
+                ),
+                Text(
+                  formatRp((widget.order.totalAmount - _cashReceived).clamp(0, widget.order.totalAmount)),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Quick choices
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _quickCashBtn(10000, '10k'),
+              const SizedBox(width: 8),
+              _quickCashBtn(20000, '20k'),
+              const SizedBox(width: 8),
+              _quickCashBtn(50000, '50k'),
+              const SizedBox(width: 8),
+              _quickCashBtn(100000, '100k'),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Keypad
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: 3,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 6,
+              childAspectRatio: 2.8,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                for (var i = 1; i <= 9; i++) _padBtn(i.toString()),
+                _padBtn('C', color: Colors.redAccent.withOpacity(0.1), textColor: Colors.redAccent),
+                _padBtn('0'),
+                _padIconBtn(Icons.backspace_rounded, 'back', color: Colors.grey[100]!),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          ElevatedButton(
+            onPressed: isButtonEnabled && !_isProcessing ? _processPayment : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: _isProcessing
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : Text('Buat Barcode QRIS DP: ${formatRp(_cashReceived)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      );
+    }
+
+    // Otherwise, normal QRIS pane (Lunas mode or QRIS already generated)
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -546,10 +912,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Klik tombol di bawah untuk membuat barcode QRIS dinamis baru via API Midtrans.',
+          Text(
+            'Klik tombol di bawah untuk membuat barcode QRIS Lunas sebesar ${formatRp(widget.order.totalAmount)} via API Midtrans.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
+            style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
           ),
           const Spacer(),
           ElevatedButton(
@@ -561,7 +927,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
             child: _isProcessing
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Buat Barcode QRIS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                : const Text('Buat Barcode QRIS Lunas', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ] else ...[
           const Text(
@@ -569,7 +935,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
+          Text(
+            isDpMode 
+                ? 'Nominal DP: ${formatRp(_cashReceived)}'
+                : 'Nominal Lunas: ${formatRp(widget.order.totalAmount)}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+          ),
+          const SizedBox(height: 16),
           Center(
             child: Container(
               padding: const EdgeInsets.all(16),
@@ -616,7 +990,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _completePayment(false),
+                  onPressed: () {
+                    _statusCheckTimer?.cancel();
+                    setState(() {
+                      _qrisUrl = null;
+                      _qrisId = null;
+                      _isProcessing = false;
+                    });
+                  },
                   icon: const Icon(Icons.cancel_rounded, size: 16, color: Colors.white),
                   label: const Text('Batalkan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
