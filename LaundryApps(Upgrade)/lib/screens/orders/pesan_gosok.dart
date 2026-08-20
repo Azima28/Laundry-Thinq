@@ -703,12 +703,12 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
                                       ),
                                     )
                                   : GridView.builder(
-                                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-                                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 3,
-                                        crossAxisSpacing: 12,
-                                        mainAxisSpacing: 12,
-                                        childAspectRatio: 2.0,
+                                      padding: const EdgeInsets.all(18),
+                                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                        maxCrossAxisExtent: 270,
+                                        crossAxisSpacing: 14,
+                                        mainAxisSpacing: 14,
+                                        childAspectRatio: 1.32,
                                       ),
                                       itemCount: _filteredItems.length,
                                       itemBuilder: (context, index) {
@@ -840,111 +840,247 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
 
   Widget _buildIronProductCard(TransactionModel item, double weight) {
     final isSelected = weight > 0;
+    final isExpress = item.nama.toLowerCase().contains('exp') || item.nama.toLowerCase().contains('kilat');
 
     return Container(
       decoration: BoxDecoration(
         color: isSelected ? const Color(0xFFFFF7ED) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isSelected ? const Color(0xFFF97316) : StyleConstants.borderLight,
-          width: isSelected ? 1.5 : 1,
+          width: isSelected ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: isSelected
+                ? const Color(0xFFF97316).withValues(alpha: 0.12)
+                : const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: isSelected ? 12 : 6,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _updateWeight(item.id, 0.5),
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    item.nama,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: StyleConstants.textHeading),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (_notes[item.id]?.isNotEmpty == true)
-                  InkWell(
-                    onTap: () => _showNoteDialog(item.id ?? 0, item.nama),
-                    child: const Icon(Icons.note_alt_rounded, size: 16, color: Color(0xFFF97316)),
-                  ),
-              ],
-            ),
-
-            Text(
-              formatRp(item.harga),
-              style: StyleConstants.tabularNumbers(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFFF97316),
-              ),
-            ),
-
-            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                InkWell(
-                  onTap: () => _setCustomWeight(item.id ?? 0, item.nama),
-                  borderRadius: BorderRadius.circular(4),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.edit_rounded, size: 11, color: StyleConstants.textMuted),
-                        SizedBox(width: 2),
-                        Text('Ketik Kg', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: StyleConstants.textMuted)),
-                      ],
-                    ),
-                  ),
-                ),
+                // Top Row: Icon Avatar + Service Title & Badge
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline_rounded, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      color: weight > 0 ? StyleConstants.dangerColor : Colors.grey[300],
-                      onPressed: () => _updateWeight(item.id, -0.5),
-                    ),
                     Container(
-                      constraints: const BoxConstraints(minWidth: 36),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '$weight',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13.5,
-                          color: isSelected ? const Color(0xFFF97316) : StyleConstants.textMuted,
-                        ),
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFFF97316)
+                            : const Color(0xFFF97316).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        isExpress ? Icons.bolt_rounded : Icons.iron_rounded,
+                        color: isSelected ? Colors.white : const Color(0xFFF97316),
+                        size: 20,
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.add_circle_rounded, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      color: const Color(0xFFF97316),
-                      onPressed: () => _updateWeight(item.id, 0.5),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isExpress
+                                  ? const Color(0xFFFEF3C7)
+                                  : const Color(0xFFFFF7ED),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              isExpress ? 'EXPRESS GOSOK' : 'SETRIKA UAP',
+                              style: const TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFFC2410C),
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            item.nama,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              color: StyleConstants.textHeading,
+                              letterSpacing: -0.3,
+                              height: 1.15,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_notes[item.id]?.isNotEmpty == true)
+                      Tooltip(
+                        message: 'Catatan: ${_notes[item.id]}',
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF97316).withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.sticky_note_2_rounded, size: 14, color: Color(0xFFF97316)),
+                        ),
+                      ),
+                  ],
+                ),
+
+                // Middle: Big Bold Price
+                Text(
+                  formatRp(item.harga),
+                  style: StyleConstants.tabularNumbers(
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFFF97316),
+                  ),
+                ),
+
+                // Bottom Controls: Manual Kg Pill & Note & Weight Stepper
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Manual Weight Input Button
+                        InkWell(
+                          onTap: () => _setCustomWeight(item.id ?? 0, item.nama),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: StyleConstants.borderLight),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.edit_rounded, size: 12, color: StyleConstants.textMuted),
+                                SizedBox(width: 3),
+                                Text(
+                                  'Kg',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: StyleConstants.textHeading,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // Note Button
+                        InkWell(
+                          onTap: () => _showNoteDialog(item.id ?? 0, item.nama),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _notes[item.id]?.isNotEmpty == true
+                                  ? const Color(0xFFFFF7ED)
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: _notes[item.id]?.isNotEmpty == true
+                                    ? const Color(0xFFF97316).withValues(alpha: 0.4)
+                                    : StyleConstants.borderLight,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.sticky_note_2_rounded,
+                                  size: 12,
+                                  color: _notes[item.id]?.isNotEmpty == true
+                                      ? const Color(0xFFF97316)
+                                      : StyleConstants.textMuted,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'Nota',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: _notes[item.id]?.isNotEmpty == true
+                                        ? const Color(0xFFC2410C)
+                                        : StyleConstants.textHeading,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Counter Stepper (- Kg +)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: StyleConstants.borderLight),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove_rounded, size: 16),
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                            color: weight > 0 ? StyleConstants.dangerColor : Colors.grey[400],
+                            onPressed: weight > 0 ? () => _updateWeight(item.id, -0.5) : null,
+                            tooltip: 'Kurangi 0.5 Kg',
+                          ),
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 34),
+                            alignment: Alignment.center,
+                            child: Text(
+                              '$weight',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                                color: isSelected ? const Color(0xFFF97316) : StyleConstants.textHeading,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add_rounded, size: 16),
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                            color: const Color(0xFFF97316),
+                            onPressed: () => _updateWeight(item.id, 0.5),
+                            tooltip: 'Tambah 0.5 Kg',
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );

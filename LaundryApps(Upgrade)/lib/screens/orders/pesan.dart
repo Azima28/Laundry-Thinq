@@ -695,11 +695,11 @@ class _PesanPageState extends State<PesanPage> {
                               )
                             : GridView.builder(
                                 padding: const EdgeInsets.all(18),
-                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 3,
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
-                                  childAspectRatio: 2.1,
+                                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 270,
+                                  crossAxisSpacing: 14,
+                                  mainAxisSpacing: 14,
+                                  childAspectRatio: 1.32,
                                 ),
                                 itemCount: _filteredItems.length,
                                 itemBuilder: (context, index) {
@@ -832,118 +832,216 @@ class _PesanPageState extends State<PesanPage> {
   // --- SUB-WIDGET: PRODUCT CARD GRID ITEM ---
   Widget _buildProductCard(TransactionModel item, int quantity) {
     final isSelected = quantity > 0;
+    final isKiloan = item.nama.toLowerCase().contains('kg') || item.nama.toLowerCase().contains('kilo');
+    final isExpress = item.nama.toLowerCase().contains('exp') || item.nama.toLowerCase().contains('kilat');
 
     return Container(
       decoration: BoxDecoration(
         color: isSelected ? StyleConstants.statusInfoBg : Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isSelected ? StyleConstants.primaryColor : StyleConstants.borderLight,
-          width: isSelected ? 1.5 : 1,
+          width: isSelected ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: isSelected
+                ? StyleConstants.primaryColor.withValues(alpha: 0.12)
+                : const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: isSelected ? 12 : 6,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Title & Price
-            Row(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _updateQuantity(item.id, true),
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    item.nama,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13.5,
-                      color: StyleConstants.textHeading,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (_notes[item.id]?.isNotEmpty == true)
-                  InkWell(
-                    onTap: () => _showNoteDialog(item.id ?? 0, item.nama),
-                    child: const Icon(Icons.note_alt_rounded, size: 16, color: StyleConstants.primaryColor),
-                  ),
-              ],
-            ),
-
-            // Price badge
-            Text(
-              formatRp(item.harga),
-              style: StyleConstants.tabularNumbers(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w800,
-                color: StyleConstants.primaryColor,
-              ),
-            ),
-
-            // Quantity Control Stepper
-            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                InkWell(
-                  onTap: () => _showNoteDialog(item.id ?? 0, item.nama),
-                  borderRadius: BorderRadius.circular(4),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(4),
+                // Top Row: Icon Avatar + Service Title & Badge
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? StyleConstants.primaryColor
+                            : StyleConstants.primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        isExpress
+                            ? Icons.bolt_rounded
+                            : (isKiloan ? Icons.scale_rounded : Icons.local_laundry_service_rounded),
+                        color: isSelected ? Colors.white : StyleConstants.primaryColor,
+                        size: 20,
+                      ),
                     ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.edit_note_rounded, size: 12, color: StyleConstants.textMuted),
-                        SizedBox(width: 2),
-                        Text('Catatan', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: StyleConstants.textMuted)),
-                      ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isExpress
+                                  ? const Color(0xFFFEF3C7)
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              isExpress ? 'EXPRESS' : (isKiloan ? 'KILOAN' : 'REGULER'),
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                color: isExpress ? const Color(0xFFD97706) : StyleConstants.textMuted,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            item.nama,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              color: StyleConstants.textHeading,
+                              letterSpacing: -0.3,
+                              height: 1.15,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
+                    if (_notes[item.id]?.isNotEmpty == true)
+                      Tooltip(
+                        message: 'Catatan: ${_notes[item.id]}',
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: StyleConstants.warningColor.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.sticky_note_2_rounded, size: 14, color: StyleConstants.warningColor),
+                        ),
+                      ),
+                  ],
+                ),
+
+                // Middle: Big Bold Price
+                Text(
+                  formatRp(item.harga),
+                  style: StyleConstants.tabularNumbers(
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w900,
+                    color: StyleConstants.primaryColor,
                   ),
                 ),
+
+                // Bottom Controls: Note Pill & Quantity Stepper
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline_rounded, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      color: quantity > 0 ? StyleConstants.dangerColor : Colors.grey[300],
-                      onPressed: () => _updateQuantity(item.id, false),
-                    ),
-                    Container(
-                      constraints: const BoxConstraints(minWidth: 28),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '$quantity',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13.5,
-                          color: isSelected ? StyleConstants.primaryColor : StyleConstants.textMuted,
+                    // Note Button
+                    InkWell(
+                      onTap: () => _showNoteDialog(item.id ?? 0, item.nama),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _notes[item.id]?.isNotEmpty == true
+                              ? StyleConstants.warningColor.withValues(alpha: 0.12)
+                              : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: _notes[item.id]?.isNotEmpty == true
+                                ? StyleConstants.warningColor.withValues(alpha: 0.4)
+                                : StyleConstants.borderLight,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.edit_note_rounded,
+                              size: 14,
+                              color: _notes[item.id]?.isNotEmpty == true
+                                  ? StyleConstants.warningColor
+                                  : StyleConstants.textMuted,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Catatan',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: _notes[item.id]?.isNotEmpty == true
+                                    ? StyleConstants.warningColor
+                                    : StyleConstants.textHeading,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.add_circle_rounded, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      color: StyleConstants.primaryColor,
-                      onPressed: () => _updateQuantity(item.id, true),
+
+                    // Counter Stepper (- Qty +)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: StyleConstants.borderLight),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove_rounded, size: 16),
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                            color: quantity > 0 ? StyleConstants.dangerColor : Colors.grey[400],
+                            onPressed: quantity > 0 ? () => _updateQuantity(item.id, false) : null,
+                            tooltip: 'Kurangi',
+                          ),
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 26),
+                            alignment: Alignment.center,
+                            child: Text(
+                              '$quantity',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                                color: isSelected ? StyleConstants.primaryColor : StyleConstants.textHeading,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add_rounded, size: 16),
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                            color: StyleConstants.primaryColor,
+                            onPressed: () => _updateQuantity(item.id, true),
+                            tooltip: 'Tambah',
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
