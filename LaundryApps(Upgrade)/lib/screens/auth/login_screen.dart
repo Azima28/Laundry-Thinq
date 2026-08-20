@@ -157,200 +157,208 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // SISI KIRI (42%): Form Login Seamless Tanpa Box Border Kaku
+                // SISI KIRI (42%): Brand di Atas Kiri + Form Login Terpusat
                 Expanded(
                   flex: 42,
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 40),
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 420),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Brand Header
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 42,
-                                    height: 42,
-                                    decoration: BoxDecoration(
-                                      gradient: StyleConstants.primaryGradient,
-                                      borderRadius: BorderRadius.circular(10),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: StyleConstants.primaryColor.withValues(alpha: 0.4),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.local_laundry_service_rounded,
-                                      color: Colors.white,
-                                      size: 24,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  const Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'SMART LAUNDRY',
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w900,
-                                          color: Colors.white,
-                                          letterSpacing: 1.0,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Aplikasi Kasir & Kontrol Toko',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: StyleConstants.accentCyan,
-                                        ),
-                                      ),
-                                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 36),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // BRAND LOGO PINNED AT TOP LEFT
+                        Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                gradient: StyleConstants.primaryGradient,
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: StyleConstants.primaryColor.withValues(alpha: 0.4),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
-
-                              const SizedBox(height: 48),
-
-                              // Form Title & Subtitle
-                              Text(
-                                _isSettingUpAdmin ? 'Buat Akun Admin' : 'Masuk Akun',
-                                style: const TextStyle(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                  letterSpacing: -0.4,
-                                ),
+                              child: const Icon(
+                                Icons.local_laundry_service_rounded,
+                                color: Colors.white,
+                                size: 24,
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _isSettingUpAdmin
-                                    ? 'Buat akun pengelola utama untuk memulai toko.'
-                                    : 'Masukkan username dan password akun Anda.',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF94A3B8),
-                                ),
-                              ),
-                              const SizedBox(height: 32),
-
-                              // Username Field (Seamless Dark Style)
-                              TextFormField(
-                                controller: _usernameController,
-                                autofocus: true,
-                                style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
-                                textInputAction: TextInputAction.next,
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Username wajib diisi';
-                                  }
-                                  return null;
-                                },
-                                decoration: _buildDarkInputDecoration(
-                                  'Username',
-                                  Icons.person_outline_rounded,
-                                  hintText: 'Ketik nama pengguna...',
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Password Field (Seamless Dark Style)
-                              TextFormField(
-                                controller: _passwordController,
-                                obscureText: _obscureText,
-                                style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
-                                textInputAction: TextInputAction.done,
-                                onFieldSubmitted: (_) => _isLoading ? null : _login(),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Password wajib diisi';
-                                  }
-                                  return null;
-                                },
-                                decoration: _buildDarkInputDecoration(
-                                  'Password',
-                                  Icons.lock_outline_rounded,
-                                  hintText: 'Ketik password akun...',
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                      size: 18,
-                                      color: const Color(0xFF94A3B8),
-                                    ),
-                                    onPressed: () => setState(() => _obscureText = !_obscureText),
+                            ),
+                            const SizedBox(width: 14),
+                            const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'SMART LAUNDRY',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    letterSpacing: 1.0,
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 28),
-
-                              // Tombol Masuk
-                              ElevatedButton(
-                                onPressed: _isLoading ? null : _login,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: StyleConstants.primaryColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
+                                Text(
+                                  'Aplikasi Kasir & Kontrol Toko',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: StyleConstants.accentCyan,
                                   ),
-                                  elevation: 0,
                                 ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
+                              ],
+                            ),
+                          ],
+                        ),
+
+                        // CENTERED FORM CONTENT
+                        Expanded(
+                          child: Center(
+                            child: SingleChildScrollView(
+                              child: Container(
+                                constraints: const BoxConstraints(maxWidth: 420),
+                                child: Form(
+                                  key: _formKey,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Form Title & Subtitle
+                                      Text(
+                                        _isSettingUpAdmin ? 'Buat Akun Admin' : 'Masuk Akun',
+                                        style: const TextStyle(
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.w900,
                                           color: Colors.white,
-                                          strokeWidth: 2.2,
+                                          letterSpacing: -0.4,
                                         ),
-                                      )
-                                    : Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        _isSettingUpAdmin
+                                            ? 'Buat akun pengelola utama untuk memulai toko.'
+                                            : 'Masukkan username dan password akun Anda.',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF94A3B8),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 32),
+
+                                      // Username Field (Seamless Dark Style)
+                                      TextFormField(
+                                        controller: _usernameController,
+                                        autofocus: true,
+                                        style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
+                                        textInputAction: TextInputAction.next,
+                                        validator: (value) {
+                                          if (value == null || value.trim().isEmpty) {
+                                            return 'Username wajib diisi';
+                                          }
+                                          return null;
+                                        },
+                                        decoration: _buildDarkInputDecoration(
+                                          'Username',
+                                          Icons.person_outline_rounded,
+                                          hintText: 'Ketik nama pengguna...',
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+
+                                      // Password Field (Seamless Dark Style)
+                                      TextFormField(
+                                        controller: _passwordController,
+                                        obscureText: _obscureText,
+                                        style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
+                                        textInputAction: TextInputAction.done,
+                                        onFieldSubmitted: (_) => _isLoading ? null : _login(),
+                                        validator: (value) {
+                                          if (value == null || value.trim().isEmpty) {
+                                            return 'Password wajib diisi';
+                                          }
+                                          return null;
+                                        },
+                                        decoration: _buildDarkInputDecoration(
+                                          'Password',
+                                          Icons.lock_outline_rounded,
+                                          hintText: 'Ketik password akun...',
+                                          suffixIcon: IconButton(
+                                            icon: Icon(
+                                              _obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                              size: 18,
+                                              color: const Color(0xFF94A3B8),
+                                            ),
+                                            onPressed: () => setState(() => _obscureText = !_obscureText),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 28),
+
+                                      // Tombol Masuk
+                                      ElevatedButton(
+                                        onPressed: _isLoading ? null : _login,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: StyleConstants.primaryColor,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          elevation: 0,
+                                        ),
+                                        child: _isLoading
+                                            ? const SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: CircularProgressIndicator(
+                                                  color: Colors.white,
+                                                  strokeWidth: 2.2,
+                                                ),
+                                              )
+                                            : Row(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  const Icon(Icons.login_rounded, size: 18),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    _isSettingUpAdmin ? 'Simpan & Masuk' : 'Masuk ke Kasir',
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.w900,
+                                                      letterSpacing: 0.3,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                      ),
+                                      const SizedBox(height: 24),
+
+                                      // Keterangan Akses Aman
+                                      const Row(
                                         children: [
-                                          const Icon(Icons.login_rounded, size: 18),
-                                          const SizedBox(width: 8),
+                                          Icon(Icons.shield_outlined, size: 14, color: Color(0xFF94A3B8)),
+                                          SizedBox(width: 6),
                                           Text(
-                                            _isSettingUpAdmin ? 'Simpan & Masuk' : 'Masuk ke Kasir',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w900,
-                                              letterSpacing: 0.3,
+                                            'Akses Aman & Terproteksi',
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF94A3B8),
                                             ),
                                           ),
                                         ],
                                       ),
-                              ),
-                              const SizedBox(height: 24),
-
-                              // Keterangan Akses Aman
-                              const Row(
-                                children: [
-                                  Icon(Icons.shield_outlined, size: 14, color: Color(0xFF94A3B8)),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'Akses Aman & Terproteksi',
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF94A3B8),
-                                    ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
