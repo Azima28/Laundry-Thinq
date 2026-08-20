@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/models/order_model.dart';
@@ -7,6 +8,44 @@ import '../../database/models/database_helper.dart';
 import '../../services/midtrans_service.dart';
 import '../../utils/currency_format.dart';
 import '../../utils/style_constants.dart';
+
+class ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  static String format(String digitsOnly) {
+    if (digitsOnly.isEmpty) return '';
+    final number = int.tryParse(digitsOnly) ?? 0;
+    if (number == 0) return '0';
+    final s = number.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) {
+        buffer.write('.');
+      }
+      buffer.write(s[i]);
+    }
+    return buffer.toString();
+  }
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    final digitsOnly = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digitsOnly.isEmpty) {
+      return const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
+    }
+
+    final formatted = format(digitsOnly);
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
 
 class PaymentScreen extends StatefulWidget {
   final Order order;
@@ -72,7 +111,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   void _setQuickCash(int amount) {
-    _cashController.text = amount > 0 ? amount.toString() : '';
+    if (amount <= 0) {
+      _cashController.clear();
+    } else {
+      final formatted = ThousandsSeparatorInputFormatter.format(amount.toString());
+      _cashController.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    }
   }
 
   Future<void> _processPayment() async {
@@ -616,6 +663,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 child: TextField(
                   controller: _cashController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    ThousandsSeparatorInputFormatter(),
+                  ],
                   autofocus: true,
                   style: StyleConstants.tabularNumbers(
                     fontSize: 28,
