@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../database/models/database_helper.dart';
 import '../../database/models/customer_model.dart';
+import '../../utils/style_constants.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 
 class CustomerScreen extends StatefulWidget {
@@ -16,12 +17,12 @@ class _CustomerScreenState extends State<CustomerScreen> {
   List<Customer> _filteredCustomers = [];
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
-  
+
   // Master-Detail selected customer
   Customer? _selectedCustomer;
 
-  final Color primaryColor = const Color(0xFF4E80EE);
-  final Color backgroundColor = const Color(0xFFF8FAFC);
+  final Color primaryColor = StyleConstants.primaryColor;
+  final Color backgroundColor = StyleConstants.backgroundColor;
 
   @override
   void initState() {
@@ -421,7 +422,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
   Widget _buildCustomerListTile(Customer customer, bool isSelected) {
     return Container(
       decoration: BoxDecoration(
-        color: isSelected ? primaryColor.withOpacity(0.04) : Colors.white,
+        color: isSelected ? primaryColor.withValues(alpha: 0.04) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: isSelected ? primaryColor : Colors.grey[200]!, width: isSelected ? 1.5 : 1),
       ),
@@ -469,7 +470,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)],
+              boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.05), blurRadius: 10)],
             ),
             child: Icon(Icons.people_outline_rounded, size: 48, color: Colors.grey[300]),
           ),
@@ -497,7 +498,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.01), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -508,7 +509,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
             children: [
               CircleAvatar(
                 radius: 36,
-                backgroundColor: primaryColor.withOpacity(0.1),
+                backgroundColor: primaryColor.withValues(alpha: 0.1),
                 child: Text(
                   customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
                   style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 32),

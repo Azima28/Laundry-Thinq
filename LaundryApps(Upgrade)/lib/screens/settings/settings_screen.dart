@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../transactions/user_repository.dart';
+import '../../utils/style_constants.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
-  final Color primaryColor = const Color(0xFF4E80EE);
-  final Color backgroundColor = const Color(0xFFF8FAFC);
+  final Color primaryColor = StyleConstants.primaryColor;
+  final Color backgroundColor = StyleConstants.backgroundColor;
 
   Future<bool> _checkAdminAccess() async {
     final prefs = await SharedPreferences.getInstance();
@@ -154,10 +155,10 @@ class SettingsScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: StyleConstants.borderLight),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.01),
+            color: Colors.black.withValues(alpha: 0.01),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
@@ -185,7 +186,7 @@ class SettingsScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: color.withOpacity(0.08),
+                        color: color.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Icon(icon, color: color, size: 24),

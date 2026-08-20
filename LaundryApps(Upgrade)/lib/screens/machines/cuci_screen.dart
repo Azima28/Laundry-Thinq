@@ -9,6 +9,7 @@ import '../../database/models/order_model.dart';
 import '../../database/models/database_helper.dart';
 import '../../database/models/machine_model.dart';
 import '../../services/notification_service.dart';
+import '../../utils/style_constants.dart';
 
 class CuciScreen extends StatelessWidget {
   final int items;
@@ -272,10 +273,10 @@ class _CuciContentState extends State<CuciContent> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: primaryColor.withOpacity(0.1),
+                          color: primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: primaryColor.withOpacity(0.2),
+                            color: primaryColor.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Row(
@@ -359,7 +360,7 @@ class _CuciContentState extends State<CuciContent> {
     final bool isFailed = MachineStatusService.instance.isOrderFailed(orderKey);
 
     Color borderCol = isSelected ? primaryColor : Colors.grey[200]!;
-    Color bgCol = isSelected ? primaryColor.withOpacity(0.04) : Colors.white;
+    Color bgCol = isSelected ? primaryColor.withValues(alpha: 0.04) : Colors.white;
 
     if (isProcessing) {
       bgCol = Colors.yellow.shade50;
@@ -376,7 +377,7 @@ class _CuciContentState extends State<CuciContent> {
         border: Border.all(color: borderCol, width: isSelected ? 2 : 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.01),
+            color: Colors.black.withValues(alpha: 0.01),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -589,24 +590,24 @@ class _CuciContentState extends State<CuciContent> {
 
     if (isError) {
       // 6. ERROR (Red)
-      color = const Color(0xFFEF4444);
-      bg = const Color(0xFFEF4444).withOpacity(0.06);
-      border = const Color(0xFFEF4444).withOpacity(0.3);
+      color = StyleConstants.dangerColor;
+      bg = StyleConstants.statusDangerBg;
+      border = StyleConstants.dangerColor.withValues(alpha: 0.3);
       badgeText = "ERROR";
       canClick = true;
     } else if (isRunning) {
       // 3. RUNNING (Blue)
-      color = const Color(0xFF3B82F6);
-      bg = const Color(0xFF3B82F6).withOpacity(0.06);
-      border = const Color(0xFF3B82F6).withOpacity(0.3);
+      color = StyleConstants.primaryColor;
+      bg = StyleConstants.statusInfoBg;
+      border = StyleConstants.primaryColor.withValues(alpha: 0.3);
       final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
       badgeText = "RUNNING$timeText";
-      canClick = !service.thinqOk || isManual; // Clickable if ThinQ is degraded or it is a manual machine
+      canClick = !service.thinqOk || isManual;
     } else if (customerName.isEmpty) {
       // 1. READY (Green)
-      color = const Color(0xFF22C55E);
-      bg = const Color(0xFF22C55E).withOpacity(0.06);
-      border = const Color(0xFF22C55E).withOpacity(0.3);
+      color = StyleConstants.successColor;
+      bg = StyleConstants.statusSuccessBg;
+      border = StyleConstants.successColor.withValues(alpha: 0.3);
       badgeText = "READY";
       canClick = _selectedOrderItem != null;
     } else {
@@ -614,25 +615,25 @@ class _CuciContentState extends State<CuciContent> {
       if (machineStatus == 'unready') {
         // 2. BOOKING (Orange)
         color = const Color(0xFFF97316);
-        bg = const Color(0xFFF97316).withOpacity(0.06);
-        border = const Color(0xFFF97316).withOpacity(0.3);
+        bg = const Color(0xFFFFF7ED);
+        border = const Color(0xFFF97316).withValues(alpha: 0.3);
         final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
         badgeText = "BOOKING$timeText";
-        canClick = !service.thinqOk || isManual; // Clickable if ThinQ is degraded or it is a manual machine
+        canClick = !service.thinqOk || isManual;
       } else {
         // Finished / Idle, waiting for cashier action
         if (waSent) {
           // 5. SUDAH DI-WA (Purple)
-          color = const Color(0xFF8B5CF6);
-          bg = const Color(0xFF8B5CF6).withOpacity(0.06);
-          border = const Color(0xFF8B5CF6).withOpacity(0.3);
+          color = StyleConstants.secondaryColor;
+          bg = const Color(0xFFEEF2FF);
+          border = StyleConstants.secondaryColor.withValues(alpha: 0.3);
           badgeText = "✓ WA";
           canClick = true;
         } else {
           // 4. MENUNGGU (Amber)
-          color = const Color(0xFFF59E0B);
-          bg = const Color(0xFFF59E0B).withOpacity(0.06);
-          border = const Color(0xFFF59E0B).withOpacity(0.3);
+          color = StyleConstants.warningColor;
+          bg = StyleConstants.statusWarningBg;
+          border = StyleConstants.warningColor.withValues(alpha: 0.3);
           badgeText = "SELESAI";
           canClick = true;
         }
@@ -655,7 +656,7 @@ class _CuciContentState extends State<CuciContent> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.01),
+            color: Colors.black.withValues(alpha: 0.01),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

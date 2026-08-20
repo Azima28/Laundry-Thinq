@@ -111,6 +111,11 @@ class MachineStatusService {
     _notifier.value++;
   }
 
+  Future<void> pollNow() async {
+    await _fetch();
+    await _fetchConnectivity();
+  }
+
   Future<void> start() async {
     if (_timer != null) return;
     final prefs = await SharedPreferences.getInstance();

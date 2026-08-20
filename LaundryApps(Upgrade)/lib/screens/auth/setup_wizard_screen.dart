@@ -7,7 +7,6 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import '../../services/printer_service.dart';
 import '../../services/machine_status_service.dart';
 import '../../database/models/database_helper.dart';
-import '../../database/models/user_model.dart';
 import '../../database/models/machine_model.dart';
 import '../../transactions/user_repository.dart';
 

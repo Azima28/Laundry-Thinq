@@ -561,7 +561,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         border: Border.all(color: StyleConstants.borderLight),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.005),
+            color: Colors.black.withValues(alpha: 0.005),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -573,7 +573,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           children: [
             CircleAvatar(
               radius: 20,
-              backgroundColor: isAdmin ? primaryColor.withOpacity(0.08) : const Color(0xFFF1F5F9),
+              backgroundColor: isAdmin ? primaryColor.withValues(alpha: 0.08) : const Color(0xFFF1F5F9),
               child: Icon(
                 isAdmin ? Icons.admin_panel_settings_rounded : Icons.person_rounded,
                 color: isAdmin ? primaryColor : const Color(0xFF64748B),
@@ -599,7 +599,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: isAdmin ? Colors.blue.withOpacity(0.08) : Colors.purple.withOpacity(0.08),
+                          color: isAdmin ? Colors.blue.withValues(alpha: 0.08) : Colors.purple.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -615,7 +615,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: user.isActive ? const Color(0xFF10B981).withOpacity(0.08) : const Color(0xFFF43F5E).withOpacity(0.08),
+                          color: user.isActive ? const Color(0xFF10B981).withValues(alpha: 0.08) : const Color(0xFFF43F5E).withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
