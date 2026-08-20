@@ -139,153 +139,78 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. SISI KIRI (42%): Panel Pengenalan Aplikasi (Bahasa Ramah & Jelas)
+          // 1. SISI KIRI (42%): Form Login Kasir / Admin
           Expanded(
             flex: 42,
             child: Container(
-              color: StyleConstants.sidebarBackground,
+              color: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Logo & Nama Toko
-                  Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: StyleConstants.primaryColor,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.local_laundry_service_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'SMART LAUNDRY',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          Text(
-                            'Aplikasi Kasir & Kontrol Toko',
-                            style: TextStyle(
-                              color: StyleConstants.accentCyan,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-
-                  const Spacer(),
-
-                  // Judul & Deskripsi Utama (Lugas & Mudah Dipahami)
-                  const Text(
-                    'Kelola Usaha Laundry Jadi Lebih Rapi & Cepat',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      height: 1.35,
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Catat pesanan pelanggan, pantau mesin cuci dan pengering, serta rekap laporan keuangan toko dalam satu aplikasi.',
-                    style: TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 13,
-                      height: 1.5,
-                    ),
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // 3 Fitur Utama (Bahasa Sehari-hari)
-                  _buildSimpleFeatureItem(
-                    icon: Icons.receipt_long_rounded,
-                    title: 'Kasir & Pembayaran',
-                    desc: 'Input pesanan kiloan & satuan, hitung tagihan otomatis, dan cetak struk.',
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSimpleFeatureItem(
-                    icon: Icons.local_laundry_service_rounded,
-                    title: 'Pantau Mesin Cuci & Pengering',
-                    desc: 'Ketahui mesin yang sedang berputar, sisa waktu cuci, dan antrean cucian.',
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSimpleFeatureItem(
-                    icon: Icons.account_balance_wallet_rounded,
-                    title: 'Laporan Omzet & Keuangan',
-                    desc: 'Rekap uang masuk, catatan pengeluaran harian, dan data piutang pelanggan.',
-                  ),
-
-                  const Spacer(),
-
-                  // Footer Keterangan Sistem
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF334155)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.check_circle_rounded, size: 14, color: StyleConstants.successColor),
-                        SizedBox(width: 8),
-                        Text(
-                          'Sistem Kasir Offline · Data Tersimpan di Komputer Toko',
-                          style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11.5, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // 2. SISI KANAN (58%): Kartu Login Kasir (Rapi & Proporsional)
-          Expanded(
-            flex: 58,
-            child: Container(
-              color: StyleConstants.backgroundColor,
-              alignment: Alignment.center,
-              padding: const EdgeInsets.all(32),
               child: SingleChildScrollView(
                 child: Center(
                   child: Container(
-                    constraints: const BoxConstraints(maxWidth: 440),
-                    padding: const EdgeInsets.all(36),
-                    decoration: StyleConstants.cardDecoration(
-                      withShadow: true,
-                    ),
+                    constraints: const BoxConstraints(maxWidth: 420),
                     child: Form(
                       key: _formKey,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Header Form
+                          // Brand Header
+                          Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  gradient: StyleConstants.primaryGradient,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: StyleConstants.primaryColor.withValues(alpha: 0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.local_laundry_service_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'SMART LAUNDRY',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
+                                      color: StyleConstants.textHeading,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Aplikasi Kasir & Kontrol Toko',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: StyleConstants.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 48),
+
+                          // Form Title & Subtitle
                           Text(
                             _isSettingUpAdmin ? 'Buat Akun Admin' : 'Masuk Akun',
                             style: const TextStyle(
-                              fontSize: 22,
+                              fontSize: 24,
                               fontWeight: FontWeight.w900,
                               color: StyleConstants.textHeading,
                               letterSpacing: -0.4,
@@ -297,13 +222,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ? 'Buat akun pengelola utama untuk memulai toko.'
                                 : 'Masukkan username dan password akun Anda.',
                             style: const TextStyle(
-                              fontSize: 12.5,
+                              fontSize: 13,
                               color: StyleConstants.textMuted,
                             ),
                           ),
-                          const SizedBox(height: 28),
+                          const SizedBox(height: 32),
 
-                          // Kolom Username
+                          // Field Username
                           TextFormField(
                             controller: _usernameController,
                             autofocus: true,
@@ -320,9 +245,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               hintText: 'Ketik nama pengguna...',
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 18),
 
-                          // Kolom Password
+                          // Field Password
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _obscureText,
@@ -348,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 28),
 
                           // Tombol Masuk
                           ElevatedButton(
@@ -379,7 +304,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       Text(
                                         _isSettingUpAdmin ? 'Simpan & Masuk' : 'Masuk ke Kasir',
                                         style: const TextStyle(
-                                          fontSize: 13.5,
+                                          fontSize: 14,
                                           fontWeight: FontWeight.w800,
                                           letterSpacing: 0.3,
                                         ),
@@ -387,7 +312,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ],
                                   ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 24),
 
                           // Keterangan Akses Aman
                           const Row(
@@ -413,53 +338,279 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
+
+          // VERTICAL DIVIDER
+          Container(width: 1, color: StyleConstants.borderLight),
+
+          // 2. SISI KANAN (58%): Dark Hero Panel dengan Garis Naga / Dynamic Wave Art
+          Expanded(
+            flex: 58,
+            child: Stack(
+              children: [
+                // Background Gradient & Flowing Dragon Lines Canvas
+                Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF0B0F19), Color(0xFF0F172A), Color(0xFF1E293B)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: CustomPaint(
+                    painter: FlowingDragonLinesPainter(),
+                    size: Size.infinite,
+                  ),
+                ),
+
+                // Foreground Content (Lugas & Jelas)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 48),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Spacer(),
+
+                      // Title
+                      const Text(
+                        'Kelola Usaha Laundry Jadi Lebih Rapi & Cepat',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          height: 1.35,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Catat pesanan pelanggan, pantau mesin cuci dan pengering, serta rekap laporan keuangan toko dalam satu aplikasi.',
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 13.5,
+                          height: 1.5,
+                        ),
+                      ),
+
+                      const SizedBox(height: 36),
+
+                      // 3 Feature Cards
+                      _buildFeatureCard(
+                        icon: Icons.receipt_long_rounded,
+                        title: 'Kasir & Pembayaran',
+                        desc: 'Input pesanan kiloan & satuan, hitung tagihan otomatis, dan cetak struk.',
+                        accentColor: StyleConstants.primaryColor,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildFeatureCard(
+                        icon: Icons.local_laundry_service_rounded,
+                        title: 'Pantau Mesin Cuci & Pengering',
+                        desc: 'Ketahui mesin yang sedang berputar, sisa waktu cuci, dan antrean cucian.',
+                        accentColor: StyleConstants.accentCyan,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildFeatureCard(
+                        icon: Icons.account_balance_wallet_rounded,
+                        title: 'Laporan Omzet & Keuangan',
+                        desc: 'Rekap uang masuk, catatan pengeluaran harian, dan data piutang pelanggan.',
+                        accentColor: const Color(0xFF10B981),
+                      ),
+
+                      const Spacer(),
+
+                      // Bottom Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B).withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_rounded, size: 14, color: StyleConstants.successColor),
+                            SizedBox(width: 8),
+                            Text(
+                              'Sistem Kasir Offline · Data Tersimpan di Komputer Toko',
+                              style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11.5, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSimpleFeatureItem({
+  Widget _buildFeatureCard({
     required IconData icon,
     required String title,
     required String desc,
+    required Color accentColor,
   }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E293B),
-            borderRadius: BorderRadius.circular(8),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B).withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF334155).withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 18, color: accentColor),
           ),
-          child: Icon(icon, size: 18, color: StyleConstants.accentCyan),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w800,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                desc,
-                style: const TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 12,
-                  height: 1.4,
+                const SizedBox(height: 2),
+                Text(
+                  desc,
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
+}
+
+/// CustomPainter to render elegant glowing flowing dragon/wave contour lines
+class FlowingDragonLinesPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final width = size.width;
+    final height = size.height;
+
+    // Line 1: Primary Cyan Ribbon
+    final paint1 = Paint()
+      ..color = const Color(0xFF06B6D4).withValues(alpha: 0.22)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    final path1 = Path();
+    path1.moveTo(0, height * 0.75);
+    path1.cubicTo(
+      width * 0.25, height * 0.60,
+      width * 0.45, height * 0.90,
+      width * 0.75, height * 0.50,
+    );
+    path1.cubicTo(
+      width * 0.88, height * 0.32,
+      width * 0.92, height * 0.25,
+      width, height * 0.15,
+    );
+    canvas.drawPath(path1, paint1);
+
+    // Line 2: Blue Wave Line
+    final paint2 = Paint()
+      ..color = const Color(0xFF3B82F6).withValues(alpha: 0.20)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2;
+
+    final path2 = Path();
+    path2.moveTo(0, height * 0.68);
+    path2.cubicTo(
+      width * 0.28, height * 0.52,
+      width * 0.48, height * 0.82,
+      width * 0.72, height * 0.42,
+    );
+    path2.cubicTo(
+      width * 0.86, height * 0.22,
+      width * 0.95, height * 0.18,
+      width, height * 0.08,
+    );
+    canvas.drawPath(path2, paint2);
+
+    // Line 3: Indigo Contour
+    final paint3 = Paint()
+      ..color = const Color(0xFF6366F1).withValues(alpha: 0.18)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8;
+
+    final path3 = Path();
+    path3.moveTo(0, height * 0.82);
+    path3.cubicTo(
+      width * 0.22, height * 0.68,
+      width * 0.42, height * 0.98,
+      width * 0.78, height * 0.58,
+    );
+    path3.cubicTo(
+      width * 0.90, height * 0.38,
+      width * 0.96, height * 0.30,
+      width, height * 0.22,
+    );
+    canvas.drawPath(path3, paint3);
+
+    // Line 4: Subtle Soft Highlight Line
+    final paint4 = Paint()
+      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.12)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+
+    final path4 = Path();
+    path4.moveTo(0, height * 0.60);
+    path4.cubicTo(
+      width * 0.30, height * 0.45,
+      width * 0.50, height * 0.75,
+      width * 0.70, height * 0.35,
+    );
+    path4.cubicTo(
+      width * 0.82, height * 0.15,
+      width * 0.90, height * 0.12,
+      width, 0,
+    );
+    canvas.drawPath(path4, paint4);
+
+    // Line 5: Low Ambient Ground Contour
+    final paint5 = Paint()
+      ..color = const Color(0xFF0EA5E9).withValues(alpha: 0.10)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    final path5 = Path();
+    path5.moveTo(0, height * 0.90);
+    path5.cubicTo(
+      width * 0.20, height * 0.80,
+      width * 0.40, height * 1.05,
+      width * 0.80, height * 0.65,
+    );
+    path5.cubicTo(
+      width * 0.92, height * 0.48,
+      width * 0.98, height * 0.40,
+      width, height * 0.32,
+    );
+    canvas.drawPath(path5, paint5);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
