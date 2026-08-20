@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/models/database_helper.dart';
 import '../../database/models/order_model.dart';
 import '../../database/models/db_encryption_helper.dart';
 import '../../transactions/order_repository.dart';
-import '../../services/machine_status_service.dart';
 import '../../utils/style_constants.dart';
 import 'dart:async';
 
@@ -330,7 +328,7 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
+                      color: Colors.black.withValues(alpha: 0.02),
                       blurRadius: 16,
                       offset: const Offset(0, 8),
                     )
@@ -419,7 +417,7 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
                                         border: Border.all(color: const Color(0xFFE2E8F0)),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.01),
+                                            color: Colors.black.withValues(alpha: 0.01),
                                             blurRadius: 10,
                                             offset: const Offset(0, 4),
                                           ),
@@ -554,8 +552,7 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
             ),
           ),
         ],
-      ),
-    );
+      );
 
     if (canPop) {
       return Scaffold(
@@ -606,18 +603,18 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
         child: InkWell(
           onTap: () => setState(() => _selectedFilter = label),
           borderRadius: BorderRadius.circular(12),
-          hoverColor: isSelected 
-              ? Colors.white.withOpacity(0.1) 
+          hoverColor: isSelected
+              ? Colors.white.withValues(alpha: 0.1)
               : const Color(0xFFF8FAFC),
-          focusColor: isSelected 
-              ? Colors.white.withOpacity(0.1) 
+          focusColor: isSelected
+              ? Colors.white.withValues(alpha: 0.1)
               : const Color(0xFFF8FAFC),
-          splashColor: isSelected 
-              ? Colors.white.withOpacity(0.15) 
-              : primaryColor.withOpacity(0.1),
-          highlightColor: isSelected 
-              ? Colors.white.withOpacity(0.05) 
-              : primaryColor.withOpacity(0.05),
+          splashColor: isSelected
+              ? Colors.white.withValues(alpha: 0.15)
+              : primaryColor.withValues(alpha: 0.1),
+          highlightColor: isSelected
+              ? Colors.white.withValues(alpha: 0.05)
+              : primaryColor.withValues(alpha: 0.05),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             child: Row(
