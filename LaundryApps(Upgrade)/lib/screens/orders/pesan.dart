@@ -37,7 +37,6 @@ class _PesanPageState extends State<PesanPage> {
 
   List<Customer> _allCustomers = [];
   Customer? _selectedCustomer;
-  String _selectedCategory = 'semua'; // 'semua', 'kiloan', 'satuan', 'express'
 
   @override
   void initState() {
@@ -90,20 +89,13 @@ class _PesanPageState extends State<PesanPage> {
   void _filterProducts() {
     final query = _searchProductController.text.toLowerCase().trim();
     setState(() {
-      _filteredItems = _allItems.where((item) {
-        final matchQuery = item.nama.toLowerCase().contains(query);
-        if (_selectedCategory == 'semua') return matchQuery;
-        if (_selectedCategory == 'kiloan') {
-          return matchQuery && (item.nama.toLowerCase().contains('kg') || item.nama.toLowerCase().contains('kilo'));
-        }
-        if (_selectedCategory == 'satuan') {
-          return matchQuery && !item.nama.toLowerCase().contains('kg') && !item.nama.toLowerCase().contains('kilo');
-        }
-        if (_selectedCategory == 'express') {
-          return matchQuery && (item.nama.toLowerCase().contains('exp') || item.nama.toLowerCase().contains('kilat'));
-        }
-        return matchQuery;
-      }).toList();
+      if (query.isEmpty) {
+        _filteredItems = List.from(_allItems);
+      } else {
+        _filteredItems = _allItems.where((item) {
+          return item.nama.toLowerCase().contains(query);
+        }).toList();
+      }
     });
   }
 
@@ -694,39 +686,28 @@ class _PesanPageState extends State<PesanPage> {
                       // SISI KIRI (65%): Catalog Grid & Quick Search
                       Expanded(
                         flex: 65,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Category Filter Chips Bar
-                            _buildCategoryChipsBar(),
-
-                            // Catalog Grid Items
-                            Expanded(
-                              child: _filteredItems.isEmpty
-                                  ? const Center(
-                                      child: Text(
-                                        'Tidak ada paket layanan yang sesuai.',
-                                        style: TextStyle(color: StyleConstants.textMuted),
-                                      ),
-                                    )
-                                  : GridView.builder(
-                                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-                                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 3,
-                                        crossAxisSpacing: 12,
-                                        mainAxisSpacing: 12,
-                                        childAspectRatio: 2.1,
-                                      ),
-                                      itemCount: _filteredItems.length,
-                                      itemBuilder: (context, index) {
-                                        final item = _filteredItems[index];
-                                        final quantity = _quantities[item.id ?? 0] ?? 0;
-                                        return _buildProductCard(item, quantity);
-                                      },
-                                    ),
-                            ),
-                          ],
-                        ),
+                        child: _filteredItems.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'Tidak ada paket layanan yang sesuai.',
+                                  style: TextStyle(color: StyleConstants.textMuted),
+                                ),
+                              )
+                            : GridView.builder(
+                                padding: const EdgeInsets.all(18),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 3,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
+                                  childAspectRatio: 2.1,
+                                ),
+                                itemCount: _filteredItems.length,
+                                itemBuilder: (context, index) {
+                                  final item = _filteredItems[index];
+                                  final quantity = _quantities[item.id ?? 0] ?? 0;
+                                  return _buildProductCard(item, quantity);
+                                },
+                              ),
                       ),
 
                       // VERTICAL SPLIT DIVIDER
@@ -844,69 +825,6 @@ class _PesanPageState extends State<PesanPage> {
               ),
             ),
         ],
-      ),
-    );
-  }
-
-  // --- SUB-WIDGET: CATEGORY FILTER CHIPS ---
-  Widget _buildCategoryChipsBar() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 6),
-      child: Row(
-        children: [
-          _categoryChip('semua', 'Semua Layanan', Icons.grid_view_rounded),
-          const SizedBox(width: 8),
-          _categoryChip('kiloan', 'Cuci Kiloan', Icons.scale_rounded),
-          const SizedBox(width: 8),
-          _categoryChip('satuan', 'Satuan & Bedcover', Icons.inventory_2_rounded),
-          const SizedBox(width: 8),
-          _categoryChip('express', 'Express & Kilat', Icons.bolt_rounded),
-        ],
-      ),
-    );
-  }
-
-  Widget _categoryChip(String key, String label, IconData icon) {
-    final isSelected = _selectedCategory == key;
-    return InkWell(
-      onTap: () {
-        setState(() => _selectedCategory = key);
-        _filterProducts();
-      },
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? StyleConstants.primaryColor : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? StyleConstants.primaryColor : StyleConstants.borderLight,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: StyleConstants.primaryColor.withValues(alpha: 0.25),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  )
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: isSelected ? Colors.white : StyleConstants.textMuted),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: isSelected ? Colors.white : StyleConstants.textBody,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
