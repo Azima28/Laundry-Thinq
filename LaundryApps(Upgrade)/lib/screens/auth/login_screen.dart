@@ -147,313 +147,223 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             child: CustomPaint(
-              painter: FullScreenDragonLinesPainter(),
+              painter: CenterDragonLinesPainter(),
               size: Size.infinite,
             ),
           ),
 
-          // 2. MAIN 2-COLUMN BALANCED DESKTOP LAYOUT (NO EMPTY SIDES)
+          // 2. CENTERED ELEGANT LOGIN CARD (MACOS / ENTERPRISE DESKTOP STYLE)
           SafeArea(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // SISI KIRI (45%): Form Login Kartu Elegan (Glassmorphism)
-                Expanded(
-                  flex: 45,
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 32),
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 440),
-                        padding: const EdgeInsets.all(36),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A).withValues(alpha: 0.90),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(0xFF334155),
-                            width: 1.2,
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 42),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: const Color(0xFF334155),
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        blurRadius: 36,
+                        offset: const Offset(0, 14),
+                      ),
+                    ],
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Centered Brand Logo
+                        Center(
+                          child: Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              gradient: StyleConstants.primaryGradient,
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: StyleConstants.primaryColor.withValues(alpha: 0.4),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.local_laundry_service_rounded,
+                              color: Colors.white,
+                              size: 30,
+                            ),
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.5),
-                              blurRadius: 28,
-                              offset: const Offset(0, 10),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Brand Title
+                        const Center(
+                          child: Text(
+                            'SMART LAUNDRY',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ),
+                        const Center(
+                          child: Text(
+                            'Aplikasi Kasir & Kontrol Toko',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: StyleConstants.accentCyan,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 32),
+                        const Divider(height: 1, color: Color(0xFF1E293B)),
+                        const SizedBox(height: 28),
+
+                        // Form Heading
+                        Text(
+                          _isSettingUpAdmin ? 'Buat Akun Admin' : 'Masuk Akun',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _isSettingUpAdmin
+                              ? 'Buat akun pengelola utama untuk memulai toko.'
+                              : 'Masukkan username dan password akun Anda.',
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Username Field
+                        TextFormField(
+                          controller: _usernameController,
+                          autofocus: true,
+                          style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
+                          textInputAction: TextInputAction.next,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Username wajib diisi';
+                            }
+                            return null;
+                          },
+                          decoration: _buildDarkInputDecoration(
+                            'Username',
+                            Icons.person_outline_rounded,
+                            hintText: 'Ketik nama pengguna...',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Password Field
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: _obscureText,
+                          style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _isLoading ? null : _login(),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Password wajib diisi';
+                            }
+                            return null;
+                          },
+                          decoration: _buildDarkInputDecoration(
+                            'Password',
+                            Icons.lock_outline_rounded,
+                            hintText: 'Ketik password akun...',
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                size: 18,
+                                color: const Color(0xFF94A3B8),
+                              ),
+                              onPressed: () => setState(() => _obscureText = !_obscureText),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 26),
+
+                        // Submit Button
+                        ElevatedButton(
+                          onPressed: _isLoading ? null : _login,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: StyleConstants.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.2,
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.login_rounded, size: 18),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _isSettingUpAdmin ? 'Simpan & Masuk' : 'Masuk ke Kasir',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Security Footer
+                        const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.shield_outlined, size: 14, color: Color(0xFF94A3B8)),
+                            SizedBox(width: 6),
+                            Text(
+                              'Sistem Kasir Offline · Akses Terproteksi',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF94A3B8),
+                              ),
                             ),
                           ],
-                        ),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Brand Header
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      gradient: StyleConstants.primaryGradient,
-                                      borderRadius: BorderRadius.circular(10),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: StyleConstants.primaryColor.withValues(alpha: 0.4),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.local_laundry_service_rounded,
-                                      color: Colors.white,
-                                      size: 24,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  const Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'SMART LAUNDRY',
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w900,
-                                          color: Colors.white,
-                                          letterSpacing: 1.0,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Aplikasi Kasir & Kontrol Toko',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: StyleConstants.accentCyan,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 36),
-
-                              // Form Title
-                              Text(
-                                _isSettingUpAdmin ? 'Buat Akun Admin' : 'Masuk Akun',
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                  letterSpacing: -0.4,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _isSettingUpAdmin
-                                    ? 'Buat akun pengelola utama untuk memulai toko.'
-                                    : 'Masukkan username dan password akun Anda.',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF94A3B8),
-                                ),
-                              ),
-                              const SizedBox(height: 28),
-
-                              // Username Field (Dark Style)
-                              TextFormField(
-                                controller: _usernameController,
-                                autofocus: true,
-                                style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
-                                textInputAction: TextInputAction.next,
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Username wajib diisi';
-                                  }
-                                  return null;
-                                },
-                                decoration: _buildDarkInputDecoration(
-                                  'Username',
-                                  Icons.person_outline_rounded,
-                                  hintText: 'Ketik nama pengguna...',
-                                ),
-                              ),
-                              const SizedBox(height: 18),
-
-                              // Password Field (Dark Style)
-                              TextFormField(
-                                controller: _passwordController,
-                                obscureText: _obscureText,
-                                style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
-                                textInputAction: TextInputAction.done,
-                                onFieldSubmitted: (_) => _isLoading ? null : _login(),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Password wajib diisi';
-                                  }
-                                  return null;
-                                },
-                                decoration: _buildDarkInputDecoration(
-                                  'Password',
-                                  Icons.lock_outline_rounded,
-                                  hintText: 'Ketik password akun...',
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                      size: 18,
-                                      color: const Color(0xFF94A3B8),
-                                    ),
-                                    onPressed: () => setState(() => _obscureText = !_obscureText),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 28),
-
-                              // Tombol Masuk
-                              ElevatedButton(
-                                onPressed: _isLoading ? null : _login,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: StyleConstants.primaryColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  elevation: 0,
-                                ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2.2,
-                                        ),
-                                      )
-                                    : Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(Icons.login_rounded, size: 18),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            _isSettingUpAdmin ? 'Simpan & Masuk' : 'Masuk ke Kasir',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w900,
-                                              letterSpacing: 0.3,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                              ),
-                              const SizedBox(height: 20),
-
-                              // Keterangan Akses Aman
-                              const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.shield_outlined, size: 14, color: Color(0xFF94A3B8)),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'Akses Aman & Terproteksi',
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF94A3B8),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // SISI KANAN (55%): Info Fitur & Visual Keunggulan (Menyatu Alami)
-                Expanded(
-                  flex: 55,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 48),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Spacer(),
-
-                        // Headline
-                        const Text(
-                          'Kelola Usaha Laundry Jadi Lebih Rapi & Cepat',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            height: 1.35,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Catat pesanan pelanggan, pantau mesin cuci dan pengering, serta rekap laporan keuangan toko dalam satu aplikasi.',
-                          style: TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 14,
-                            height: 1.5,
-                          ),
-                        ),
-
-                        const SizedBox(height: 36),
-
-                        // 3 Fitur Utama (Dark Card Style)
-                        _buildFeatureCard(
-                          icon: Icons.receipt_long_rounded,
-                          title: 'Kasir & Pembayaran',
-                          desc: 'Input pesanan kiloan & satuan, hitung tagihan otomatis, dan cetak struk.',
-                          accentColor: StyleConstants.primaryColor,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildFeatureCard(
-                          icon: Icons.local_laundry_service_rounded,
-                          title: 'Pantau Mesin Cuci & Pengering',
-                          desc: 'Ketahui mesin yang sedang berputar, sisa waktu cuci, dan antrean cucian.',
-                          accentColor: StyleConstants.accentCyan,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildFeatureCard(
-                          icon: Icons.account_balance_wallet_rounded,
-                          title: 'Laporan Omzet & Keuangan',
-                          desc: 'Rekap uang masuk, catatan pengeluaran harian, dan data piutang pelanggan.',
-                          accentColor: const Color(0xFF10B981),
-                        ),
-
-                        const Spacer(),
-
-                        // Bottom Status Tag
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A).withValues(alpha: 0.8),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFF334155)),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.check_circle_rounded, size: 14, color: StyleConstants.successColor),
-                              SizedBox(width: 8),
-                              Text(
-                                'Sistem Kasir Offline · Data Tersimpan di Komputer Toko',
-                                style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11.5, fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -487,64 +397,10 @@ class _LoginScreenState extends State<LoginScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     );
   }
-
-  Widget _buildFeatureCard({
-    required IconData icon,
-    required String title,
-    required String desc,
-    required Color accentColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withValues(alpha: 0.70),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF334155).withValues(alpha: 0.8)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 18, color: accentColor),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  desc,
-                  style: const TextStyle(
-                    color: Color(0xFF94A3B8),
-                    fontSize: 12,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-/// CustomPainter to render full-screen flowing glowing dragon/wave contour lines
-class FullScreenDragonLinesPainter extends CustomPainter {
+/// CustomPainter to render full-screen flowing dragon/wave lines harmonized for centered layout
+class CenterDragonLinesPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final width = size.width;
@@ -610,14 +466,14 @@ class FullScreenDragonLinesPainter extends CustomPainter {
     );
     canvas.drawPath(path3, paint3);
 
-    // Line 4: Soft Cyan Ambient Top Contour
+    // Line 4: Ambient Soft Wave
     final paint4 = Paint()
       ..color = const Color(0xFF38BDF8).withValues(alpha: 0.12)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4;
 
     final path4 = Path();
-    path4.moveTo(0, height * 0.50);
+    path4.moveTo(0, height * 0.48);
     path4.cubicTo(
       width * 0.25, height * 0.65,
       width * 0.52, height * 0.25,
@@ -629,26 +485,6 @@ class FullScreenDragonLinesPainter extends CustomPainter {
       width, 0,
     );
     canvas.drawPath(path4, paint4);
-
-    // Line 5: Deep Bottom Contour
-    final paint5 = Paint()
-      ..color = const Color(0xFF0EA5E9).withValues(alpha: 0.10)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6;
-
-    final path5 = Path();
-    path5.moveTo(0, height * 0.88);
-    path5.cubicTo(
-      width * 0.15, height * 1.00,
-      width * 0.38, height * 0.60,
-      width * 0.80, height * 0.90,
-    );
-    path5.cubicTo(
-      width * 0.90, height * 0.98,
-      width * 0.97, height * 0.55,
-      width, height * 0.40,
-    );
-    canvas.drawPath(path5, paint5);
   }
 
   @override
