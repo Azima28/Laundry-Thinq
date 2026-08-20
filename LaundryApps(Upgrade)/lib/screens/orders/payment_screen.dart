@@ -71,23 +71,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
     super.dispose();
   }
 
-  void _onKeyPress(String val) {
-    String currentText = _cashController.text.replaceAll('.', '').replaceAll(',', '');
-    if (val == 'C') {
-      _cashController.clear();
-    } else if (val == 'back') {
-      if (currentText.isNotEmpty) {
-        currentText = currentText.substring(0, currentText.length - 1);
-        _cashController.text = currentText;
-      }
-    } else {
-      currentText += val;
-      _cashController.text = currentText;
-    }
-  }
-
   void _setQuickCash(int amount) {
-    _cashController.text = amount.toString();
+    _cashController.text = amount > 0 ? amount.toString() : '';
   }
 
   Future<void> _processPayment() async {
@@ -565,7 +550,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  // --- CASH TENDER PANE ---
+  // --- CASH TENDER PANE (DESKTOP KEYBOARD WORKSTATION) ---
   Widget _buildCashPane(int change) {
     final isLunasMode = _paymentStatus == 'lunas';
     final isButtonEnabled = isLunasMode
@@ -575,185 +560,249 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          isLunasMode ? 'Input Nominal Uang Tunai (Lunas)' : 'Input Nominal Uang Tunai DP (Cicilan)',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
-        ),
-        const SizedBox(height: 14),
-
-        // Cash Input Field
-        TextFormField(
-          controller: _cashController,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          style: StyleConstants.tabularNumbers(fontSize: 24, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
-          decoration: InputDecoration(
-            prefixIcon: const Padding(
-              padding: EdgeInsets.only(left: 18, right: 10),
-              child: Text('Rp', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isLunasMode ? 'Input Nominal Uang Tunai Diterima' : 'Input Nominal Uang Muka (DP)',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Ketik langsung menggunakan keyboard fisik atau pilih pecahan cepat',
+                  style: TextStyle(fontSize: 12, color: StyleConstants.textMuted),
+                ),
+              ],
             ),
-            prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-            filled: true,
-            fillColor: const Color(0xFFF8FAFC),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: StyleConstants.borderLight)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: StyleConstants.borderLight)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: StyleConstants.borderFocus, width: 2)),
+            if (_cashReceived > 0)
+              TextButton.icon(
+                onPressed: () => _cashController.clear(),
+                icon: const Icon(Icons.clear_rounded, size: 16, color: StyleConstants.dangerColor),
+                label: const Text('Reset', style: TextStyle(color: StyleConstants.dangerColor, fontWeight: FontWeight.bold, fontSize: 12)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // 1. Large Focused Cash Input Field (Keyboard First)
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isButtonEnabled ? StyleConstants.successColor : StyleConstants.borderFocus,
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: StyleConstants.primaryColor.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Row(
+            children: [
+              const Text(
+                'Rp',
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: StyleConstants.textMuted),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: TextField(
+                  controller: _cashController,
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  style: StyleConstants.tabularNumbers(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: StyleConstants.textHeading,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: '0',
+                    hintStyle: TextStyle(color: Color(0xFFCBD5E1), fontSize: 28, fontWeight: FontWeight.w900),
+                    border: InputBorder.none,
+                  ),
+                  onSubmitted: (_) {
+                    if (isButtonEnabled && !_isProcessing) {
+                      _processPayment();
+                    }
+                  },
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 18),
 
-        // Change or Debt Box
+        // 2. Quick Cash Denomination Suggestions
+        const Text(
+          'PILIHAN PECAHAN UANG CEPAT:',
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: StyleConstants.textMuted, letterSpacing: 0.5),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _quickCashPresetBtn(widget.order.totalAmount, 'Uang Pas (${formatRp(widget.order.totalAmount)})', isExact: true),
+            _quickCashPresetBtn(10000, 'Rp 10.000'),
+            _quickCashPresetBtn(20000, 'Rp 20.000'),
+            _quickCashPresetBtn(50000, 'Rp 50.000'),
+            _quickCashPresetBtn(100000, 'Rp 100.000'),
+            _quickCashPresetBtn(200000, 'Rp 200.000'),
+            _quickCashPresetBtn(500000, 'Rp 500.000'),
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        // 3. Live Change / Kembalian Calculation Display (Enterprise POS Banner)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: isLunasMode
-                ? (change >= 0 ? StyleConstants.statusSuccessBg : StyleConstants.statusWarningBg)
-                : StyleConstants.statusInfoBg,
-            borderRadius: BorderRadius.circular(10),
+                ? (change >= 0 ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB))
+                : const Color(0xFFEFF6FF),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isLunasMode
-                  ? (change >= 0 ? StyleConstants.successColor.withValues(alpha: 0.3) : StyleConstants.warningColor.withValues(alpha: 0.3))
-                  : StyleConstants.primaryColor.withValues(alpha: 0.3),
+                  ? (change >= 0 ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A))
+                  : const Color(0xFFBFDBFE),
+              width: 1.5,
             ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                isLunasMode
-                    ? (change >= 0 ? 'Kembalian Pelanggan:' : 'Uang Pembayaran Kurang:')
-                    : 'Sisa Pembayaran (Piutang):',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                  color: isLunasMode
-                      ? (change >= 0 ? StyleConstants.statusSuccessText : StyleConstants.statusWarningText)
-                      : StyleConstants.statusInfoText,
-                ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isLunasMode
+                          ? (change >= 0 ? StyleConstants.successColor.withValues(alpha: 0.15) : StyleConstants.warningColor.withValues(alpha: 0.15))
+                          : StyleConstants.primaryColor.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isLunasMode
+                          ? (change >= 0 ? Icons.price_check_rounded : Icons.warning_amber_rounded)
+                          : Icons.account_balance_wallet_rounded,
+                      size: 26,
+                      color: isLunasMode
+                          ? (change >= 0 ? StyleConstants.successColor : StyleConstants.warningColor)
+                          : StyleConstants.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isLunasMode
+                            ? (change >= 0 ? 'KEMBALIAN UANG TUNAI' : 'UANG PEMBAYARAN KURANG')
+                            : 'SISA PEMBAYARAN (PIUTANG)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                          color: isLunasMode
+                              ? (change >= 0 ? const Color(0xFF047857) : const Color(0xFFB45309))
+                              : const Color(0xFF1D4ED8),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        isLunasMode
+                            ? (change >= 0 ? 'Uang kembalian yang harus diserahkan ke pelanggan' : 'Nominal diterima belum mencukupi total tagihan')
+                            : 'Akan tercatat sebagai piutang pelanggan',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: isLunasMode
+                              ? (change >= 0 ? const Color(0xFF065F46) : const Color(0xFF92400E))
+                              : const Color(0xFF1E40AF),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
               Text(
                 isLunasMode
-                    ? formatRp(change.abs())
+                    ? formatRp(change >= 0 ? change : change.abs())
                     : formatRp((widget.order.totalAmount - _cashReceived).clamp(0, widget.order.totalAmount)),
                 style: StyleConstants.tabularNumbers(
-                  fontSize: 16,
+                  fontSize: 28,
                   fontWeight: FontWeight.w900,
                   color: isLunasMode
-                      ? (change >= 0 ? StyleConstants.statusSuccessText : StyleConstants.statusWarningText)
-                      : StyleConstants.statusInfoText,
+                      ? (change >= 0 ? const Color(0xFF047857) : const Color(0xFFB45309))
+                      : const Color(0xFF1D4ED8),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 14),
 
-        // Quick Cash Money Presets
-        Row(
-          children: [
-            _quickCashPresetBtn(widget.order.totalAmount, 'Uang Pas'),
-            const SizedBox(width: 8),
-            _quickCashPresetBtn(10000, '10k'),
-            const SizedBox(width: 8),
-            _quickCashPresetBtn(20000, '20k'),
-            const SizedBox(width: 8),
-            _quickCashPresetBtn(50000, '50k'),
-            const SizedBox(width: 8),
-            _quickCashPresetBtn(100000, '100k'),
-          ],
-        ),
-        const SizedBox(height: 14),
+        const Spacer(),
 
-        // Numpad Grid
-        Expanded(
-          child: GridView.count(
-            crossAxisCount: 3,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 2.9,
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              for (var i = 1; i <= 9; i++) _padBtn(i.toString()),
-              _padBtn('C', color: StyleConstants.statusDangerBg, textColor: StyleConstants.dangerColor),
-              _padBtn('0'),
-              _padIconBtn(Icons.backspace_rounded, 'back'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        // Confirm Action Button
+        // 4. Large Action Confirmation Button (Keyboard Enter Action)
         ElevatedButton(
           onPressed: (isButtonEnabled && !_isProcessing) ? _processPayment : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: isLunasMode ? StyleConstants.successColor : StyleConstants.warningColor,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 0,
           ),
           child: _isProcessing
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : Text(
-                  isLunasMode ? 'KONFIRMASI PEMBAYARAN LUNAS (SELESAI)' : 'KONFIRMASI PEMBAYARAN DP (CICILAN)',
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, letterSpacing: 0.4),
+              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.check_circle_rounded, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      isLunasMode ? 'KONFIRMASI PEMBAYARAN LUNAS & CETAK STRUK (ENTER)' : 'KONFIRMASI PEMBAYARAN DP (ENTER)',
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
+                    ),
+                  ],
                 ),
         ),
       ],
     );
   }
 
-  Widget _quickCashPresetBtn(int amount, String label) {
-    return Expanded(
-      child: OutlinedButton(
-        onPressed: () => _setQuickCash(amount),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: StyleConstants.borderLight),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  Widget _quickCashPresetBtn(int amount, String label, {bool isExact = false}) {
+    final isSelected = _cashReceived == amount;
+    return OutlinedButton(
+      onPressed: () => _setQuickCash(amount),
+      style: OutlinedButton.styleFrom(
+        backgroundColor: isExact
+            ? (isSelected ? StyleConstants.primaryColor : StyleConstants.primaryColor.withValues(alpha: 0.08))
+            : (isSelected ? StyleConstants.textHeading : Colors.white),
+        foregroundColor: isExact
+            ? (isSelected ? Colors.white : StyleConstants.primaryColor)
+            : (isSelected ? Colors.white : StyleConstants.textHeading),
+        side: BorderSide(
+          color: isExact ? StyleConstants.primaryColor : (isSelected ? StyleConstants.textHeading : StyleConstants.borderLight),
+          width: isSelected ? 1.5 : 1,
         ),
-        child: Text(label, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: StyleConstants.textBody)),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
-    );
-  }
-
-  Widget _padBtn(String val, {Color? color, Color? textColor}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color ?? const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: StyleConstants.borderLight),
-      ),
-      child: InkWell(
-        onTap: () => _onKeyPress(val),
-        borderRadius: BorderRadius.circular(10),
-        child: Center(
-          child: Text(
-            val,
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-              color: textColor ?? StyleConstants.textHeading,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _padIconBtn(IconData icon, String action) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: StyleConstants.borderLight),
-      ),
-      child: InkWell(
-        onTap: () => _onKeyPress(action),
-        borderRadius: BorderRadius.circular(10),
-        child: Center(
-          child: Icon(icon, size: 20, color: StyleConstants.textBody),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+          color: isExact
+              ? (isSelected ? Colors.white : StyleConstants.primaryColor)
+              : (isSelected ? Colors.white : StyleConstants.textHeading),
         ),
       ),
     );
