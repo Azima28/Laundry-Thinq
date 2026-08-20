@@ -107,7 +107,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           setState(() => _isProcessing = false);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('⚠️ Uang tunai yang diterima kurang dari total tagihan!'), backgroundColor: StyleConstants.warningColor),
+              const SnackBar(content: Text('Uang tunai yang diterima kurang dari total tagihan!'), backgroundColor: StyleConstants.warningColor),
             );
           }
           return;
@@ -119,7 +119,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           setState(() => _isProcessing = false);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('⚠️ Jumlah DP harus lebih besar dari 0 dan kurang dari total tagihan!'), backgroundColor: StyleConstants.warningColor),
+              const SnackBar(content: Text('Jumlah DP harus lebih besar dari 0 dan kurang dari total tagihan!'), backgroundColor: StyleConstants.warningColor),
             );
           }
           return;
@@ -819,7 +819,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
           if (_lastError != null) ...[
             const SizedBox(height: 12),
-            Text('⚠️ $_lastError', textAlign: TextAlign.center, style: const TextStyle(color: StyleConstants.dangerColor, fontSize: 12, fontWeight: FontWeight.bold)),
+            Text('Error: $_lastError', textAlign: TextAlign.center, style: const TextStyle(color: StyleConstants.dangerColor, fontSize: 12, fontWeight: FontWeight.bold)),
           ],
           const Spacer(),
           ElevatedButton(

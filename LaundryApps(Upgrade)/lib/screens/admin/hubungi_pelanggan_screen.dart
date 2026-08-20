@@ -195,7 +195,7 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
                 Navigator.pop(context);
                 _loadReadyOrders();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('✅ Nomor WhatsApp berhasil diubah!'), backgroundColor: Colors.green),
+                  const SnackBar(content: Text('Nomor WhatsApp berhasil diubah.'), backgroundColor: Colors.green),
                 );
               }
             },
@@ -209,13 +209,13 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
   Future<void> _notifyCustomer(Order order) async {
     if (order.customerPhone == null || order.customerPhone!.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Nomor WhatsApp pelanggan belum diatur!'), backgroundColor: Colors.orange),
+        const SnackBar(content: Text('Nomor WhatsApp pelanggan belum diatur.'), backgroundColor: Colors.orange),
       );
       return;
     }
 
     final String message = "Halo Kak ${order.customerName},\n\nPesanan Laundry Anda dengan Nota #${order.id} telah *SELESAI* dan siap untuk diambil/diantarkan.\n\nTerima kasih banyak telah mencuci di Smart Laundry!";
-    
+
     // Save to wa_outbox queue in python database or directly open link
     final db = await _db.database;
     await db.insert('wa_outbox', {
@@ -226,7 +226,7 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('💬 Notifikasi masuk antrean WhatsApp Outbox!'), backgroundColor: Colors.green),
+      const SnackBar(content: Text('Notifikasi masuk antrean WhatsApp Outbox.'), backgroundColor: Colors.green),
     );
   }
 
@@ -235,11 +235,11 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
     if (success) {
       _loadReadyOrders();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Pesanan berhasil diselesaikan!'), backgroundColor: Colors.green),
+        const SnackBar(content: Text('Pesanan berhasil diselesaikan.'), backgroundColor: Colors.green),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('❌ Gagal memperbarui status pesanan')),
+        const SnackBar(content: Text('Gagal memperbarui status pesanan.')),
       );
     }
   }

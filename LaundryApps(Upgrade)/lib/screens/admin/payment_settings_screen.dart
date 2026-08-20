@@ -80,7 +80,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Pengaturan pembayaran berhasil disimpan!'),
+            content: Text('Pengaturan pembayaran berhasil disimpan.'),
             backgroundColor: Colors.green,
           ),
         );
@@ -90,7 +90,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Gagal menyimpan pengaturan: $e'),
+            content: Text('Gagal menyimpan pengaturan: $e'),
             backgroundColor: Colors.red,
           ),
         );

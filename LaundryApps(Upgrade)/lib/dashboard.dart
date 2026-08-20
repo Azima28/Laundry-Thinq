@@ -257,7 +257,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
-                        color: StyleConstants.primaryColor.withOpacity(0.35),
+                        color: StyleConstants.primaryColor.withValues(alpha: 0.35),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -375,7 +375,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.08),
+                      color: Colors.red.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -413,23 +413,17 @@ class _DashboardPageState extends State<DashboardPage> {
       preferBelow: false,
       child: InkWell(
         onTap: () => setState(() => _selectedIndex = index),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: EdgeInsets.symmetric(
             vertical: 10,
             horizontal: _isSidebarExpanded ? 12 : 0,
           ),
           decoration: BoxDecoration(
-            color: isSelected ? StyleConstants.primaryColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: StyleConstants.primaryColor.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    )
-                  ]
+            color: isSelected ? const Color(0xFF1E293B) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: isSelected
+                ? Border.all(color: const Color(0xFF334155), width: 1)
                 : null,
           ),
           child: Row(
@@ -437,7 +431,7 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               Icon(
                 icon,
-                color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                color: isSelected ? StyleConstants.accentCyan : const Color(0xFF94A3B8),
                 size: 20,
               ),
               if (_isSidebarExpanded) ...[
@@ -446,9 +440,9 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: Text(
                     label,
                     style: TextStyle(
-                      color: isSelected ? Colors.white : const Color(0xFFCBD5E1),
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                      fontSize: 13.5,
+                      color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                      fontSize: 13,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -457,7 +451,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.white.withOpacity(0.2) : StyleConstants.accentCyan.withOpacity(0.2),
+                      color: isSelected ? StyleConstants.accentCyan.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -465,7 +459,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
-                        color: isSelected ? Colors.white : StyleConstants.accentCyan,
+                        color: isSelected ? StyleConstants.accentCyan : const Color(0xFF94A3B8),
                       ),
                     ),
                   ),
@@ -532,7 +526,7 @@ class _DashboardPageState extends State<DashboardPage> {
               children: [
                 CircleAvatar(
                   radius: 12,
-                  backgroundColor: StyleConstants.primaryColor.withOpacity(0.12),
+                  backgroundColor: StyleConstants.primaryColor.withValues(alpha: 0.12),
                   child: const Icon(Icons.person_rounded, size: 14, color: StyleConstants.primaryColor),
                 ),
                 const SizedBox(width: 8),
@@ -593,7 +587,7 @@ class _DashboardPageState extends State<DashboardPage> {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.25)),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -874,7 +868,7 @@ class _DashboardPageState extends State<DashboardPage> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -936,7 +930,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: accentColor.withOpacity(0.1),
+                    color: accentColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(icon, color: accentColor, size: 26),
@@ -1019,7 +1013,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, color: color, size: 18),

@@ -67,7 +67,7 @@ class _TambahItemScreenState extends State<TambahItemScreen> {
     
     if (nama.isEmpty || hargaText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Nama dan harga harus diisi!')),
+        const SnackBar(content: Text('Nama dan harga harus diisi.')),
       );
       return;
     }
@@ -75,7 +75,7 @@ class _TambahItemScreenState extends State<TambahItemScreen> {
     final int? harga = int.tryParse(hargaText);
     if (harga == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Harga harus berupa angka!')),
+        const SnackBar(content: Text('Harga harus berupa angka.')),
       );
       return;
     }
@@ -85,7 +85,7 @@ class _TambahItemScreenState extends State<TambahItemScreen> {
       stock = int.tryParse(stockText);
       if (stock == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('⚠️ Stok harus berupa angka!')),
+          const SnackBar(content: Text('Stok harus berupa angka.')),
         );
         return;
       }
@@ -102,7 +102,7 @@ class _TambahItemScreenState extends State<TambahItemScreen> {
       type: TransactionType.item,
       createdAt: DateTime.now(),
     );
-    
+
     final success = await _repository.insertTransaction(item) > 0;
     if (success) {
       _namaController.clear();
@@ -116,11 +116,11 @@ class _TambahItemScreenState extends State<TambahItemScreen> {
       });
       _loadItems();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Item berhasil ditambahkan!'), backgroundColor: Colors.green),
+        const SnackBar(content: Text('Item berhasil ditambahkan.'), backgroundColor: Colors.green),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('❌ Gagal menambahkan item')),
+        const SnackBar(content: Text('Gagal menambahkan item.')),
       );
     }
   }

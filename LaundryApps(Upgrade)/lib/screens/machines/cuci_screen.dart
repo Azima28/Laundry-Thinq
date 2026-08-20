@@ -623,11 +623,11 @@ class _CuciContentState extends State<CuciContent> {
       } else {
         // Finished / Idle, waiting for cashier action
         if (waSent) {
-          // 5. SUDAH DI-WA (Purple)
-          color = StyleConstants.secondaryColor;
-          bg = const Color(0xFFEEF2FF);
-          border = StyleConstants.secondaryColor.withValues(alpha: 0.3);
-          badgeText = "✓ WA";
+          // 5. SUDAH DI-WA (Purple / Teal)
+          color = StyleConstants.infoColor;
+          bg = StyleConstants.statusInfoBg;
+          border = StyleConstants.infoColor.withValues(alpha: 0.3);
+          badgeText = "WA TERKIRIM";
           canClick = true;
         } else {
           // 4. MENUNGGU (Amber)
@@ -1226,22 +1226,39 @@ class _CuciContentState extends State<CuciContent> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isReplacing
-                        ? primaryColor
-                        : (isLastMachine && sendWa ? const Color(0xFF8B5CF6) : const Color(0xFF22C55E)),
+                        ? StyleConstants.primaryColor
+                        : (isLastMachine && sendWa ? StyleConstants.successColor : StyleConstants.primaryColor),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
+                    elevation: 0,
                   ),
-                  child: Text(
-                    isReplacing
-                        ? '✓ Ganti Pelanggan'
-                        : (isLastMachine
-                            ? (sendWa ? '📩 Selesaikan & Kirim WA' : '✓ Selesaikan Mesin')
-                            : '✓ Selesaikan Mesin Ini'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isReplacing
+                            ? Icons.swap_horiz_rounded
+                            : (sendWa ? Icons.send_rounded : Icons.check_circle_rounded),
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isReplacing
+                            ? 'Ganti Pelanggan'
+                            : (isLastMachine
+                                ? (sendWa ? 'Selesaikan & Kirim WA' : 'Selesaikan Mesin')
+                                : 'Selesaikan Mesin Ini'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

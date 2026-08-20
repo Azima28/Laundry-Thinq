@@ -203,7 +203,7 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
           setState(() {
             _testPhoneCtrl.text = prefs.getString('wa_test_phone') ?? '6289522584477';
             _chatbotEnabled = data['chatbot_enabled'] ?? true;
-            _chatbotWelcomeController.text = data['chatbot_welcome_message'] ?? 'Halo! Selamat datang di Azima Laundry. 😊 Ada yang bisa kami bantu?';
+            _chatbotWelcomeController.text = data['chatbot_welcome_message'] ?? 'Halo! Selamat datang di Smart Laundry. Ada yang bisa kami bantu?';
             _chatbotWelcomeCooldown = data['chatbot_welcome_cooldown'] ?? 0;
             _chatbotStaffCooldown = data['chatbot_staff_cooldown'] ?? 30;
             _chatbotMenu = List<dynamic>.from(data['chatbot_menu'] ?? []);
@@ -249,7 +249,7 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Template WhatsApp berhasil disimpan!'), backgroundColor: Colors.green),
+            const SnackBar(content: Text('Template WhatsApp berhasil disimpan.'), backgroundColor: Colors.green),
           );
         }
       } else {
@@ -258,7 +258,7 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Gagal menyimpan: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Gagal menyimpan: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -1159,7 +1159,7 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
                       controller: labelController,
                       maxLength: 30,
                       decoration: InputDecoration(
-                        hintText: 'Misal: 💰 Daftar Harga',
+                        hintText: 'Misal: Daftar Harga Layanan',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         counterText: '',

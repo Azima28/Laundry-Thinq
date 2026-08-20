@@ -117,7 +117,7 @@ class _MesinCuciScreenState extends State<MesinCuciScreen> {
     
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ Mesin "$name" berhasil disimpan ke Database!'), backgroundColor: Colors.green),
+        SnackBar(content: Text('Mesin "$name" berhasil disimpan ke Database.'), backgroundColor: Colors.green),
       );
     }
     _loadSavedMachines();
@@ -129,7 +129,7 @@ class _MesinCuciScreenState extends State<MesinCuciScreen> {
       await _db.deleteMachine(machine.id!);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('🗑️ Mesin "$name" berhasil dihapus dari Database!'), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text('Mesin "$name" berhasil dihapus dari Database.'), backgroundColor: Colors.redAccent),
         );
       }
       _loadSavedMachines();
@@ -167,17 +167,17 @@ class _MesinCuciScreenState extends State<MesinCuciScreen> {
             }
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Berhasil mendeteksi mesin ThinQ!'), backgroundColor: Colors.green),
+            const SnackBar(content: Text('Berhasil mendeteksi mesin ThinQ.'), backgroundColor: Colors.green),
           );
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('⚠️ Gagal fetch: Status ${response.statusCode}'), backgroundColor: Colors.orange),
+          SnackBar(content: Text('Gagal fetch: Status ${response.statusCode}'), backgroundColor: Colors.orange),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Gagal menghubungi API server: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Gagal menghubungi API server: $e'), backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isLoading = false);
@@ -189,7 +189,7 @@ class _MesinCuciScreenState extends State<MesinCuciScreen> {
     if (base.isEmpty) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('🔌 Menghubungkan ke $entityId...'), duration: const Duration(seconds: 1)),
+      SnackBar(content: Text('Menghubungkan ke $entityId...'), duration: const Duration(seconds: 1)),
     );
 
     try {
@@ -212,16 +212,16 @@ class _MesinCuciScreenState extends State<MesinCuciScreen> {
           };
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('🟢 Koneksi OK! Status: ${data['state']}'), backgroundColor: Colors.green),
+          SnackBar(content: Text('Koneksi OK! Status: ${data['state']}'), backgroundColor: Colors.green),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('🔴 Gagal tes koneksi: HTTP ${response.statusCode}'), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text('Gagal tes koneksi: HTTP ${response.statusCode}'), backgroundColor: Colors.redAccent),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Gagal menghubungi API: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Gagal menghubungi API: $e'), backgroundColor: Colors.red),
       );
     }
   }

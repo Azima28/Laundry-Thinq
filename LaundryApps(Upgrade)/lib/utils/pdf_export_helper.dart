@@ -428,7 +428,7 @@ class PdfExportHelper {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Laporan berhasil disimpan di:\n${file.path}'),
+            content: Text('Laporan berhasil disimpan di:\n${file.path}'),
             backgroundColor: const Color(0xFF10B981), // Emerald Green
             duration: const Duration(seconds: 7),
             action: SnackBarAction(
@@ -445,7 +445,7 @@ class PdfExportHelper {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Gagal menyimpan PDF: $e'),
+            content: Text('Gagal menyimpan PDF: $e'),
             backgroundColor: Colors.red,
           ),
         );

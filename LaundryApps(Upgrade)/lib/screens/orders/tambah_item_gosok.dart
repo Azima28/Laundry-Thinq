@@ -47,7 +47,7 @@ class _TambahItemGosokScreenState extends State<TambahItemGosokScreen> {
     
     if (nama.isEmpty || hargaText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Nama dan harga harus diisi!')),
+        const SnackBar(content: Text('Nama dan harga harus diisi.')),
       );
       return;
     }
@@ -55,7 +55,7 @@ class _TambahItemGosokScreenState extends State<TambahItemGosokScreen> {
     final int? harga = int.tryParse(hargaText);
     if (harga == null || harga <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Harga tidak valid!')),
+        const SnackBar(content: Text('Harga tidak valid.')),
       );
       return;
     }
@@ -64,7 +64,7 @@ class _TambahItemGosokScreenState extends State<TambahItemGosokScreen> {
     final int? durasi = int.tryParse(durasiText);
     if (durasiText.isNotEmpty && (durasi == null || durasi < 0)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Durasi pengerjaan tidak valid!')),
+        const SnackBar(content: Text('Durasi pengerjaan tidak valid.')),
       );
       return;
     }
@@ -86,16 +86,16 @@ class _TambahItemGosokScreenState extends State<TambahItemGosokScreen> {
         _durasiController.clear();
         _loadItems();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Layanan setrika berhasil ditambahkan!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Layanan setrika berhasil ditambahkan.'), backgroundColor: Colors.green),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('❌ Gagal menambahkan item')),
+          const SnackBar(content: Text('Gagal menambahkan item.')),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Terjadi kesalahan: $e')),
+        SnackBar(content: Text('Terjadi kesalahan: $e')),
       );
     }
   }

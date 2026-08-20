@@ -381,7 +381,7 @@ class _PesanPageState extends State<PesanPage> {
   Future<void> _submitOrder(String mode) async {
     if (_customerNameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Pilih atau isi nama pelanggan terlebih dahulu')),
+        const SnackBar(content: Text('Pilih atau isi nama pelanggan terlebih dahulu')),
       );
       return;
     }
@@ -1182,7 +1182,7 @@ class _PesanPageState extends State<PesanPage> {
               Padding(
                 padding: const EdgeInsets.only(top: 4, left: 24),
                 child: Text(
-                  '📝 $note',
+                  'Catatan: $note',
                   style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: StyleConstants.primaryColor),
                 ),
               ),
@@ -1297,18 +1297,18 @@ class _PesanPageState extends State<PesanPage> {
 
     final buffer = StringBuffer();
     buffer.writeln("=========================");
-    buffer.writeln("   🧾 *SMART LAUNDRY PRO* 🧾");
+    buffer.writeln("   *SMART LAUNDRY PRO*");
     buffer.writeln("=========================");
     buffer.writeln("Halo Kak *${name}*, berikut adalah rincian pesanan cuci Kakak:\n");
-    buffer.writeln("📌 *Nota #${orderId}* - _(${dateStr})_");
+    buffer.writeln("*Nota #${orderId}* - _(${dateStr})_");
     buffer.writeln("---------------------------------");
-    buffer.writeln("🛒 *DETAIL LAYANAN:*");
+    buffer.writeln("*DETAIL LAYANAN:*");
 
     for (var item in finalOrder.items) {
       if (item.quantity == 1) {
-        buffer.writeln("• *${item.itemName}* ➔ *${formatRp(item.price)}*");
+        buffer.writeln("- *${item.itemName}* -> *${formatRp(item.price)}*");
       } else {
-        buffer.writeln("• *${item.itemName}* ➔ *${item.quantity} x ${formatRp(item.price)}* = *${formatRp(item.price * item.quantity)}*");
+        buffer.writeln("- *${item.itemName}* -> *${item.quantity} x ${formatRp(item.price)}* = *${formatRp(item.price * item.quantity)}*");
       }
       if (item.note != null && item.note!.trim().isNotEmpty) {
         buffer.writeln("  _Catatan: ${item.note!.trim()}_");
@@ -1316,12 +1316,12 @@ class _PesanPageState extends State<PesanPage> {
     }
 
     buffer.writeln("---------------------------------");
-    buffer.writeln("💰 *TOTAL TAGIHAN:* *${formatRp(finalOrder.totalAmount)}*");
-    buffer.writeln("💳 *STATUS PEMBAYARAN:* *${statusBayar}*");
+    buffer.writeln("*TOTAL TAGIHAN:* *${formatRp(finalOrder.totalAmount)}*");
+    buffer.writeln("*STATUS PEMBAYARAN:* *${statusBayar}*");
     buffer.writeln("---------------------------------");
-    buffer.writeln("📢 *INFORMASI:* Kakak akan menerima pesan WhatsApp otomatis ketika proses pencucian dimulai dan setelah selesai/siap diambil.");
+    buffer.writeln("*INFORMASI:* Kakak akan menerima pesan WhatsApp otomatis ketika proses pencucian dimulai dan setelah selesai/siap diambil.");
     buffer.writeln("=========================");
-    buffer.writeln("🙏 Terima kasih telah mempercayakan pakaian Kakak kepada kami! 😊");
+    buffer.writeln("Terima kasih telah mempercayakan pakaian Kakak kepada kami.");
 
     try {
       await MachineStatusService.instance.sendCustomWa(

@@ -75,14 +75,14 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
     final amountStr = _amountController.text.trim();
     if (name.isEmpty || amountStr.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Harap isi nama dan jumlah uang pengeluaran'), backgroundColor: Colors.orange),
+        const SnackBar(content: Text('Harap isi nama dan jumlah uang pengeluaran.'), backgroundColor: Colors.orange),
       );
       return;
     }
     final amount = int.tryParse(amountStr);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Jumlah uang pengeluaran tidak valid'), backgroundColor: Colors.orange),
+        const SnackBar(content: Text('Jumlah uang pengeluaran tidak valid.'), backgroundColor: Colors.orange),
       );
       return;
     }
@@ -96,9 +96,9 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
 
     _nameController.clear();
     _amountController.clear();
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✅ Pengeluaran berhasil disimpan'), backgroundColor: Colors.green),
+      const SnackBar(content: Text('Pengeluaran berhasil disimpan.'), backgroundColor: Colors.green),
     );
 
     _loadExpenses();

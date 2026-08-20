@@ -7,6 +7,7 @@ import '../../transactions/transaction_repository.dart';
 import '../../database/models/database_helper.dart';
 import '../../utils/currency_format.dart';
 import '../../services/machine_status_service.dart';
+import '../../utils/style_constants.dart';
 
 class HistoryGosokPage extends StatefulWidget {
   @override
@@ -180,10 +181,10 @@ class _HistoryGosokPageState extends State<HistoryGosokPage> {
               onPressed: () async {
                 final inputAmount = int.tryParse(controller.text) ?? 0;
                 if (inputAmount <= 0) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('⚠️ Nominal bayar tidak valid')));
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Nominal bayar tidak valid.')));
                   return;
                 }
-                
+
                 final totalNewPaid = order.paidAmount + inputAmount;
                 final isFullyPaid = totalNewPaid >= order.totalAmount;
 
@@ -201,7 +202,7 @@ class _HistoryGosokPageState extends State<HistoryGosokPage> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(isFullyPaid ? '✅ Pembayaran Lunas berhasil!' : '✅ Cicilan masuk berhasil dicatat!'),
+                      content: Text(isFullyPaid ? 'Pembayaran Lunas berhasil dicatat.' : 'Cicilan masuk berhasil dicatat.'),
                       backgroundColor: Colors.green,
                     ),
                   );
@@ -304,11 +305,11 @@ class _HistoryGosokPageState extends State<HistoryGosokPage> {
                 
                 // 3. Send WhatsApp notification
                 if (order.customerPhone != null && order.customerPhone!.trim().isNotEmpty) {
-                  final message = 
-                      "Halo Kak *${order.customerName}*, cucian setrika/gosok untuk Nota *#${order.id}* sudah selesai dan siap diambil ya. Terima kasih! 😊";
-                  
+                  final message =
+                      "Halo Kak *${order.customerName}*, cucian setrika/gosok untuk Nota *#${order.id}* sudah selesai dan siap diambil ya. Terima kasih.";
+
                   try {
-                    final response = await MachineStatusService.instance.sendWaMessage(
+                    final response = await MachineStatusService.instance.sendCustomWa(
                       phone: order.customerPhone!,
                       message: message,
                     );
@@ -316,7 +317,7 @@ class _HistoryGosokPageState extends State<HistoryGosokPage> {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('✅ Status diupdate & Notifikasi WA terkirim!'),
+                            content: Text('Status diupdate & Notifikasi WA terkirim.'),
                             backgroundColor: Colors.green,
                           ),
                         );
@@ -325,7 +326,7 @@ class _HistoryGosokPageState extends State<HistoryGosokPage> {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('⚠️ Status diupdate, tapi WA gagal: ${response['error']}'),
+                            content: Text('Status diupdate, tapi WA gagal: ${response['error']}'),
                             backgroundColor: Colors.orange,
                           ),
                         );
@@ -335,7 +336,7 @@ class _HistoryGosokPageState extends State<HistoryGosokPage> {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('⚠️ Status diupdate, tapi WA gagal: $e'),
+                          content: Text('Status diupdate, tapi WA gagal: $e'),
                           backgroundColor: Colors.orange,
                         ),
                       );
@@ -345,7 +346,7 @@ class _HistoryGosokPageState extends State<HistoryGosokPage> {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('✅ Status berhasil diubah ke Selesai! (Tidak ada No. WA)'),
+                        content: Text('Status berhasil diubah ke Selesai.'),
                         backgroundColor: Colors.green,
                       ),
                     );
@@ -354,7 +355,7 @@ class _HistoryGosokPageState extends State<HistoryGosokPage> {
               },
               icon: const Icon(Icons.check_circle_rounded, size: 16),
               label: const Text('Selesaikan & Kirim WA'),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6)),
+              style: ElevatedButton.styleFrom(backgroundColor: StyleConstants.primaryColor),
             ),
           if (!order.isPaid)
             ElevatedButton.icon(

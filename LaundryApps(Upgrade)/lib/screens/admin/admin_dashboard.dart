@@ -120,7 +120,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 final pwd = passwordCtrl.text.trim();
                 if (uname.isEmpty || pwd.isEmpty) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('⚠️ Mohon isi semua field!')),
+                    const SnackBar(content: Text('Mohon isi semua field.')),
                   );
                   return;
                 }
@@ -129,7 +129,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 final users = await _userRepository.getAllUsers();
                 if (users.any((u) => u.username.toLowerCase() == uname.toLowerCase())) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('⚠️ Username sudah digunakan!')),
+                    const SnackBar(content: Text('Username sudah digunakan.')),
                   );
                   return;
                 }
@@ -139,11 +139,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   Navigator.pop(ctx);
                   _loadUsers();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('✅ User baru berhasil dibuat!'), backgroundColor: Colors.green),
+                    const SnackBar(content: Text('User baru berhasil dibuat.'), backgroundColor: Colors.green),
                   );
                 } else {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('❌ Gagal menambahkan user')),
+                    const SnackBar(content: Text('Gagal menambahkan user.')),
                   );
                 }
               },
@@ -216,7 +216,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               final pwd = passwordCtrl.text.trim();
               if (pwd.isEmpty) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('⚠️ Mohon isi password baru')),
+                  const SnackBar(content: Text('Mohon isi password baru.')),
                 );
                 return;
               }
@@ -225,11 +225,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
               if (success) {
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('✅ Password berhasil diubah!'), backgroundColor: Colors.green),
+                  const SnackBar(content: Text('Password berhasil diubah.'), backgroundColor: Colors.green),
                 );
               } else {
                 ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('❌ Gagal mengubah password')),
+                  const SnackBar(content: Text('Gagal mengubah password.')),
                 );
               }
             },

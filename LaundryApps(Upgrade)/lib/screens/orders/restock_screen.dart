@@ -41,7 +41,7 @@ class _RestockScreenState extends State<RestockScreen> {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('⚠️ Gagal memuat barang: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Gagal memuat barang: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -165,7 +165,7 @@ class _RestockScreenState extends State<RestockScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 backgroundColor: Colors.green,
-                                content: Text('✅ Stok "${item.nama}" berhasil ditambah +$addedAmount pcs!'),
+                                content: Text('Stok "${item.nama}" berhasil ditambah +$addedAmount pcs.'),
                               ),
                             );
                           } else {

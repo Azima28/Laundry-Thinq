@@ -394,7 +394,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
   Future<void> _submitOrder(String mode) async {
     if (_customerNameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Pilih atau isi nama pelanggan terlebih dahulu')),
+        const SnackBar(content: Text('Pilih atau isi nama pelanggan terlebih dahulu')),
       );
       return;
     }
@@ -1068,7 +1068,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
             if (note != null && note.trim().isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4, left: 24),
-                child: Text('📝 $note', style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFFF97316))),
+                child: Text('Catatan: $note', style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFFF97316))),
               ),
           ],
         );
@@ -1177,27 +1177,27 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
 
     final buffer = StringBuffer();
     buffer.writeln("=========================");
-    buffer.writeln("   🧺 *AZIMA GOSOK & SETRIKA* 🧺");
+    buffer.writeln("   *AZIMA GOSOK & SETRIKA*");
     buffer.writeln("=========================");
     buffer.writeln("Halo Kak *${name}*, berikut adalah rincian nota setrika Kakak:\n");
-    buffer.writeln("📌 *Nota #${orderId}* - _(${dateStr})_");
+    buffer.writeln("*Nota #${orderId}* - _(${dateStr})_");
     buffer.writeln("---------------------------------");
-    buffer.writeln("🛒 *DETAIL LAYANAN:*");
+    buffer.writeln("*DETAIL LAYANAN:*");
 
     for (var item in finalOrder.items) {
-      buffer.writeln("• *${item.itemName}* ➔ *${formatRp(item.price)}*");
+      buffer.writeln("- *${item.itemName}* -> *${formatRp(item.price)}*");
       if (item.note != null && item.note!.trim().isNotEmpty) {
         buffer.writeln("  _Catatan: ${item.note!.trim()}_");
       }
     }
 
     buffer.writeln("---------------------------------");
-    buffer.writeln("💰 *TOTAL TAGIHAN:* *${formatRp(finalOrder.totalAmount)}*");
-    buffer.writeln("💳 *STATUS PEMBAYARAN:* *${statusBayar}*");
+    buffer.writeln("*TOTAL TAGIHAN:* *${formatRp(finalOrder.totalAmount)}*");
+    buffer.writeln("*STATUS PEMBAYARAN:* *${statusBayar}*");
     buffer.writeln("---------------------------------");
-    buffer.writeln("📢 *INFORMASI:* Kakak akan menerima pesan WhatsApp otomatis setelah proses penyetrikaan selesai dilakukan dan pakaian siap diambil.");
+    buffer.writeln("*INFORMASI:* Kakak akan menerima pesan WhatsApp otomatis setelah proses penyetrikaan selesai dilakukan dan pakaian siap diambil.");
     buffer.writeln("=========================");
-    buffer.writeln("🙏 Terima kasih telah mempercayakan pakaian Kakak kepada kami! 😊");
+    buffer.writeln("Terima kasih telah mempercayakan pakaian Kakak kepada kami.");
 
     try {
       await MachineStatusService.instance.sendCustomWa(

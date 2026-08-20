@@ -62,14 +62,14 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ Nota berhasil dikirim ke printer thermal!'),
+              content: Text('Nota berhasil dikirim ke printer thermal.'),
               backgroundColor: StyleConstants.successColor,
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('⚠️ Printer tidak merespons. Periksa koneksi printer thermal.'),
+              content: Text('Printer tidak merespons. Periksa koneksi printer thermal.'),
               backgroundColor: StyleConstants.dangerColor,
             ),
           );
@@ -89,7 +89,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   Future<void> _sendWaAgain() async {
     if (widget.order.customerPhone == null || widget.order.customerPhone!.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Pelanggan tidak memiliki nomor WhatsApp.')),
+        const SnackBar(content: Text('Pelanggan tidak memiliki nomor WhatsApp.')),
       );
       return;
     }
@@ -101,13 +101,13 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       await MachineStatusService.instance.sendCustomWa(phone: phone, message: msg);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Pesan WhatsApp berhasil dikirim ulang!'), backgroundColor: StyleConstants.successColor),
+          const SnackBar(content: Text('Pesan WhatsApp berhasil dikirim ulang.'), backgroundColor: StyleConstants.successColor),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('❌ Gagal mengirim WhatsApp.'), backgroundColor: StyleConstants.dangerColor),
+          const SnackBar(content: Text('Gagal mengirim WhatsApp.'), backgroundColor: StyleConstants.dangerColor),
         );
       }
     } finally {

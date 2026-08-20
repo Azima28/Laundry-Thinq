@@ -116,13 +116,13 @@ class _HistoryPageState extends State<HistoryPage> {
       _loadOrders();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Status pengerjaan berhasil diperbarui!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Status pengerjaan berhasil diperbarui.'), backgroundColor: Colors.green),
         );
       }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('❌ Gagal memperbarui status pengerjaan'), backgroundColor: Colors.red),
+          const SnackBar(content: Text('Gagal memperbarui status pengerjaan.'), backgroundColor: Colors.red),
         );
       }
     }
@@ -187,10 +187,10 @@ class _HistoryPageState extends State<HistoryPage> {
               onPressed: () async {
                 final inputAmount = int.tryParse(controller.text) ?? 0;
                 if (inputAmount <= 0) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('⚠️ Nominal bayar tidak valid')));
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Nominal bayar tidak valid.')));
                   return;
                 }
-                
+
                 final totalNewPaid = order.paidAmount + inputAmount;
                 final isFullyPaid = totalNewPaid >= order.totalAmount;
 
@@ -208,7 +208,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(isFullyPaid ? '✅ Pembayaran Lunas berhasil!' : '✅ Cicilan masuk berhasil dicatat!'),
+                      content: Text(isFullyPaid ? 'Pembayaran Lunas berhasil dicatat.' : 'Cicilan masuk berhasil dicatat.'),
                       backgroundColor: Colors.green,
                     ),
                   );

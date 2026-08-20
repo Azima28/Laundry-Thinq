@@ -161,7 +161,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result ? '✅ Terhubung ke $name' : '❌ Gagal terhubung ke $name'),
+          content: Text(result ? 'Terhubung ke $name' : 'Gagal terhubung ke $name'),
           backgroundColor: result ? Colors.green : Colors.red,
         ),
       );
@@ -177,7 +177,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
       if (!connected) {
         await PrintBluetoothThermal.connect(macPrinterAddress: _selectedPrinterMac);
       }
-      
+
       List<int> bytes = [];
       bytes += utf8.encode('\n');
       bytes += utf8.encode('================================\n');
@@ -187,11 +187,11 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
       bytes += utf8.encode('Status: Berhasil Terhubung!\n');
       bytes += utf8.encode('Tanggal: ${DateTime.now().toString().substring(0, 19)}\n');
       bytes += utf8.encode('================================\n\n\n\n');
-      
+
       await PrintBluetoothThermal.writeBytes(bytes);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('⚠️ Gagal cetak: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Gagal cetak: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -219,7 +219,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
         );
         if (!result) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('⚠️ Gagal membuat akun administrator.'), backgroundColor: Colors.red),
+            const SnackBar(content: Text('Gagal membuat akun administrator.'), backgroundColor: Colors.red),
           );
           setState(() => _isLoading = false);
           return false;
@@ -230,7 +230,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Error: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
       return false;
     }
@@ -268,19 +268,19 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(connected ? '✅ Sinkronisasi LG ThinQ Berhasil!' : '⚠️ Pengaturan disimpan, namun belum terhubung ke mesin.'),
+              content: Text(connected ? 'Sinkronisasi LG ThinQ Berhasil!' : 'Pengaturan disimpan, namun belum terhubung ke mesin.'),
               backgroundColor: connected ? Colors.green : Colors.orange,
             ),
           );
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('⚠️ Error: Status ${response.statusCode}'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: Status ${response.statusCode}'), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Gagal terhubung ke API: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Gagal terhubung ke API: $e'), backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isLoading = false);
@@ -327,13 +327,13 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
             final int count = data['total_devices'] ?? 0;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('✅ Sinkronisasi Bardi Tuya Berhasil! Menemukan $count perangkat.'),
+                content: Text('Sinkronisasi Bardi Tuya Berhasil! Menemukan $count perangkat.'),
                 backgroundColor: Colors.green,
               ),
             );
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('⚠️ Gagal menyimpan pengaturan: HTTP ${saveResp.statusCode}'), backgroundColor: Colors.orange),
+              SnackBar(content: Text('Gagal menyimpan pengaturan: HTTP ${saveResp.statusCode}'), backgroundColor: Colors.orange),
             );
           }
         } else {
@@ -342,7 +342,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('⚠️ Gagal: ${data['error'] ?? 'koneksi ditolak'}'),
+              content: Text('Gagal: ${data['error'] ?? 'koneksi ditolak'}'),
               backgroundColor: Colors.orange,
             ),
           );
@@ -351,12 +351,12 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
         final data = json.decode(response.body);
         final errMsg = data['error'] ?? 'Status ${response.statusCode}';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('⚠️ Sinkronisasi Gagal: $errMsg'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Sinkronisasi Gagal: $errMsg'), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Gagal terhubung ke API: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Gagal terhubung ke API: $e'), backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isLoading = false);
@@ -392,7 +392,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
         final List<String> thinqDevices = List<String>.from(data['devices'] ?? []);
-        
+
         final List<MachineModel> list = [];
         for (final name in thinqDevices) {
           final displayName = name.replaceAll('_', ' ');
@@ -434,12 +434,12 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
           }
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Berhasil menyinkronkan ${thinqDevices.length} mesin cuci LG ThinQ.'), backgroundColor: Colors.green),
+          SnackBar(content: Text('Berhasil menyinkronkan ${thinqDevices.length} mesin cuci LG ThinQ.'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Gagal sinkronisasi data ThinQ: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Gagal sinkronisasi data ThinQ: $e'), backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isFetchingMachines = false);
@@ -456,17 +456,16 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
         final List<dynamic> tuyaDevices = data['devices'] ?? [];
-        
+
         final List<MachineModel> list = [];
-        for (final device in tuyaDevices) {
-          final String name = device['name'] ?? 'Bardi Dryer';
-          final String id = device['id'] ?? '';
-          final String key = device['key'] ?? '';
+        for (final item in tuyaDevices) {
+          final devId = item['id'] ?? '';
+          final devName = item['name'] ?? 'Pengering';
           list.add(MachineModel(
-            name: name,
+            name: devName,
             machineType: 'pengering',
-            url: id,
-            key: key,
+            url: devId,
+            key: devId,
             createdAt: DateTime.now(),
           ));
         }
@@ -476,7 +475,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
           final numA = _extractMachineNumber(a);
           final numB = _extractMachineNumber(b);
           if (numA == numB) {
-            return a.name.compareTo(b.name);
+            return a.url.compareTo(b.url);
           }
           return numA.compareTo(numB);
         });
@@ -500,12 +499,12 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
           }
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Berhasil menyinkronkan ${tuyaDevices.length} stopkontak Bardi.'), backgroundColor: Colors.green),
+          SnackBar(content: Text('Berhasil menyinkronkan ${tuyaDevices.length} stopkontak Bardi.'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Gagal sinkronisasi data Bardi: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Gagal sinkronisasi data Bardi: $e'), backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isFetchingMachines = false);

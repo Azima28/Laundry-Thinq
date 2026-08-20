@@ -47,11 +47,11 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     if (!hasPermission) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('⚠️ Izin Bluetooth diperlukan untuk mendeteksi printer')),
+          const SnackBar(content: Text('Izin Bluetooth diperlukan untuk mendeteksi printer')),
         );
       }
     }
-    
+
     final enabled = await PrintBluetoothThermal.bluetoothEnabled;
     if (mounted) setState(() => _btEnabled = enabled);
     if (enabled && hasPermission) _loadDevices();
@@ -60,7 +60,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   Future<void> _loadDevices() async {
     final hasPermission = await PrinterService.requestPermissions();
     if (!hasPermission) return;
-    
+
     setState(() => _isLoading = true);
     try {
       final List<BluetoothInfo> devices = await PrintBluetoothThermal.pairedBluetooths;
@@ -93,7 +93,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
         _savePrinterConnection(mac, name);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result ? '✅ Terhubung ke $name' : '❌ Gagal terhubung ke $name'),
+            content: Text(result ? 'Terhubung ke $name' : 'Gagal terhubung ke $name'),
             backgroundColor: result ? Colors.green : Colors.red,
           ),
         );
@@ -115,7 +115,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
         _selectedName = '';
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('🔌 Sambungan printer diputus'), backgroundColor: Colors.blueGrey),
+        const SnackBar(content: Text('Sambungan printer diputus'), backgroundColor: Colors.blueGrey),
       );
     } catch (e) {
       debugPrint('Error disconnecting printer: $e');
@@ -149,7 +149,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Pengaturan struk belanja berhasil disimpan!'), backgroundColor: Colors.green),
+        const SnackBar(content: Text('Pengaturan struk belanja berhasil disimpan.'), backgroundColor: Colors.green),
       );
     }
   }
@@ -157,20 +157,20 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   Future<void> _testPrint() async {
     if (!_isConnected) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Hubungkan printer bluetooth terlebih dahulu!'), backgroundColor: Colors.orange),
+        const SnackBar(content: Text('Hubungkan printer bluetooth terlebih dahulu.'), backgroundColor: Colors.orange),
       );
       return;
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🖨️ Mencetak halaman pengujian...'), duration: Duration(seconds: 1)),
+      const SnackBar(content: Text('Mencetak halaman pengujian...'), duration: Duration(seconds: 1)),
     );
 
     try {
       await PrinterService.printTestPage();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Gagal cetak: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Gagal cetak: $e'), backgroundColor: Colors.red),
       );
     }
   }

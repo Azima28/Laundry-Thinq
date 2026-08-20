@@ -135,7 +135,7 @@ class _BardiTuyaSettingsScreenState extends State<BardiTuyaSettingsScreen> {
           setState(() => _isConnected = true);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('🎉 Kredensial Tuya Bardi berhasil disimpan!'),
+              content: Text('Kredensial Tuya Bardi berhasil disimpan.'),
               backgroundColor: Colors.green,
             ),
           );
@@ -201,7 +201,7 @@ class _BardiTuyaSettingsScreenState extends State<BardiTuyaSettingsScreen> {
           
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('🎉 Berhasil mensinkronkan ${devices.length} stopkontak Bardi (kategori cz)!'),
+              content: Text('Berhasil mensinkronkan ${devices.length} stopkontak Bardi (kategori cz).'),
               backgroundColor: Colors.green,
             ),
           );
@@ -250,18 +250,18 @@ class _BardiTuyaSettingsScreenState extends State<BardiTuyaSettingsScreen> {
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Mesin pengering berhasil disimpan!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Mesin pengering berhasil disimpan.'), backgroundColor: Colors.green),
         );
         _loadDryerMachines();
       } else {
         final err = json.decode(response.body)['error'] ?? 'Gagal menyimpan';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Error: $err'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: $err'), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Error: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isMachinesLoading = false);
@@ -277,17 +277,17 @@ class _BardiTuyaSettingsScreenState extends State<BardiTuyaSettingsScreen> {
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('🗑️ Mesin pengering berhasil dihapus!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Mesin pengering berhasil dihapus.'), backgroundColor: Colors.green),
         );
         _loadDryerMachines();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('❌ Gagal menghapus mesin pengering'), backgroundColor: Colors.red),
+          const SnackBar(content: Text('Gagal menghapus mesin pengering.'), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Error: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isMachinesLoading = false);

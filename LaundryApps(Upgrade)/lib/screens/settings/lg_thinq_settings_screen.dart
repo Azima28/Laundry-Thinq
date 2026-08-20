@@ -101,7 +101,7 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
           if (addedCount > 0) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('🎉 Auto-detect: Berhasil mendaftarkan $addedCount mesin baru ke database kasir!'),
+                content: Text('Auto-detect: Berhasil mendaftarkan $addedCount mesin baru ke database kasir.'),
                 backgroundColor: Colors.green,
               ),
             );
@@ -129,7 +129,7 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
           _intervalRunningHighCtrl.text = (data['interval_running_high'] ?? 300).toString();
           _intervalRunningLowCtrl.text = (data['interval_running_low'] ?? 120).toString();
         });
-        
+
         if (_isConnected) {
           await _autoDetectAndRegisterMachines();
         }
@@ -159,17 +159,17 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
       );
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Pengaturan LG ThinQ berhasil disimpan!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Pengaturan LG ThinQ berhasil disimpan.'), backgroundColor: Colors.green),
         );
         _fetchStatus();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('⚠️ Gagal menyimpan: Status ${response.statusCode}'), backgroundColor: Colors.orange),
+          SnackBar(content: Text('Gagal menyimpan: Status ${response.statusCode}'), backgroundColor: Colors.orange),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Gagal terhubung ke API: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Gagal terhubung ke API: $e'), backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isLoading = false);
@@ -388,16 +388,16 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
           _scannedThinqDevices = List<Map<String, dynamic>>.from(data);
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('🎉 Berhasil memindai ${data.length} perangkat LG ThinQ!'), backgroundColor: Colors.green),
+          SnackBar(content: Text('Berhasil memindai ${data.length} perangkat LG ThinQ.'), backgroundColor: Colors.green),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('❌ Gagal memindai perangkat LG ThinQ. Cek kredensial Anda.'), backgroundColor: Colors.red),
+          const SnackBar(content: Text('Gagal memindai perangkat LG ThinQ. Cek kredensial Anda.'), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Error memindai: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error memindai: $e'), backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isScanningThinq = false);
@@ -417,21 +417,21 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
           if (id != null) 'id': id,
         }),
       ).timeout(const Duration(seconds: 10));
-      
+
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Mesin berhasil disimpan!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Mesin berhasil disimpan.'), backgroundColor: Colors.green),
         );
         _loadMachines();
       } else {
         final err = json.decode(response.body)['error'] ?? 'Gagal menyimpan';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Error: $err'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: $err'), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Error: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isMachinesLoading = false);
@@ -444,20 +444,20 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
       final response = await http.delete(
         Uri.parse('${_apiBaseUrl}api/machines/$id'),
       ).timeout(const Duration(seconds: 10));
-      
+
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('🗑️ Mesin berhasil dihapus!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Mesin berhasil dihapus.'), backgroundColor: Colors.green),
         );
         _loadMachines();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('❌ Gagal menghapus mesin'), backgroundColor: Colors.red),
+          const SnackBar(content: Text('Gagal menghapus mesin.'), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Error: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isMachinesLoading = false);
