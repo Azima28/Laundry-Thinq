@@ -359,12 +359,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
           ),
 
-          // Main 2-Pane Split Workstation
+          // Main 2-Pane Split Workstation (Workstation Kiri, Ringkasan & Opsi Kanan)
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Sisi Kiri (380px): Invoice Summary & Status Option Selector
+                // 1. SISI KIRI (Expanded): Dedicated Interactive Tender Workstation
+                Expanded(
+                  child: Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(28),
+                    child: (_paymentStatus == 'piutang')
+                        ? _buildUnpaidPane()
+                        : (_paymentMethod == 'cash')
+                            ? _buildCashPane(change)
+                            : _buildQrisPane(),
+                  ),
+                ),
+
+                // VERTICAL DIVIDER
+                Container(width: 1, color: StyleConstants.borderLight),
+
+                // 2. SISI KANAN (380px): Invoice Summary & Status Option Selector
                 Container(
                   width: 380,
                   color: const Color(0xFFF8FAFC),
@@ -465,22 +481,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         ],
                       ],
                     ),
-                  ),
-                ),
-
-                // VERTICAL DIVIDER
-                Container(width: 1, color: StyleConstants.borderLight),
-
-                // Sisi Kanan: Dedicated Interactive Tender Workstation
-                Expanded(
-                  child: Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.all(28),
-                    child: (_paymentStatus == 'piutang')
-                        ? _buildUnpaidPane()
-                        : (_paymentMethod == 'cash')
-                            ? _buildCashPane(change)
-                            : _buildQrisPane(),
                   ),
                 ),
               ],
