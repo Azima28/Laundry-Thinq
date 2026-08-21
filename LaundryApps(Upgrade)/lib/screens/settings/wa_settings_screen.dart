@@ -312,37 +312,64 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: _connected ? const Color(0xFFA7F3D0) : const Color(0xFFFCA5A5)),
                           ),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                _connected ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                                color: _connected ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                                size: 28,
+                              Row(
+                                children: [
+                                  Icon(
+                                    _connected ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                    color: _connected ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                    size: 28,
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _connected ? 'Terhubung' : 'Terputus',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                            color: _connected ? const Color(0xFF065F46) : const Color(0xFF991B1B),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _connected
+                                              ? 'HP: $_phone (${_pushname ?? 'Kasir'})'
+                                              : 'WhatsApp belum tersambung ke komputer.',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: _connected ? const Color(0xFF047857) : const Color(0xFFB91C1C),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _connected ? 'Terhubung' : 'Terputus',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                        color: _connected ? const Color(0xFF065F46) : const Color(0xFF991B1B),
+                              const SizedBox(height: 14),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  final res = await _statusService.openWhatsAppWebGUI();
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(res['message'] ?? 'Membuka jendela WhatsApp Web...'),
+                                        backgroundColor: res['success'] == true ? const Color(0xFF10B981) : Colors.red,
                                       ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      _connected
-                                          ? 'HP: $_phone (${_pushname ?? 'Kasir'})'
-                                          : 'WhatsApp belum tersambung ke komputer.',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: _connected ? const Color(0xFF047857) : const Color(0xFFB91C1C),
-                                      ),
-                                    ),
-                                  ],
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.open_in_new_rounded, color: Colors.white, size: 16),
+                                label: const Text('Buka Jendela WhatsApp Web', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF10B981),
+                                  minimumSize: const Size.fromHeight(38),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  elevation: 0,
                                 ),
                               ),
                             ],

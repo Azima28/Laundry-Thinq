@@ -543,6 +543,16 @@ def api_wa_status():
     return jsonify(wa_bridge.get_wa_status())
 
 
+@app.route('/api/wa/open-gui')
+def api_wa_open_gui():
+    """Proxy to WhatsApp Node.js service to focus/open the WhatsApp Web GUI window."""
+    try:
+        resp = requests.get(f"{wa_bridge.WA_SERVICE_URL}/open-gui", timeout=10)
+        return Response(resp.text, mimetype='application/json'), resp.status_code
+    except Exception as e:
+        return jsonify({"error": f"Failed to reach WhatsApp service: {str(e)}"}), 503
+
+
 @app.route('/api/wa/qr')
 def api_wa_qr():
     """Proxy to WhatsApp Node.js service to fetch current QR code."""

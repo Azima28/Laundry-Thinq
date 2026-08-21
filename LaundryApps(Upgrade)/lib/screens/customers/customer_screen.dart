@@ -1052,9 +1052,25 @@ class _CustomerScreenState extends State<CustomerScreen> {
                       style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
                     ),
                     const Spacer(),
-                    const Text(
-                      'Direct Delivery & Custom Chat',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                    TextButton.icon(
+                      onPressed: () async {
+                        final res = await MachineStatusService.instance.openWhatsAppWebGUI();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(res['message'] ?? 'Membuka jendela WhatsApp Web...'),
+                              backgroundColor: res['success'] == true ? const Color(0xFF10B981) : Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.open_in_new_rounded, size: 14, color: Color(0xFF047857)),
+                      label: const Text('Buka WhatsApp Web', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
                     ),
                   ],
                 ),

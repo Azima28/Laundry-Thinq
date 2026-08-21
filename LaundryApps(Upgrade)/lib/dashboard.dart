@@ -652,6 +652,28 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  Future<void> _openWhatsAppGUI() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+            SizedBox(width: 10),
+            Text('Membuka jendela WhatsApp Web di layar...'),
+          ],
+        ),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    final res = await _statusService.openWhatsAppWebGUI();
+    if (!res['success'] && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Gagal membuka WA'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   Widget _buildNetworkStatusBar() {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -662,16 +684,22 @@ class _DashboardPageState extends State<DashboardPage> {
         const SizedBox(width: 6),
         _statusPill('Tuya/Bardi', _statusService.bardiOk, Icons.outlet_rounded),
         const SizedBox(width: 6),
-        _statusPill('WhatsApp', _statusService.waOk, Icons.chat_rounded),
+        _statusPill(
+          'WhatsApp',
+          _statusService.waOk,
+          Icons.chat_rounded,
+          onTap: _openWhatsAppGUI,
+          tooltip: 'Klik untuk membuka jendela WhatsApp Web di desktop',
+        ),
       ],
     );
   }
 
-  Widget _statusPill(String label, bool isOk, IconData icon) {
+  Widget _statusPill(String label, bool isOk, IconData icon, {VoidCallback? onTap, String? tooltip}) {
     final color = isOk ? StyleConstants.successColor : StyleConstants.dangerColor;
     final bg = isOk ? StyleConstants.statusSuccessBg : StyleConstants.statusDangerBg;
 
-    return Container(
+    Widget pill = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
@@ -700,9 +728,29 @@ class _DashboardPageState extends State<DashboardPage> {
               color: color,
             ),
           ),
+          if (onTap != null) ...[
+            const SizedBox(width: 4),
+            Icon(Icons.open_in_new_rounded, size: 10, color: color),
+          ]
         ],
       ),
     );
+
+    if (onTap != null) {
+      pill = MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          child: pill,
+        ),
+      );
+    }
+
+    if (tooltip != null) {
+      pill = Tooltip(message: tooltip, child: pill);
+    }
+
+    return pill;
   }
 
   // ==========================================

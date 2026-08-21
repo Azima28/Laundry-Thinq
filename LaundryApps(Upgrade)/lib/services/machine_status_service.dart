@@ -186,6 +186,23 @@ class MachineStatusService {
     }
   }
 
+  /// v2: Open/Focus the live WhatsApp Web GUI window on desktop
+  Future<Map<String, dynamic>> openWhatsAppWebGUI() async {
+    try {
+      final cleanBase = _dashboardUrl.endsWith('/') ? _dashboardUrl.substring(0, _dashboardUrl.length - 1) : _dashboardUrl;
+      final uri = Uri.parse('$cleanBase/api/wa/open-gui');
+      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (resp.statusCode == 200) {
+        final data = json.decode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+        return {'success': true, 'message': data['message'] ?? 'Jendela WhatsApp Web telah dibuka.'};
+      } else {
+        return {'success': false, 'message': 'Gagal membuka WA: HTTP ${resp.statusCode}'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal menghubungi WhatsApp service: $e'};
+    }
+  }
+
   /// v2: Fetch connectivity status from Python server
   Future<void> _fetchConnectivity() async {
     try {

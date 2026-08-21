@@ -286,15 +286,15 @@ const client = new Client({
         remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
     },
     puppeteer: {
-        headless: true,
+        headless: false,
+        defaultViewport: null,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
             '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu'
+            '--window-size=1200,800',
+            '--app=https://web.whatsapp.com'
         ]
     }
 });
@@ -1143,6 +1143,35 @@ client.on('disconnected', (reason) => {
 });
 
 // --- API Endpoints ---
+
+/**
+ * GET /open-gui
+ * Activates and brings the live WhatsApp Web GUI window to the front
+ */
+app.get('/open-gui', async (req, res) => {
+    lastRequestTime = Date.now();
+    try {
+        if (!isReady && !isInitializing) {
+            initializeClient();
+            return res.json({ success: true, message: 'Menginisialisasi jendela WhatsApp Web...' });
+        }
+
+        if (client.pupPage) {
+            await client.pupPage.bringToFront();
+            if (process.platform === 'win32') {
+                const { exec } = require('child_process');
+                exec('powershell -NoProfile -Command "(New-Object -ComObject WScript.Shell).AppActivate(\'WhatsApp\')"');
+            }
+            return res.json({ success: true, message: 'Jendela WhatsApp Web telah dibuka.' });
+        } else {
+            initializeClient();
+            return res.json({ success: true, message: 'Mengaktifkan browser WhatsApp Web...' });
+        }
+    } catch (e) {
+        console.error('[WA] Error on /open-gui:', e.message);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
 
 /**
  * GET /status
