@@ -1001,13 +1001,16 @@ class _CuciContentState extends State<CuciContent> {
     bool sendWa = !waSent; // default checked if not sent yet
     bool isCustomMessage = false;
 
+    final String defaultTemplate =
+        "Halo Kak $customerName, cucian Anda di Smart Laundry sudah selesai dan siap diambil! Silakan mampir untuk pengambilan ya. Terima kasih! 😊";
+
     final TextEditingController activePhoneCtrl = TextEditingController(
       text: customerPhone.startsWith('+62')
           ? customerPhone.substring(3)
           : (customerPhone.startsWith('0') ? customerPhone.substring(1) : customerPhone),
     );
     final TextEditingController newPhoneCtrl = TextEditingController(text: '8');
-    final TextEditingController msgCtrl = TextEditingController();
+    final TextEditingController msgCtrl = TextEditingController(text: defaultTemplate);
 
     if (!mounted) return;
 
@@ -1333,7 +1336,10 @@ class _CuciContentState extends State<CuciContent> {
                                               children: [
                                                 Expanded(
                                                   child: InkWell(
-                                                    onTap: () => setModalState(() => isCustomMessage = false),
+                                                    onTap: () => setModalState(() {
+                                                      isCustomMessage = false;
+                                                      msgCtrl.text = defaultTemplate;
+                                                    }),
                                                     borderRadius: BorderRadius.circular(10),
                                                     child: Container(
                                                       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
@@ -1377,7 +1383,12 @@ class _CuciContentState extends State<CuciContent> {
                                                 const SizedBox(width: 10),
                                                 Expanded(
                                                   child: InkWell(
-                                                    onTap: () => setModalState(() => isCustomMessage = true),
+                                                    onTap: () => setModalState(() {
+                                                      isCustomMessage = true;
+                                                      if (msgCtrl.text == defaultTemplate) {
+                                                        msgCtrl.clear();
+                                                      }
+                                                    }),
                                                     borderRadius: BorderRadius.circular(10),
                                                     child: Container(
                                                       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
@@ -1420,25 +1431,75 @@ class _CuciContentState extends State<CuciContent> {
                                                 ),
                                               ],
                                             ),
+                                            const SizedBox(height: 12),
 
-                                            if (isCustomMessage) ...[
-                                              const SizedBox(height: 10),
-                                              TextField(
-                                                controller: msgCtrl,
-                                                maxLines: 2,
-                                                style: const TextStyle(fontSize: 12.5),
-                                                decoration: InputDecoration(
-                                                  hintText: 'Tulis pesan WhatsApp custom di sini...',
-                                                  border: OutlineInputBorder(
-                                                    borderRadius: BorderRadius.circular(10),
-                                                    borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                                                  ),
-                                                  filled: true,
-                                                  fillColor: Colors.white,
-                                                  contentPadding: const EdgeInsets.all(12),
+                                            // Always Visible & Directly Editable Message Textbox
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                const Row(
+                                                  children: [
+                                                    Icon(Icons.edit_note_rounded, size: 16, color: Color(0xFF475569)),
+                                                    SizedBox(width: 4),
+                                                    Text(
+                                                      'Teks Pesan (Dapat Diedit Langsung):',
+                                                      style: TextStyle(
+                                                        fontSize: 11.5,
+                                                        fontWeight: FontWeight.w800,
+                                                        color: Color(0xFF334155),
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
+                                                if (!isCustomMessage)
+                                                  InkWell(
+                                                    onTap: () {
+                                                      setModalState(() {
+                                                        msgCtrl.text = defaultTemplate;
+                                                      });
+                                                    },
+                                                    child: const Padding(
+                                                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                      child: Text(
+                                                        'Reset Template',
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: Color(0xFF16A34A),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 6),
+                                            TextField(
+                                              controller: msgCtrl,
+                                              maxLines: 3,
+                                              style: const TextStyle(
+                                                fontSize: 12.5,
+                                                height: 1.4,
+                                                color: Color(0xFF0F172A),
                                               ),
-                                            ],
+                                              decoration: InputDecoration(
+                                                hintText: isCustomMessage ? 'Tulis pesan WhatsApp khusus di sini...' : defaultTemplate,
+                                                border: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(10),
+                                                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                                ),
+                                                enabledBorder: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(10),
+                                                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                                ),
+                                                focusedBorder: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(10),
+                                                  borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
+                                                ),
+                                                filled: true,
+                                                fillColor: Colors.white,
+                                                contentPadding: const EdgeInsets.all(12),
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       ),
