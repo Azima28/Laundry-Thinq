@@ -47,19 +47,12 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
   void initState() {
     super.initState();
     _testPhoneCtrl.text = '6289522584477'; // default
-    _loadWaStatus().then((_) {
-      if (_connected) {
-        _sendTestPoll();
-        _checkVoteResult();
-      }
-    });
+    _loadWaStatus();
     _loadTemplates();
-    // Poll QR and status every 5 seconds
+    // Only poll WA QR/connection status while on this settings screen and waiting for scan
     _qrRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!_connected) {
         _loadWaStatus();
-      } else {
-        _checkVoteResult();
       }
     });
   }

@@ -767,13 +767,13 @@ let _pollCheckCount = 0;
 
 // Function to manually query votes for active polls (Workaround for unstable vote_update event)
 async function checkActivePollVotes() {
-    // Always increment and log first — even if map is empty, so we know the timer is alive
+    // Only check and log if WhatsApp is connected AND there are active polls waiting for customer vote
+    if (!isReady || activePollsToMonitor.size === 0) return;
+
     _pollCheckCount++;
     if (_pollCheckCount <= 5 || _pollCheckCount % 40 === 0) {
         console.log(`[PollMonitor] ⏱ Timer #${_pollCheckCount}: isReady=${isReady} activePolls=${activePollsToMonitor.size}${activePollsToMonitor.size > 0 ? ' IDs: ' + [...activePollsToMonitor.keys()].map(k => k.split('_').pop()).join(', ') : ''}`);
     }
-
-    if (!isReady || activePollsToMonitor.size === 0) return;
 
     const now = Date.now();
     for (const [pollId, info] of activePollsToMonitor.entries()) {
