@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/models/order_model.dart';
@@ -8,44 +7,6 @@ import '../../database/models/database_helper.dart';
 import '../../services/midtrans_service.dart';
 import '../../utils/currency_format.dart';
 import '../../utils/style_constants.dart';
-
-class ThousandsSeparatorInputFormatter extends TextInputFormatter {
-  static String format(String digitsOnly) {
-    if (digitsOnly.isEmpty) return '';
-    final number = int.tryParse(digitsOnly) ?? 0;
-    if (number == 0) return '0';
-    final s = number.toString();
-    final buffer = StringBuffer();
-    for (int i = 0; i < s.length; i++) {
-      if (i > 0 && (s.length - i) % 3 == 0) {
-        buffer.write('.');
-      }
-      buffer.write(s[i]);
-    }
-    return buffer.toString();
-  }
-
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    if (newValue.text.isEmpty) {
-      return newValue.copyWith(text: '');
-    }
-
-    final digitsOnly = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digitsOnly.isEmpty) {
-      return const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
-    }
-
-    final formatted = format(digitsOnly);
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
-  }
-}
 
 class PaymentScreen extends StatefulWidget {
   final Order order;
