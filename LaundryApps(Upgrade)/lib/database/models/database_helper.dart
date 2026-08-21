@@ -1,4 +1,7 @@
+import 'dart:io';
+import 'package:intl/intl.dart';
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'transaction_model.dart';
 import 'order_model.dart';
@@ -17,6 +20,133 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'laundry.db');
     await databaseFactory.deleteDatabase(path);
+  }
+
+  Future<String> getDatabasePath() async {
+    final dbPath = await getDatabasesPath();
+    return join(dbPath, 'laundry.db');
+  }
+
+  Future<String> getBackupDirectoryPath() async {
+    try {
+      final docDir = await getApplicationDocumentsDirectory();
+      final backupDir = Directory(join(docDir.path, 'SmartLaundry_Backups'));
+      if (!await backupDir.exists()) {
+        await backupDir.create(recursive: true);
+      }
+      return backupDir.path;
+    } catch (_) {
+      final currentDir = Directory.current;
+      final backupDir = Directory(join(currentDir.path, 'backups'));
+      if (!await backupDir.exists()) {
+        await backupDir.create(recursive: true);
+      }
+      return backupDir.path;
+    }
+  }
+
+  Future<Map<String, dynamic>> getDatabaseStatistics() async {
+    final db = await database;
+    final path = await getDatabasePath();
+    final file = File(path);
+
+    int fileSizeBytes = 0;
+    DateTime lastModified = DateTime.now();
+    if (await file.exists()) {
+      fileSizeBytes = await file.length();
+      lastModified = await file.lastModified();
+    }
+
+    final orderCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM orders')) ?? 0;
+    final customerCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM customers')) ?? 0;
+    final expenseCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM expenses')) ?? 0;
+    final serviceCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM transactions')) ?? 0;
+    final userCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM users')) ?? 0;
+
+    String formatSize(int bytes) {
+      if (bytes <= 0) return '0 B';
+      if (bytes < 1024) return '$bytes B';
+      if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+    }
+
+    return {
+      'path': path,
+      'fileSize': formatSize(fileSizeBytes),
+      'fileSizeBytes': fileSizeBytes,
+      'lastModified': lastModified,
+      'orderCount': orderCount,
+      'customerCount': customerCount,
+      'expenseCount': expenseCount,
+      'serviceCount': serviceCount,
+      'userCount': userCount,
+    };
+  }
+
+  Future<String> createBackup() async {
+    final db = await database;
+    // Checkpoint SQLite WAL to make sure all data is flushed to main disk file
+    try {
+      await db.rawQuery('PRAGMA wal_checkpoint(FULL);');
+    } catch (_) {}
+
+    final dbPath = await getDatabasePath();
+    final sourceFile = File(dbPath);
+    if (!await sourceFile.exists()) {
+      throw Exception('File database tidak ditemukan di: $dbPath');
+    }
+
+    final backupDirPath = await getBackupDirectoryPath();
+    final timestamp = DateFormat('yyyy-MM-dd_HHmmss').format(DateTime.now());
+    final backupFileName = 'laundry_backup_$timestamp.db';
+    final targetPath = join(backupDirPath, backupFileName);
+
+    await sourceFile.copy(targetPath);
+
+    // Also sync copy to root laundry.db if running in project root
+    try {
+      final rootDbFile = File(join(Directory.current.path, 'laundry.db'));
+      await sourceFile.copy(rootDbFile.path);
+    } catch (_) {}
+
+    return targetPath;
+  }
+
+  Future<List<File>> getAvailableBackups() async {
+    final backupDirPath = await getBackupDirectoryPath();
+    final dir = Directory(backupDirPath);
+    if (!await dir.exists()) return [];
+
+    final list = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.db')).toList();
+    list.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+    return list;
+  }
+
+  Future<bool> restoreDatabase(String backupFilePath) async {
+    final backupFile = File(backupFilePath);
+    if (!await backupFile.exists()) {
+      throw Exception('File backup tidak ditemukan: $backupFilePath');
+    }
+
+    // 1. Close current database
+    if (_database != null && _database!.isOpen) {
+      await _database!.close();
+      _database = null;
+    }
+
+    // 2. Overwrite current database file
+    final dbPath = await getDatabasePath();
+    await backupFile.copy(dbPath);
+
+    // 3. Overwrite root database if present
+    try {
+      final rootDbFile = File(join(Directory.current.path, 'laundry.db'));
+      await backupFile.copy(rootDbFile.path);
+    } catch (_) {}
+
+    // 4. Reopen database and verify
+    _database = await _initDB('laundry.db');
+    return true;
   }
 
   Future<Database> get database async {

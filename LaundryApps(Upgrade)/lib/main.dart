@@ -16,6 +16,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/customers/customer_screen.dart';
 import 'screens/admin/admin_dashboard.dart';
 import 'screens/settings/settings_screen.dart';
+import 'screens/settings/backup_settings_screen.dart';
 import 'screens/settings/wa_settings_screen.dart';
 import 'screens/auth/setup_wizard_screen.dart';
 import 'screens/settings/lg_thinq_settings_screen.dart';
@@ -257,6 +258,7 @@ class MyApp extends StatelessWidget {
         '/laundry_settings': (context) => const LaundrySettingsScreen(),
         '/printer_settings': (context) => PrinterSettingsScreen(),
         '/payment_settings': (context) => PaymentSettingsScreen(),
+        '/backup_settings': (context) => const BackupSettingsScreen(),
         '/customers': (context) => const CustomerScreen(),
         '/hubungi_pelanggan': (context) => const HubungiPelangganScreen(),
         '/pengeluaran': (context) => const PengeluaranScreen(),

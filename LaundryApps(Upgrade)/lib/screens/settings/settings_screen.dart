@@ -102,6 +102,14 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     _buildSettingsCard(
                       context,
+                      title: 'Backup & Restore Database',
+                      description: 'Cadangkan data transaksi ke file .db dan pulihkan database saat dibutuhkan',
+                      icon: Icons.cloud_download_rounded,
+                      color: const Color(0xFF059669),
+                      route: '/backup_settings',
+                    ),
+                    _buildSettingsCard(
+                      context,
                       title: 'Tentang Aplikasi',
                       description: 'Status diagnostic server kasir & informasi versi aplikasi',
                       icon: Icons.info_outline_rounded,
