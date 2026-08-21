@@ -525,17 +525,20 @@ async def lg_polling_loop():
                                 current_state_val = "unknown"
                         
                         raw_state_str = str(current_state_val).upper()
-                        if raw_state_str in ["POWER_OFF", "POWEROFF", "OFF", "STANDBY"]:
+                        if raw_state_str in ["POWER_OFF", "POWEROFF", "OFF"]:
                             state = "Ready"
                             run_state = "Idle"
-                        elif raw_state_str in ["RUNNING", "RUN", "WASHING", "RINSING", "SPINNING", "DRYING"]:
+                        elif raw_state_str in ["INITIAL", "INIT", "STANDBY", "STAND_BY", "POWER_ON", "POWERON"]:
+                            state = "Ready"
+                            run_state = "Standby"
+                        elif raw_state_str in ["RUNNING", "RUN", "WASHING", "RINSING", "SPINNING", "DRYING", "DETECTING"]:
                             state = "Running"
                             run_state = current_state_val.capitalize()
                         elif raw_state_str in ["END", "COMPLETE", "COMPLETED"]:
                             state = "Ready"
                             run_state = "Completed"
                         else:
-                            state = "Running"
+                            state = "Ready"
                             run_state = current_state_val.capitalize()
                             
                         timer_data = state_data.get("timer", {})
@@ -617,11 +620,14 @@ async def lg_polling_loop():
                         cfg_run_low = int(config.get("interval_running_low", 120))
                         
                         if status_ready == "ready":
-                            interval = cfg_idle  # Idle state
+                            if run_state in ("Standby", "Initial"):
+                                interval = 60  # Machine is powered ON/Standby without booking -> poll every 60s
+                            else:
+                                interval = cfg_idle  # Idle/Off state -> 300s (5 menit)
                         else:
-                            is_running = run_state not in ("Idle", "-", "", "Ready")
+                            is_running = run_state not in ("Idle", "-", "", "Ready", "Standby", "Initial")
                             if not is_running:
-                                interval = 15  # Active order but machine idle -> poll every 15s to catch when user presses START!
+                                interval = 15  # Active order but machine in Standby/Initial -> poll every 15s to catch when user presses START!
                             else:
                                 if "Offline" in run_state:
                                     interval = 15  # Fallback offline mode -> check every 15s to see if machine comes online!

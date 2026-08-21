@@ -841,7 +841,7 @@ class _PengeringContentState extends State<PengeringContent> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    minutes > 0 ? '$remain ($runState)' : (runState == 'Idle' ? 'Siap Digunakan (Idle)' : runState),
+                    minutes > 0 ? '$remain ($runState)' : ((runState == 'Idle' || runState == 'Standby' || runState == 'Initial') ? 'Siap Digunakan ($runState)' : runState),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,

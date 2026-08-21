@@ -870,7 +870,7 @@ class _CuciContentState extends State<CuciContent> {
 
                 // Subtitle/Remain
                 Text(
-                  minutes > 0 ? '$remain ($runState)' : (runState == 'Idle' ? 'Siap Digunakan (Idle)' : runState),
+                  minutes > 0 ? '$remain ($runState)' : ((runState == 'Idle' || runState == 'Standby' || runState == 'Initial') ? 'Siap Digunakan ($runState)' : runState),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
