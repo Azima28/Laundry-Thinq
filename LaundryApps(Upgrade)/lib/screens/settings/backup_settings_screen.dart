@@ -648,8 +648,10 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
           '-NoProfile',
           '-Command',
           r'''
-          Add-Type -AssemblyName System.Windows.Forms
+          [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
+          [System.Windows.Forms.Application]::EnableVisualStyles()
           $dialog = New-Object System.Windows.Forms.OpenFileDialog
+          $dialog.AutoUpgradeEnabled = $true
           $dialog.Filter = "Database SQLite (*.db;*.sqlite;*.db3)|*.db;*.sqlite;*.db3|Semua File (*.*)|*.*"
           $dialog.Title = "Pilih File Database Cadangan (.db) untuk Diimpor"
           $dialog.InitialDirectory = [Environment]::GetFolderPath("MyDocuments")

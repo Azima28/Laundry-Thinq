@@ -427,14 +427,21 @@ class PdfExportHelper {
 
       await file.writeAsBytes(bytes);
 
-      // Open PDF natively using default viewer
-      final fileUri = Uri.file(file.path);
-      final dirUri = Uri.file(targetDir.path);
+      // Open containing folder and select file natively in Windows Explorer
+      if (Platform.isWindows) {
+        try {
+          await Process.run('explorer.exe', ['/select,${file.path}']);
+        } catch (_) {}
 
-      try {
-        await launchUrl(fileUri, mode: LaunchMode.externalApplication);
-      } catch (e) {
-        await Process.run('explorer.exe', [file.path]);
+        // Launch PDF via standard Windows shell (Edge / Acrobat / Chrome)
+        try {
+          await Process.run('cmd', ['/c', 'start', '', file.path]);
+        } catch (_) {}
+      } else {
+        final fileUri = Uri.file(file.path);
+        try {
+          await launchUrl(fileUri, mode: LaunchMode.externalApplication);
+        } catch (_) {}
       }
 
       if (context.mounted) {
@@ -447,10 +454,11 @@ class PdfExportHelper {
               label: 'Buka Folder',
               textColor: Colors.white,
               onPressed: () {
-                try {
+                if (Platform.isWindows) {
+                  Process.run('explorer.exe', ['/select,${file.path}']);
+                } else {
+                  final dirUri = Uri.file(targetDir.path);
                   launchUrl(dirUri, mode: LaunchMode.externalApplication);
-                } catch (_) {
-                  Process.run('explorer.exe', [targetDir.path]);
                 }
               },
             ),
@@ -476,8 +484,10 @@ class PdfExportHelper {
     if (Platform.isWindows) {
       try {
         final script = '''
-        Add-Type -AssemblyName System.Windows.Forms
+        [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
+        [System.Windows.Forms.Application]::EnableVisualStyles()
         \$dialog = New-Object System.Windows.Forms.SaveFileDialog
+        \$dialog.AutoUpgradeEnabled = \$true
         \$dialog.Filter = "Dokumen PDF (*.pdf)|*.pdf|Semua File (*.*)|*.*"
         \$dialog.DefaultExt = "pdf"
         \$dialog.FileName = "$defaultFileName"
