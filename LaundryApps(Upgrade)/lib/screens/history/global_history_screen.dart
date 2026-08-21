@@ -31,17 +31,10 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   // --- Sub-filters for Buku Besar ---
   String _bukuBesarSubTab = 'semua'; // 'semua', 'cuci', 'gosok', 'pengeluaran'
 
-  // --- Sub-filters for Mesin Cuci / Pengering (Orders vs IoT Logs) ---
-  String _cuciViewMode = 'orders'; // 'orders' or 'iot_logs'
-  String _pengeringViewMode = 'orders'; // 'orders' or 'iot_logs'
-
-  // --- Sub-filters for Orders / Gosok ---
-  String _orderStatusFilter = 'Semua'; // 'Semua', 'Pending', 'Proses', 'Selesai'
-  String _orderPaymentFilter = 'Semua'; // 'Semua', 'Lunas', 'Belum Lunas', 'Cicilan'
-  final TextEditingController _orderSearchCtrl = TextEditingController();
-
-  // --- Sub-filters for Mesin Cuci & Pengering ---
-  final TextEditingController _machineSearchCtrl = TextEditingController();
+  // --- Search & Status Filters ---
+  String _statusFilter = 'Semua'; // 'Semua', 'Pending', 'Proses', 'Selesai'
+  String _paymentFilter = 'Semua'; // 'Semua', 'Lunas', 'Belum Lunas', 'Cicilan'
+  final TextEditingController _searchCtrl = TextEditingController();
 
   // --- Data Containers ---
   int _totalPengeluaran = 0;
@@ -58,6 +51,8 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   List<Order> _pengeringOrders = [];
   List<Order> _ironOrders = [];
 
+  Map<int, String> _machineNameMap = {};
+  Map<int, Map<String, dynamic>> _latestUsageByOrderId = {};
   List<Map<String, dynamic>> _washerUsageHistory = [];
   List<Map<String, dynamic>> _dryerUsageHistory = [];
 
@@ -65,15 +60,13 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   void initState() {
     super.initState();
     _mainCategory = widget.initialCategoryTab;
-    _orderSearchCtrl.addListener(() => setState(() {}));
-    _machineSearchCtrl.addListener(() => setState(() {}));
+    _searchCtrl.addListener(() => setState(() {}));
     _loadAllData();
   }
 
   @override
   void dispose() {
-    _orderSearchCtrl.dispose();
-    _machineSearchCtrl.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -115,7 +108,14 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
     try {
-      // 1. Load Pengeluaran
+      // 1. Load All Machines
+      final machines = await _db.getAllMachines();
+      final Map<int, String> machineNameMap = {
+        for (var m in machines)
+          if (m.id != null) m.id!: m.name
+      };
+
+      // 2. Load Pengeluaran
       final expenses = await _db.getExpensesByDate(dateStr);
       int totalPengeluaran = 0;
       List<Map<String, dynamic>> pengeluaranList = [];
@@ -134,7 +134,33 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         });
       }
 
-      // 2. Load Orders for the day
+      // 3. Load Machine Usage History (for mapping assigned machine logs)
+      final allWasherUsages = await _db.getMachineUsageHistory(type: 'cuci');
+      final dayWasherUsages = allWasherUsages.where((record) {
+        final startedAt = DateTime.parse(record['started_at'] as String).toLocal();
+        return startedAt.year == _selectedDate.year &&
+            startedAt.month == _selectedDate.month &&
+            startedAt.day == _selectedDate.day;
+      }).toList();
+
+      final allDryerUsages = await _db.getMachineUsageHistory(type: 'pengering');
+      final dayDryerUsages = allDryerUsages.where((record) {
+        final startedAt = DateTime.parse(record['started_at'] as String).toLocal();
+        return startedAt.year == _selectedDate.year &&
+            startedAt.month == _selectedDate.month &&
+            startedAt.day == _selectedDate.day;
+      }).toList();
+
+      final allUsages = await _db.getMachineUsageHistory();
+      final Map<int, Map<String, dynamic>> latestUsageByOrderId = {};
+      for (var u in allUsages) {
+        final orderId = u['order_id'] as int?;
+        if (orderId != null && !latestUsageByOrderId.containsKey(orderId)) {
+          latestUsageByOrderId[orderId] = u;
+        }
+      }
+
+      // 4. Load Orders for the day
       final orders = await _db.getOrdersByDate(dateStr);
       final allTransactions = await TransactionRepository().getAllTransactions();
       final ironItemIds = allTransactions
@@ -227,23 +253,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       ];
       combined.sort((a, b) => (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime));
 
-      // 3. Load Machine Usages for Washer and Dryer
-      final allWasherUsages = await _db.getMachineUsageHistory(type: 'cuci');
-      final dayWasherUsages = allWasherUsages.where((record) {
-        final startedAt = DateTime.parse(record['started_at'] as String).toLocal();
-        return startedAt.year == _selectedDate.year &&
-            startedAt.month == _selectedDate.month &&
-            startedAt.day == _selectedDate.day;
-      }).toList();
-
-      final allDryerUsages = await _db.getMachineUsageHistory(type: 'pengering');
-      final dayDryerUsages = allDryerUsages.where((record) {
-        final startedAt = DateTime.parse(record['started_at'] as String).toLocal();
-        return startedAt.year == _selectedDate.year &&
-            startedAt.month == _selectedDate.month &&
-            startedAt.day == _selectedDate.day;
-      }).toList();
-
       if (mounted) {
         setState(() {
           _totalPengeluaran = totalPengeluaran;
@@ -259,6 +268,9 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           _pengeringOrders = pengeringOrders;
           _ironOrders = ironOrders;
 
+          _machineNameMap = machineNameMap;
+          _latestUsageByOrderId = latestUsageByOrderId;
+
           _washerUsageHistory = dayWasherUsages;
           _dryerUsageHistory = dayDryerUsages;
 
@@ -269,6 +281,30 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  String _getMachineInfoForOrder(Order order, {String defaultCategory = 'cuci'}) {
+    // 1. Check matching machine_usage_history record
+    final usage = _latestUsageByOrderId[order.id];
+    if (usage != null && usage['machine_name'] != null && usage['machine_name'].toString().isNotEmpty) {
+      final status = usage['status']?.toString() ?? 'Success';
+      return '${usage['machine_name']} ($status)';
+    }
+
+    // 2. Check assignedMachineId in order
+    if (order.assignedMachineId != null && _machineNameMap.containsKey(order.assignedMachineId)) {
+      return _machineNameMap[order.assignedMachineId]!;
+    }
+
+    // 3. Fallback queue status
+    final s = order.status.toLowerCase();
+    if (s == 'completed' || s == 'selesai') {
+      return 'Selesai / Sukses';
+    } else if (s == 'proses' || s == 'processing') {
+      return 'Sedang Dikerjakan';
+    } else {
+      return defaultCategory == 'pengering' ? 'Antrian Pengering' : 'Antrian Cuci';
     }
   }
 
@@ -421,12 +457,12 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   }
 
   // ==========================================
-  // STATISTICS SHEET FOR WASHERS / DRYERS
+  // IOT ACTIVATION LOGS & STATISTICS MODAL
   // ==========================================
-  void _showMachineStatistics(String machineType) {
+  void _showMachineIoTAndStatsModal(String machineType) {
     final isWasher = machineType == 'cuci';
     final usageList = isWasher ? _washerUsageHistory : _dryerUsageHistory;
-    final title = isWasher ? 'Statistik Mesin Cuci' : 'Statistik Mesin Pengering';
+    final title = isWasher ? 'Log Aktivasi & Statistik Mesin Cuci' : 'Log Aktivasi & Statistik Mesin Pengering';
     final icon = isWasher ? Icons.local_laundry_service_rounded : Icons.wb_sunny_rounded;
     final color = isWasher ? StyleConstants.primaryColor : const Color(0xFFF59E0B);
 
@@ -435,8 +471,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     int countFailed = 0;
     int countSended = 0;
     Map<String, int> machineCount = {};
-    Map<String, int> machineSuccess = {};
-    Map<String, int> machineFailed = {};
 
     for (var record in usageList) {
       final status = record['status'] as String? ?? 'Success';
@@ -450,8 +484,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
 
       final name = record['machine_name'] as String? ?? 'Mesin Tak Dikenal';
       machineCount[name] = (machineCount[name] ?? 0) + 1;
-      if (status == 'Success') machineSuccess[name] = (machineSuccess[name] ?? 0) + 1;
-      if (status == 'Failed') machineFailed[name] = (machineFailed[name] ?? 0) + 1;
     }
 
     final successRate = totalUsage > 0 ? ((countSuccess / totalUsage) * 100).toStringAsFixed(1) : '0';
@@ -483,7 +515,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                   children: [
                     Icon(icon, color: color, size: 24),
                     const SizedBox(width: 10),
-                    Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: StyleConstants.textHeading)),
+                    Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: StyleConstants.textHeading)),
                     const Spacer(),
                     IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx)),
                   ],
@@ -495,23 +527,21 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                   controller: scrollController,
                   padding: const EdgeInsets.all(20),
                   children: [
-                    // Summary cards
+                    // Summary KPI Cards
                     Row(
                       children: [
-                        Expanded(child: _mStatCard('Total\nPenggunaan', '$totalUsage kali', color, Icons.repeat_rounded)),
+                        Expanded(child: _mStatCard('Total\nAktivasi IoT', '$totalUsage kali', color, Icons.repeat_rounded)),
                         const SizedBox(width: 10),
-                        Expanded(child: _mStatCard('Tingkat\nSukses', '$successRate%', StyleConstants.successColor, Icons.check_circle_rounded)),
+                        Expanded(child: _mStatCard('Tingkat\nSukses Sinyal', '$successRate%', StyleConstants.successColor, Icons.check_circle_rounded)),
                         const SizedBox(width: 10),
-                        Expanded(child: _mStatCard('Total\nMesin', '${machineCount.length}', StyleConstants.secondaryColor, Icons.precision_manufacturing_rounded)),
+                        Expanded(child: _mStatCard('Unit\nAktif', '${machineCount.length} Mesin', StyleConstants.secondaryColor, Icons.precision_manufacturing_rounded)),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
 
-                    // Activation Status Breakdown
-                    _mSectionTitle('STATUS AKTIVASI HARIAN', color),
-                    const SizedBox(height: 10),
+                    // Activation Breakdown
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
@@ -519,80 +549,100 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       ),
                       child: Column(
                         children: [
-                          _mStatusBar(Icons.check_circle_rounded, 'Berhasil', countSuccess, StyleConstants.successColor, totalUsage),
-                          const SizedBox(height: 12),
-                          _mStatusBar(Icons.send_rounded, 'Terkirim / Berjalan', countSended, StyleConstants.infoColor, totalUsage),
-                          const SizedBox(height: 12),
-                          _mStatusBar(Icons.cancel_rounded, 'Gagal', countFailed, StyleConstants.dangerColor, totalUsage),
+                          _mStatusBar(Icons.check_circle_rounded, 'Aktivasi Berhasil', countSuccess, StyleConstants.successColor, totalUsage),
+                          const SizedBox(height: 8),
+                          _mStatusBar(Icons.send_rounded, 'Sinyal Terkirim', countSended, StyleConstants.infoColor, totalUsage),
+                          const SizedBox(height: 8),
+                          _mStatusBar(Icons.cancel_rounded, 'Aktivasi Gagal', countFailed, StyleConstants.dangerColor, totalUsage),
                         ],
                       ),
                     ),
                     const SizedBox(height: 20),
 
-                    // Per Machine Breakdown
-                    _mSectionTitle('PENGGUNAAN PER MESIN', color),
+                    // Log Details List
+                    _mSectionTitle('RIWAYAT EKSEKUSI TELEMETRI IOT HARI INI', color),
                     const SizedBox(height: 10),
-                    if (machineCount.isEmpty)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Text('Belum ada data penggunaan mesin pada tanggal ini.', style: TextStyle(color: Colors.grey[500])),
+                    if (usageList.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: StyleConstants.borderLight),
+                        ),
+                        child: const Center(
+                          child: Text('Belum ada sinyal aktivasi mesin fisik yang dikirim pada tanggal ini.', style: TextStyle(color: StyleConstants.textMuted)),
                         ),
                       )
                     else
-                      ...(machineCount.keys.toList()..sort()).map((name) {
-                        final total = machineCount[name] ?? 0;
-                        final success = machineSuccess[name] ?? 0;
-                        final failed = machineFailed[name] ?? 0;
-                        final pct = totalUsage > 0 ? (total / totalUsage) : 0.0;
+                      ...usageList.map((record) {
+                        final status = record['status'] as String? ?? 'Success';
+                        final isSuccess = status == 'Success';
+                        final isFailed = status == 'Failed';
+                        final startedAt = DateTime.parse(record['started_at'] as String).toLocal();
+
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(14),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: StyleConstants.borderLight),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(icon, size: 16, color: color),
-                                      const SizedBox(width: 8),
-                                      Text(name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: StyleConstants.textHeading)),
-                                    ],
-                                  ),
-                                  Text('$total kali', style: TextStyle(fontWeight: FontWeight.w800, color: color, fontSize: 14)),
-                                ],
+                              Text(
+                                DateFormat('HH:mm:ss').format(startedAt),
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: StyleConstants.textMuted),
                               ),
-                              const SizedBox(height: 8),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: LinearProgressIndicator(
-                                  value: pct,
-                                  backgroundColor: const Color(0xFFE2E8F0),
-                                  valueColor: AlwaysStoppedAnimation(color),
-                                  minHeight: 6,
+                              const SizedBox(width: 12),
+                              Icon(icon, size: 16, color: color),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                flex: 3,
+                                child: Text(
+                                  record['machine_name'] ?? '-',
+                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading),
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  const Icon(Icons.check_circle_rounded, size: 14, color: StyleConstants.successColor),
-                                  Text(' $success berhasil', style: const TextStyle(fontSize: 12, color: StyleConstants.statusSuccessText, fontWeight: FontWeight.w600)),
-                                  if (failed > 0) ...[
-                                    const SizedBox(width: 12),
-                                    const Icon(Icons.error_rounded, size: 14, color: StyleConstants.dangerColor),
-                                    Text(' $failed gagal', style: const TextStyle(fontSize: 12, color: StyleConstants.statusDangerText, fontWeight: FontWeight.w600)),
-                                  ],
-                                  const Spacer(),
-                                  Text('${(pct * 100).toStringAsFixed(1)}% dari total', style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted)),
-                                ],
+                              Expanded(
+                                flex: 3,
+                                child: Text(
+                                  '${record['customer_name'] ?? 'Pelanggan'} • #${record['order_id'] ?? ''}',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5),
+                                ),
                               ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: isSuccess ? StyleConstants.statusSuccessBg : (isFailed ? StyleConstants.statusDangerBg : StyleConstants.statusInfoBg),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  status.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: isSuccess ? StyleConstants.statusSuccessText : (isFailed ? StyleConstants.statusDangerText : StyleConstants.statusInfoText),
+                                  ),
+                                ),
+                              ),
+                              if (isFailed) ...[
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    _retryMachineActivation(record);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: StyleConstants.dangerColor,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    minimumSize: Size.zero,
+                                  ),
+                                  child: const Text('Retry', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
                             ],
                           ),
                         );
@@ -644,13 +694,13 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       children: [
         Row(
           children: [
-            Icon(icon, size: 16, color: color),
+            Icon(icon, size: 15, color: color),
             const SizedBox(width: 8),
-            Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: StyleConstants.textHeading))),
-            Text('$count kali', style: const TextStyle(color: StyleConstants.textBody, fontSize: 13, fontWeight: FontWeight.w600)),
+            Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: StyleConstants.textHeading))),
+            Text('$count kali', style: const TextStyle(color: StyleConstants.textBody, fontSize: 12, fontWeight: FontWeight.w600)),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         Row(
           children: [
             Expanded(
@@ -660,12 +710,12 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                   value: pct,
                   backgroundColor: const Color(0xFFE2E8F0),
                   valueColor: AlwaysStoppedAnimation(color),
-                  minHeight: 6,
+                  minHeight: 5,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            Text('${(pct * 100).toStringAsFixed(0)}%', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: color)),
+            const SizedBox(width: 10),
+            Text('${(pct * 100).toStringAsFixed(0)}%', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: color)),
           ],
         ),
       ],
@@ -1056,7 +1106,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                     children: [
                       _categoryTabButton('buku_besar', 'Buku Besar', Icons.account_balance_wallet_rounded, null),
                       const SizedBox(width: 6),
-                      _categoryTabButton('order', 'Riwayat Order', Icons.receipt_long_rounded, '${_allOrders.length}'),
+                      _categoryTabButton('order', 'Semua Order', Icons.receipt_long_rounded, '${_allOrders.length}'),
                       const SizedBox(width: 6),
                       _categoryTabButton('cuci', 'Mesin Cuci', Icons.local_laundry_service_rounded, '${_cuciOrders.length}'),
                       const SizedBox(width: 6),
@@ -1086,9 +1136,9 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                 )
               else if (_mainCategory == 'cuci' || _mainCategory == 'pengering')
                 ElevatedButton.icon(
-                  onPressed: () => _showMachineStatistics(_mainCategory),
+                  onPressed: () => _showMachineIoTAndStatsModal(_mainCategory),
                   icon: const Icon(Icons.analytics_rounded, size: 15),
-                  label: const Text('Statistik Mesin', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                  label: const Text('Log Sinyal & Statistik', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _mainCategory == 'cuci' ? StyleConstants.primaryColor : const Color(0xFFF59E0B),
                     foregroundColor: Colors.white,
@@ -1175,13 +1225,37 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       case 'buku_besar':
         return _buildBukuBesarView();
       case 'order':
-        return _buildOrdersView(title: 'Semua Pesanan', ordersList: _allOrders);
+        return _buildCategoryOrdersWorkstation(
+          categoryKey: 'order',
+          title: 'Semua Transaksi & Pesanan',
+          ordersList: _allOrders,
+          accentColor: StyleConstants.primaryColor,
+          icon: Icons.receipt_long_rounded,
+        );
       case 'cuci':
-        return _buildCuciCombinedView();
+        return _buildCategoryOrdersWorkstation(
+          categoryKey: 'cuci',
+          title: 'Riwayat Layanan Mesin Cuci',
+          ordersList: _cuciOrders,
+          accentColor: StyleConstants.primaryColor,
+          icon: Icons.local_laundry_service_rounded,
+        );
       case 'pengering':
-        return _buildPengeringCombinedView();
+        return _buildCategoryOrdersWorkstation(
+          categoryKey: 'pengering',
+          title: 'Riwayat Layanan Mesin Pengering',
+          ordersList: _pengeringOrders,
+          accentColor: const Color(0xFFF59E0B),
+          icon: Icons.wb_sunny_rounded,
+        );
       case 'gosok':
-        return _buildOrdersView(title: 'Riwayat Gosok / Setrika', ordersList: _ironOrders, isIronOnly: true);
+        return _buildCategoryOrdersWorkstation(
+          categoryKey: 'gosok',
+          title: 'Riwayat Pesanan Gosok / Setrika',
+          ordersList: _ironOrders,
+          accentColor: const Color(0xFFF97316),
+          icon: Icons.iron_rounded,
+        );
       default:
         return _buildBukuBesarView();
     }
@@ -1544,166 +1618,16 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   }
 
   // ==========================================
-  // VIEW 2: MESIN CUCI WORKSTATION (ORDERS + IOT LOGS)
+  // VIEW 2: UNIFIED CATEGORY ORDERS WORKSTATION
   // ==========================================
-  Widget _buildCuciCombinedView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Mode Selector: Pesanan Cuci vs Log Sinyal IoT
-        Row(
-          children: [
-            _viewModeButton(
-              title: 'Daftar Pesanan Cuci',
-              count: _cuciOrders.length,
-              icon: Icons.receipt_long_rounded,
-              isActive: _cuciViewMode == 'orders',
-              activeColor: StyleConstants.primaryColor,
-              onTap: () => setState(() => _cuciViewMode = 'orders'),
-            ),
-            const SizedBox(width: 10),
-            _viewModeButton(
-              title: 'Log Aktivasi Mesin IoT',
-              count: _washerUsageHistory.length,
-              icon: Icons.memory_rounded,
-              isActive: _cuciViewMode == 'iot_logs',
-              activeColor: StyleConstants.primaryColor,
-              onTap: () => setState(() => _cuciViewMode = 'iot_logs'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        Expanded(
-          child: _cuciViewMode == 'orders'
-              ? _buildOrdersView(
-                  title: 'Pesanan Layanan Cuci',
-                  ordersList: _cuciOrders,
-                  accentColor: StyleConstants.primaryColor,
-                )
-              : _buildMachineUsageView(isWasher: true),
-        ),
-      ],
-    );
-  }
-
-  // ==========================================
-  // VIEW 3: MESIN PENGERING WORKSTATION
-  // ==========================================
-  Widget _buildPengeringCombinedView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            _viewModeButton(
-              title: 'Daftar Pesanan Pengering',
-              count: _pengeringOrders.length,
-              icon: Icons.receipt_long_rounded,
-              isActive: _pengeringViewMode == 'orders',
-              activeColor: const Color(0xFFF59E0B),
-              onTap: () => setState(() => _pengeringViewMode = 'orders'),
-            ),
-            const SizedBox(width: 10),
-            _viewModeButton(
-              title: 'Log Aktivasi Pengering IoT',
-              count: _dryerUsageHistory.length,
-              icon: Icons.memory_rounded,
-              isActive: _pengeringViewMode == 'iot_logs',
-              activeColor: const Color(0xFFF59E0B),
-              onTap: () => setState(() => _pengeringViewMode = 'iot_logs'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        Expanded(
-          child: _pengeringViewMode == 'orders'
-              ? _buildOrdersView(
-                  title: 'Pesanan Layanan Pengering',
-                  ordersList: _pengeringOrders,
-                  accentColor: const Color(0xFFF59E0B),
-                )
-              : _buildMachineUsageView(isWasher: false),
-        ),
-      ],
-    );
-  }
-
-  Widget _viewModeButton({
-    required String title,
-    required int count,
-    required IconData icon,
-    required bool isActive,
-    required Color activeColor,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: isActive ? StyleConstants.sidebarBackground : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isActive ? StyleConstants.sidebarBackground : StyleConstants.borderLight,
-          ),
-          boxShadow: [
-            if (isActive)
-              BoxShadow(
-                color: const Color(0xFF0F172A).withValues(alpha: 0.12),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 15, color: isActive ? StyleConstants.accentCyan : StyleConstants.textMuted),
-            const SizedBox(width: 7),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                color: isActive ? Colors.white : StyleConstants.textBody,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-              decoration: BoxDecoration(
-                color: isActive ? StyleConstants.accentCyan.withValues(alpha: 0.25) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                  color: isActive ? StyleConstants.accentCyan : StyleConstants.textMuted,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==========================================
-  // VIEW 4: GENERIC ORDERS VIEW
-  // ==========================================
-  Widget _buildOrdersView({
+  Widget _buildCategoryOrdersWorkstation({
+    required String categoryKey,
     required String title,
     required List<Order> ordersList,
-    bool isIronOnly = false,
-    Color? accentColor,
+    required Color accentColor,
+    required IconData icon,
   }) {
-    final color = accentColor ?? (isIronOnly ? const Color(0xFFF97316) : StyleConstants.primaryColor);
-    final query = _orderSearchCtrl.text.toLowerCase().trim();
+    final query = _searchCtrl.text.toLowerCase().trim();
 
     final filtered = ordersList.where((order) {
       final matchesQuery = query.isEmpty ||
@@ -1713,63 +1637,59 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           order.items.any((it) => it.itemName.toLowerCase().contains(query));
 
       bool matchesStatus = true;
-      if (_orderStatusFilter != 'Semua') {
+      if (_statusFilter != 'Semua') {
         final s = order.status.toLowerCase();
-        if (_orderStatusFilter == 'Pending') matchesStatus = (s == 'pending');
-        if (_orderStatusFilter == 'Proses') matchesStatus = (s == 'proses' || s == 'processing');
-        if (_orderStatusFilter == 'Selesai') matchesStatus = (s == 'completed' || s == 'selesai' || s == 'siap diambil');
+        if (_statusFilter == 'Pending') matchesStatus = (s == 'pending');
+        if (_statusFilter == 'Proses') matchesStatus = (s == 'proses' || s == 'processing');
+        if (_statusFilter == 'Selesai') matchesStatus = (s == 'completed' || s == 'selesai' || s == 'siap diambil');
       }
 
       bool matchesPayment = true;
-      if (_orderPaymentFilter != 'Semua') {
-        if (_orderPaymentFilter == 'Lunas') matchesPayment = order.isPaid;
-        if (_orderPaymentFilter == 'Belum Lunas') matchesPayment = (!order.isPaid && order.paidAmount == 0);
-        if (_orderPaymentFilter == 'Cicilan') matchesPayment = (!order.isPaid && order.paidAmount > 0);
+      if (_paymentFilter != 'Semua') {
+        if (_paymentFilter == 'Lunas') matchesPayment = order.isPaid;
+        if (_paymentFilter == 'Belum Lunas') matchesPayment = (!order.isPaid && order.paidAmount == 0);
+        if (_paymentFilter == 'Cicilan') matchesPayment = (!order.isPaid && order.paidAmount > 0);
       }
 
       return matchesQuery && matchesStatus && matchesPayment;
     }).toList();
 
+    int countSelesai = 0;
+    int countProses = 0;
+    int countPending = 0;
     int totalNilai = 0;
-    int totalLunas = 0;
-    int totalBelum = 0;
+
     for (var o in filtered) {
       totalNilai += o.totalAmount;
-      if (o.isPaid) {
-        totalLunas++;
+      final s = o.status.toLowerCase();
+      if (s == 'completed' || s == 'selesai' || s == 'siap diambil') {
+        countSelesai++;
+      } else if (s == 'proses' || s == 'processing') {
+        countProses++;
       } else {
-        totalBelum++;
+        countPending++;
       }
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // KPI Ribbon for Orders
+        // 4-in-1 KPI Ribbon (Lifecycle Status)
         Row(
           children: [
             Expanded(
               child: _buildFinancialKpiCard(
-                title: 'TOTAL PESANAN (${title.toUpperCase()})',
-                value: '${filtered.length} Nota',
-                icon: Icons.receipt_long_rounded,
-                color: color,
+                title: 'TOTAL PESANAN',
+                value: '${filtered.length} Nota (${formatRp(totalNilai)})',
+                icon: icon,
+                color: accentColor,
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _buildFinancialKpiCard(
-                title: 'TOTAL NILAI NOTA',
-                value: formatRp(totalNilai),
-                icon: Icons.payments_rounded,
-                color: StyleConstants.secondaryColor,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildFinancialKpiCard(
-                title: 'STATUS LUNAS',
-                value: '$totalLunas Nota',
+                title: 'SUKSES / SELESAI',
+                value: '$countSelesai Nota',
                 icon: Icons.check_circle_rounded,
                 color: StyleConstants.successColor,
               ),
@@ -1777,10 +1697,19 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: _buildFinancialKpiCard(
-                title: 'BELUM LUNAS / CICILAN',
-                value: '$totalBelum Nota',
-                icon: Icons.pending_actions_rounded,
-                color: StyleConstants.dangerColor,
+                title: 'SEDANG PROSES / MESIN',
+                value: '$countProses Nota',
+                icon: Icons.sync_rounded,
+                color: StyleConstants.infoColor,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildFinancialKpiCard(
+                title: 'ANTRIAN / PENDING',
+                value: '$countPending Nota',
+                icon: Icons.hourglass_top_rounded,
+                color: StyleConstants.warningColor,
               ),
             ),
           ],
@@ -1794,10 +1723,10 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
               child: SizedBox(
                 height: 38,
                 child: TextField(
-                  controller: _orderSearchCtrl,
+                  controller: _searchCtrl,
                   style: const TextStyle(fontSize: 12.5),
                   decoration: InputDecoration(
-                    prefixIcon: Icon(Icons.search_rounded, size: 18, color: color),
+                    prefixIcon: Icon(Icons.search_rounded, size: 18, color: accentColor),
                     hintText: 'Cari nama pelanggan, nomor WhatsApp, nomor nota, atau item...',
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: StyleConstants.borderLight)),
@@ -1813,18 +1742,18 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
             // Status Filter Chips
             _filterChipGroup(
               label: 'Status:',
-              currentVal: _orderStatusFilter,
+              currentVal: _statusFilter,
               options: ['Semua', 'Pending', 'Proses', 'Selesai'],
-              onSelected: (val) => setState(() => _orderStatusFilter = val),
+              onSelected: (val) => setState(() => _statusFilter = val),
             ),
             const SizedBox(width: 8),
 
             // Payment Filter Chips
             _filterChipGroup(
               label: 'Bayar:',
-              currentVal: _orderPaymentFilter,
+              currentVal: _paymentFilter,
               options: ['Semua', 'Lunas', 'Belum Lunas', 'Cicilan'],
-              onSelected: (val) => setState(() => _orderPaymentFilter = val),
+              onSelected: (val) => setState(() => _paymentFilter = val),
             ),
           ],
         ),
@@ -1834,7 +1763,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         Expanded(
           child: filtered.isEmpty
               ? _buildEmptyState('Tidak ada pesanan $title yang sesuai dengan filter tanggal atau pencarian.')
-              : _buildOrdersTable(filtered),
+              : _buildCategoryOrdersTable(filtered, categoryKey, accentColor),
         ),
       ],
     );
@@ -1886,7 +1815,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     );
   }
 
-  Widget _buildOrdersTable(List<Order> orders) {
+  Widget _buildCategoryOrdersTable(List<Order> orders, String categoryKey, Color accentColor) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1904,16 +1833,18 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
               borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
               border: Border(bottom: BorderSide(color: StyleConstants.borderLight)),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                SizedBox(width: 70, child: Text('NOTA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                SizedBox(width: 70, child: Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                Expanded(flex: 3, child: Text('PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                Expanded(flex: 3, child: Text('RINCIAN ITEM', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                SizedBox(width: 100, child: Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                SizedBox(width: 100, child: Text('PEMBAYARAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                SizedBox(width: 110, child: Text('TOTAL', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                SizedBox(width: 130, child: Text('AKSI', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                const SizedBox(width: 70, child: Text('NOTA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                const SizedBox(width: 65, child: Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                if (categoryKey == 'cuci' || categoryKey == 'pengering')
+                  const Expanded(flex: 3, child: Text('MESIN DIGUNAKAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                const Expanded(flex: 3, child: Text('PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                const Expanded(flex: 3, child: Text('RINCIAN ITEM', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                const SizedBox(width: 110, child: Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                const SizedBox(width: 100, child: Text('PEMBAYARAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                const SizedBox(width: 110, child: Text('TOTAL', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                const SizedBox(width: 120, child: Text('AKSI', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
               ],
             ),
           ),
@@ -1925,8 +1856,9 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
               separatorBuilder: (ctx, i) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
               itemBuilder: (ctx, i) {
                 final order = orders[i];
-                final isDone = order.status.toLowerCase() == 'completed' || order.status.toLowerCase() == 'selesai';
+                final isDone = order.status.toLowerCase() == 'completed' || order.status.toLowerCase() == 'selesai' || order.status.toLowerCase() == 'siap diambil';
                 final isProcessing = order.status.toLowerCase() == 'proses' || order.status.toLowerCase() == 'processing';
+                final machineInfo = _getMachineInfoForOrder(order, defaultCategory: categoryKey);
 
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1940,12 +1872,37 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                         ),
                       ),
                       SizedBox(
-                        width: 70,
+                        width: 65,
                         child: Text(
                           DateFormat('HH:mm').format(order.orderDate),
                           style: const TextStyle(fontSize: 12, color: StyleConstants.textMuted, fontWeight: FontWeight.w600),
                         ),
                       ),
+                      if (categoryKey == 'cuci' || categoryKey == 'pengering')
+                        Expanded(
+                          flex: 3,
+                          child: Row(
+                            children: [
+                              Icon(
+                                categoryKey == 'cuci' ? Icons.local_laundry_service_rounded : Icons.wb_sunny_rounded,
+                                size: 15,
+                                color: accentColor,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  machineInfo,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12.5,
+                                    color: machineInfo.contains('Antrian') ? StyleConstants.warningColor : StyleConstants.textHeading,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       Expanded(
                         flex: 3,
                         child: Column(
@@ -1967,18 +1924,18 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                         ),
                       ),
                       SizedBox(
-                        width: 100,
+                        width: 110,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                           decoration: BoxDecoration(
                             color: isDone ? StyleConstants.statusSuccessBg : (isProcessing ? StyleConstants.statusInfoBg : StyleConstants.statusWarningBg),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            order.status.toUpperCase(),
+                            isDone ? 'SELESAI / SUKSES' : (isProcessing ? 'SEDANG PROSES' : 'PENDING'),
                             style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
                               color: isDone ? StyleConstants.statusSuccessText : (isProcessing ? StyleConstants.statusInfoText : StyleConstants.statusWarningText),
                             ),
                             textAlign: TextAlign.center,
@@ -1988,7 +1945,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       SizedBox(
                         width: 100,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                           decoration: BoxDecoration(
                             color: order.isPaid ? StyleConstants.statusSuccessBg : StyleConstants.statusDangerBg,
                             borderRadius: BorderRadius.circular(12),
@@ -1997,7 +1954,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                             order.isPaid ? 'LUNAS' : (order.paidAmount > 0 ? 'CICILAN' : 'BELUM BAYAR'),
                             style: TextStyle(
                               fontSize: 10,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w900,
                               color: order.isPaid ? StyleConstants.statusSuccessText : StyleConstants.statusDangerText,
                             ),
                             textAlign: TextAlign.center,
@@ -2013,7 +1970,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                         ),
                       ),
                       SizedBox(
-                        width: 130,
+                        width: 120,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -2051,259 +2008,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                                 const PopupMenuItem(value: 'Selesai', child: Text('Set: Selesai')),
                               ],
                             ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================
-  // VIEW 5: LOG MESIN CUCI & PENGERING (IOT)
-  // ==========================================
-  Widget _buildMachineUsageView({required bool isWasher}) {
-    final baseList = isWasher ? _washerUsageHistory : _dryerUsageHistory;
-    final query = _machineSearchCtrl.text.toLowerCase().trim();
-    final accentColor = isWasher ? StyleConstants.primaryColor : const Color(0xFFF59E0B);
-    final icon = isWasher ? Icons.local_laundry_service_rounded : Icons.wb_sunny_rounded;
-
-    final filtered = baseList.where((record) {
-      final customerName = (record['customer_name'] as String? ?? '').toLowerCase();
-      final machineName = (record['machine_name'] as String? ?? '').toLowerCase();
-      final orderIdStr = '${record['order_id'] ?? ''}';
-      return query.isEmpty || customerName.contains(query) || machineName.contains(query) || orderIdStr.contains(query);
-    }).toList();
-
-    int successCount = 0;
-    int failedCount = 0;
-    for (var r in filtered) {
-      if (r['status'] == 'Success') {
-        successCount++;
-      } else if (r['status'] == 'Failed') {
-        failedCount++;
-      }
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Machine KPI Ribbon
-        Row(
-          children: [
-            Expanded(
-              child: _buildFinancialKpiCard(
-                title: isWasher ? 'TOTAL SIKLUS CUCI IOT' : 'TOTAL SIKLUS PENGERING IOT',
-                value: '${filtered.length} Kali Berjalan',
-                icon: icon,
-                color: accentColor,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildFinancialKpiCard(
-                title: 'AKTIVASI BERHASIL',
-                value: '$successCount Siklus',
-                icon: Icons.check_circle_rounded,
-                color: StyleConstants.successColor,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildFinancialKpiCard(
-                title: 'GAGAL / PERLU RETRY',
-                value: '$failedCount Mesin',
-                icon: Icons.warning_rounded,
-                color: StyleConstants.dangerColor,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildFinancialKpiCard(
-                title: 'PERSENTASE SUKSES',
-                value: filtered.isNotEmpty ? '${((successCount / filtered.length) * 100).toStringAsFixed(0)}%' : '0%',
-                icon: Icons.analytics_rounded,
-                color: StyleConstants.secondaryColor,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // Search Bar & Statistics Button
-        Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 38,
-                child: TextField(
-                  controller: _machineSearchCtrl,
-                  style: const TextStyle(fontSize: 12.5),
-                  decoration: InputDecoration(
-                    prefixIcon: Icon(Icons.search_rounded, size: 18, color: accentColor),
-                    hintText: isWasher ? 'Cari nama pelanggan, nama mesin cuci, atau nomor nota...' : 'Cari nama pelanggan, nama mesin pengering...',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: StyleConstants.borderLight)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: StyleConstants.borderLight)),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-
-        // Machine Usage Records Table
-        Expanded(
-          child: filtered.isEmpty
-              ? _buildEmptyState('Belum ada riwayat siklus mesin IoT pada tanggal ini.')
-              : _buildMachineUsageTable(filtered, accentColor, isWasher),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMachineUsageTable(List<Map<String, dynamic>> records, Color accentColor, bool isWasher) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: StyleConstants.borderLight),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Table Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-              border: Border(bottom: BorderSide(color: StyleConstants.borderLight)),
-            ),
-            child: const Row(
-              children: [
-                SizedBox(width: 80, child: Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                Expanded(flex: 3, child: Text('NAMA MESIN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                Expanded(flex: 3, child: Text('PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                SizedBox(width: 80, child: Text('NOTA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                SizedBox(width: 110, child: Text('STATUS AKTIVASI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                Expanded(flex: 3, child: Text('CATATAN / ERROR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                SizedBox(width: 110, child: Text('AKSI', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-              ],
-            ),
-          ),
-
-          // Scrollable Records
-          Expanded(
-            child: ListView.separated(
-              itemCount: records.length,
-              separatorBuilder: (ctx, i) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-              itemBuilder: (ctx, i) {
-                final record = records[i];
-                final status = record['status'] as String? ?? 'Success';
-                final isSuccess = status == 'Success';
-                final isFailed = status == 'Failed';
-                final startedAt = DateTime.parse(record['started_at'] as String).toLocal();
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 80,
-                        child: Text(
-                          DateFormat('HH:mm:ss').format(startedAt),
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: StyleConstants.textMuted),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Row(
-                          children: [
-                            Icon(isWasher ? Icons.local_laundry_service_rounded : Icons.wb_sunny_rounded, size: 15, color: accentColor),
-                            const SizedBox(width: 6),
-                            Text(
-                              record['machine_name'] ?? '-',
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          record['customer_name'] ?? 'Tanpa Nama',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: StyleConstants.textHeading),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 80,
-                        child: Text(
-                          record['order_id'] != null ? '#${record['order_id']}' : '-',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: StyleConstants.primaryColor),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 110,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: isSuccess ? StyleConstants.statusSuccessBg : (isFailed ? StyleConstants.statusDangerBg : StyleConstants.statusInfoBg),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            status.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: isSuccess ? StyleConstants.statusSuccessText : (isFailed ? StyleConstants.statusDangerText : StyleConstants.statusInfoText),
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          record['error_message'] ?? 'Sinyal terkirim & normal',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: isFailed ? StyleConstants.dangerColor : StyleConstants.textMuted,
-                            fontWeight: isFailed ? FontWeight.w600 : FontWeight.normal,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      SizedBox(
-                        width: 110,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (isFailed)
-                              ElevatedButton.icon(
-                                onPressed: () => _retryMachineActivation(record),
-                                icon: const Icon(Icons.replay_rounded, size: 12),
-                                label: const Text('Retry', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: StyleConstants.dangerColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  minimumSize: Size.zero,
-                                  elevation: 0,
-                                ),
-                              )
-                            else
-                              const Text('Normal', style: TextStyle(fontSize: 11.5, color: StyleConstants.textMuted, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
