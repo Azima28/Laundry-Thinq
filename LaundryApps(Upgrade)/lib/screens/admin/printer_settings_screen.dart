@@ -556,6 +556,40 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                       }
                     },
                   ),
+                  if (_receiptWidth == 76) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFC7D2FE)),
+                      ),
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.verified_rounded, size: 20, color: Color(0xFF4338CA)),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Konfigurasi Optimal Epson TM-U220D (76 mm Dot Matrix):',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF3730A3)),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  '• Ukuran font otomatis diperbesar (13.5pt Header / 10pt Item) dengan ketebalan ekstra tebal agar teks terbaca tajam dan rapat di pita ribbon/NCR 2-ply 9-pin.\n• Margin telah disesuaikan dengan batas area cetak 63.5 mm (40 kolom) agar tidak terpotong di tepi kertas.',
+                                  style: TextStyle(fontSize: 11.5, color: Color(0xFF4338CA), height: 1.4),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 18),
 
                   TextField(
