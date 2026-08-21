@@ -688,7 +688,7 @@ class _PesanPageState extends State<PesanPage> {
   }
 
   // =========================================================
-  // MAIN VIEW: INTEGRATED SPLIT WORKSTATION (60% : 40%)
+  // MAIN VIEW: INTEGRATED SPLIT WORKSTATION (58% : 42%)
   // =========================================================
   @override
   Widget build(BuildContext context) {
@@ -708,10 +708,10 @@ class _PesanPageState extends State<PesanPage> {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Top POS Header Bar
+                    // Top Universal Header Bar
                     _buildPosHeader(),
 
-                    // Main 2-Container Workspace (60% : 40%)
+                    // Main 2-Container Workspace (58% : 42%)
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.all(14.0),
@@ -719,7 +719,7 @@ class _PesanPageState extends State<PesanPage> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             // =========================================================
-                            // CONTAINER KIRI: KATALOG PRODUK KOMPAK & PADAT (58%)
+                            // CONTAINER KIRI: KATALOG PRODUK BERAKSEN WARNA (58%)
                             // =========================================================
                             Expanded(
                               flex: 58,
@@ -730,16 +730,16 @@ class _PesanPageState extends State<PesanPage> {
                                   border: Border.all(color: StyleConstants.borderLight),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 3),
+                                      color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
                                     ),
                                   ],
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
-                                    // Catalog Section Header
+                                    // Catalog Header Ribbon
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                                       decoration: const BoxDecoration(
@@ -749,16 +749,39 @@ class _PesanPageState extends State<PesanPage> {
                                       ),
                                       child: Row(
                                         children: [
-                                          const Icon(Icons.grid_view_rounded, size: 18, color: StyleConstants.primaryColor),
-                                          const SizedBox(width: 8),
-                                          const Text(
-                                            'Katalog Layanan & Paket Cuci',
-                                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: StyleConstants.primaryColor.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: const Icon(Icons.grid_view_rounded, size: 16, color: StyleConstants.primaryColor),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          const Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Katalog Layanan & Paket Cuci',
+                                                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
+                                              ),
+                                              Text(
+                                                'Pilih paket cucian untuk dimasukkan ke nota transaksi',
+                                                style: TextStyle(fontSize: 10.5, color: StyleConstants.textMuted),
+                                              ),
+                                            ],
                                           ),
                                           const Spacer(),
-                                          Text(
-                                            '${_filteredItems.length} Paket Tersedia',
-                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: StyleConstants.textMuted),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFE2E8F0),
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Text(
+                                              '${_filteredItems.length} Layanan',
+                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -771,11 +794,18 @@ class _PesanPageState extends State<PesanPage> {
                                               child: Column(
                                                 mainAxisAlignment: MainAxisAlignment.center,
                                                 children: [
-                                                  Icon(Icons.inventory_2_outlined, size: 42, color: Colors.grey[300]),
-                                                  const SizedBox(height: 10),
+                                                  Container(
+                                                    padding: const EdgeInsets.all(16),
+                                                    decoration: const BoxDecoration(
+                                                      color: Color(0xFFF8FAFC),
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: Icon(Icons.inventory_2_outlined, size: 40, color: Colors.grey[300]),
+                                                  ),
+                                                  const SizedBox(height: 12),
                                                   const Text(
                                                     'Tidak ada layanan yang sesuai pencarian.',
-                                                    style: TextStyle(color: StyleConstants.textMuted, fontSize: 13, fontWeight: FontWeight.w600),
+                                                    style: TextStyle(color: StyleConstants.textMuted, fontSize: 13, fontWeight: FontWeight.w700),
                                                   ),
                                                 ],
                                               ),
@@ -784,9 +814,9 @@ class _PesanPageState extends State<PesanPage> {
                                               padding: const EdgeInsets.all(14),
                                               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                                                 maxCrossAxisExtent: 220,
-                                                crossAxisSpacing: 10,
-                                                mainAxisSpacing: 10,
-                                                childAspectRatio: 1.52,
+                                                crossAxisSpacing: 12,
+                                                mainAxisSpacing: 12,
+                                                childAspectRatio: 1.48,
                                               ),
                                               itemCount: _filteredItems.length,
                                               itemBuilder: (context, index) {
@@ -804,7 +834,7 @@ class _PesanPageState extends State<PesanPage> {
                             const SizedBox(width: 14),
 
                             // =========================================================
-                            // CONTAINER KANAN: NOTA STRUK & PEMBAYARAN TERPADU (42%)
+                            // CONTAINER KANAN: NOTA STRUK & STUDIO BAYAR TERPADU (42%)
                             // =========================================================
                             Expanded(
                               flex: 42,
@@ -815,8 +845,8 @@ class _PesanPageState extends State<PesanPage> {
                                   border: Border.all(color: StyleConstants.borderLight),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-                                      blurRadius: 12,
+                                      color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                                      blurRadius: 14,
                                       offset: const Offset(0, 4),
                                     ),
                                   ],
@@ -824,7 +854,7 @@ class _PesanPageState extends State<PesanPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
-                                    // 1. Customer Header Badge
+                                    // 1. Digital Slip Receipt Header & Customer Card
                                     _buildCustomerTicketSection(),
 
                                     const Divider(height: 1, color: StyleConstants.borderLight),
@@ -834,9 +864,7 @@ class _PesanPageState extends State<PesanPage> {
                                       child: _buildCartItemsList(),
                                     ),
 
-                                    const Divider(height: 1, color: StyleConstants.borderLight),
-
-                                    // 3. Integrated Payment & Total Section
+                                    // 3. Integrated Payment & High-Contrast Total Banner
                                     _buildIntegratedPaymentSection(total, totalItems),
                                   ],
                                 ),
@@ -937,25 +965,44 @@ class _PesanPageState extends State<PesanPage> {
     );
   }
 
-  // --- SUB-WIDGET: PRODUCT CARD COMPACT ---
+  // --- SUB-WIDGET: PRODUCT CARD RICH ACCENTS ---
   Widget _buildProductCard(TransactionModel item, int quantity) {
     final isSelected = quantity > 0;
-    final isKiloan = item.nama.toLowerCase().contains('kg') || item.nama.toLowerCase().contains('kilo');
-    final isExpress = item.nama.toLowerCase().contains('exp') || item.nama.toLowerCase().contains('kilat');
+    final nameLower = item.nama.toLowerCase();
+    final isKiloan = nameLower.contains('kg') || nameLower.contains('kilo');
+    final isExpress = nameLower.contains('exp') || nameLower.contains('kilat');
+    final isBedcover = nameLower.contains('bed') || nameLower.contains('selimut') || nameLower.contains('sepatu');
+
+    // Distinct Theme Accent Color
+    final Color accentColor = isExpress
+        ? StyleConstants.warningColor
+        : (isKiloan
+            ? StyleConstants.successColor
+            : (isBedcover ? StyleConstants.secondaryColor : StyleConstants.primaryColor));
+
+    final IconData categoryIcon = isExpress
+        ? Icons.bolt_rounded
+        : (isKiloan
+            ? Icons.scale_rounded
+            : (isBedcover ? Icons.inventory_2_rounded : Icons.local_laundry_service_rounded));
+
+    final String categoryBadge = isExpress
+        ? 'EXPRESS'
+        : (isKiloan ? 'KILOAN' : (isBedcover ? 'SATUAN' : 'REGULER'));
 
     return Container(
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
+        color: isSelected ? accentColor.withValues(alpha: 0.06) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isSelected ? StyleConstants.primaryColor : StyleConstants.borderLight,
+          color: isSelected ? accentColor : StyleConstants.borderLight,
           width: isSelected ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
             color: isSelected
-                ? StyleConstants.primaryColor.withValues(alpha: 0.12)
-                : const Color(0xFF0F172A).withValues(alpha: 0.02),
+                ? accentColor.withValues(alpha: 0.16)
+                : const Color(0xFF0F172A).withValues(alpha: 0.03),
             blurRadius: isSelected ? 8 : 4,
             offset: const Offset(0, 2),
           ),
@@ -972,7 +1019,7 @@ class _PesanPageState extends State<PesanPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Top Title & Icon
+                // Top Title, Accent Icon & Tag
                 Row(
                   children: [
                     Container(
@@ -980,42 +1027,61 @@ class _PesanPageState extends State<PesanPage> {
                       height: 28,
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? StyleConstants.primaryColor
-                            : StyleConstants.primaryColor.withValues(alpha: 0.1),
+                            ? accentColor
+                            : accentColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(7),
                       ),
                       child: Icon(
-                        isExpress
-                            ? Icons.bolt_rounded
-                            : (isKiloan ? Icons.scale_rounded : Icons.local_laundry_service_rounded),
-                        color: isSelected ? Colors.white : StyleConstants.primaryColor,
+                        categoryIcon,
+                        color: isSelected ? Colors.white : accentColor,
                         size: 16,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        item.nama,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                          color: StyleConstants.textHeading,
-                          letterSpacing: -0.2,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: accentColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              categoryBadge,
+                              style: TextStyle(
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w900,
+                                color: accentColor,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            item.nama,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12.5,
+                              color: StyleConstants.textHeading,
+                              letterSpacing: -0.2,
+                              height: 1.1,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
-                    if (_notes[item.id]?.isNotEmpty == true)
-                      InkWell(
-                        onTap: () => _showNoteDialog(item.id ?? 0, item.nama),
-                        child: const Icon(Icons.sticky_note_2_rounded, size: 14, color: StyleConstants.warningColor),
-                      )
-                    else
-                      InkWell(
-                        onTap: () => _showNoteDialog(item.id ?? 0, item.nama),
-                        child: const Icon(Icons.note_add_outlined, size: 14, color: StyleConstants.textMuted),
+                    InkWell(
+                      onTap: () => _showNoteDialog(item.id ?? 0, item.nama),
+                      child: Icon(
+                        _notes[item.id]?.isNotEmpty == true ? Icons.sticky_note_2_rounded : Icons.note_add_outlined,
+                        size: 15,
+                        color: _notes[item.id]?.isNotEmpty == true ? StyleConstants.warningColor : StyleConstants.textMuted,
                       ),
+                    ),
                   ],
                 ),
 
@@ -1026,9 +1092,9 @@ class _PesanPageState extends State<PesanPage> {
                     Text(
                       formatRp(item.harga),
                       style: StyleConstants.tabularNumbers(
-                        fontSize: 14,
+                        fontSize: 14.5,
                         fontWeight: FontWeight.w900,
-                        color: StyleConstants.primaryColor,
+                        color: isSelected ? accentColor : StyleConstants.textHeading,
                       ),
                     ),
 
@@ -1058,7 +1124,7 @@ class _PesanPageState extends State<PesanPage> {
                               style: TextStyle(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 12.5,
-                                color: isSelected ? StyleConstants.primaryColor : StyleConstants.textHeading,
+                                color: isSelected ? accentColor : StyleConstants.textHeading,
                               ),
                             ),
                           ),
@@ -1066,7 +1132,7 @@ class _PesanPageState extends State<PesanPage> {
                             icon: const Icon(Icons.add_rounded, size: 14),
                             padding: const EdgeInsets.all(2),
                             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                            color: StyleConstants.primaryColor,
+                            color: accentColor,
                             onPressed: () => _updateQuantity(item.id, true),
                             tooltip: 'Tambah',
                           ),
@@ -1083,7 +1149,7 @@ class _PesanPageState extends State<PesanPage> {
     );
   }
 
-  // --- CUSTOMER BADGE SECTION ---
+  // --- CUSTOMER VIP HEADER SECTION ---
   Widget _buildCustomerTicketSection() {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -1093,19 +1159,43 @@ class _PesanPageState extends State<PesanPage> {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: StyleConstants.primaryColor.withValues(alpha: 0.1),
-            child: const Icon(Icons.person_rounded, size: 16, color: StyleConstants.primaryColor),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: StyleConstants.primaryGradient,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.person_rounded, size: 16, color: Colors.white),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    const Text(
+                      'PELANGGAN: ',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: StyleConstants.textMuted, letterSpacing: 0.5),
+                    ),
+                    if (_customerNameController.text.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: StyleConstants.successColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'TERDAFTAR',
+                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: StyleConstants.successColor),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 2),
                 Text(
                   _customerNameController.text.isEmpty
-                      ? 'Pilih Pelanggan...'
+                      ? 'Pilih Data Pelanggan...'
                       : _customerNameController.text,
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
@@ -1132,16 +1222,18 @@ class _PesanPageState extends State<PesanPage> {
             ),
             const SizedBox(width: 8),
           ],
-          OutlinedButton(
+          ElevatedButton(
             onPressed: _showCustomerPicker,
-            style: OutlinedButton.styleFrom(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: StyleConstants.primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              side: const BorderSide(color: StyleConstants.borderLight),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
             ),
             child: Text(
               _customerNameController.text.isEmpty ? 'Pilih (+)' : 'Ganti',
-              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: StyleConstants.primaryColor),
+              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -1158,15 +1250,23 @@ class _PesanPageState extends State<PesanPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.shopping_bag_outlined, size: 36, color: Colors.grey[300]),
-            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF8FAFC),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.receipt_long_rounded, size: 36, color: Colors.grey[300]),
+            ),
+            const SizedBox(height: 10),
             const Text(
               'Nota Pesanan Masih Kosong',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: StyleConstants.textMuted),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
             ),
+            const SizedBox(height: 2),
             const Text(
-              'Klik paket cucian di sebelah kiri untuk menambahkan.',
-              style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+              'Klik kartu paket di sebelah kiri untuk menambahkan.',
+              style: TextStyle(fontSize: 11, color: StyleConstants.textMuted),
             ),
           ],
         ),
@@ -1186,14 +1286,14 @@ class _PesanPageState extends State<PesanPage> {
         return Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
-                color: StyleConstants.primaryColor.withValues(alpha: 0.1),
+                color: StyleConstants.primaryColor,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
                 '${qty}x',
-                style: const TextStyle(fontWeight: FontWeight.w900, color: StyleConstants.primaryColor, fontSize: 12),
+                style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 11.5),
               ),
             ),
             const SizedBox(width: 8),
@@ -1203,9 +1303,13 @@ class _PesanPageState extends State<PesanPage> {
                 children: [
                   Text(
                     item.nama,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: StyleConstants.textHeading),
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: StyleConstants.textHeading),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    '@ ${formatRp(item.harga)}',
+                    style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
                   ),
                   if (note != null && note.trim().isNotEmpty)
                     Text(
@@ -1217,12 +1321,12 @@ class _PesanPageState extends State<PesanPage> {
             ),
             Text(
               formatRp(subtotal),
-              style: StyleConstants.tabularNumbers(fontSize: 12.5, fontWeight: FontWeight.w800),
+              style: StyleConstants.tabularNumbers(fontSize: 13, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
             ),
             const SizedBox(width: 6),
             InkWell(
               onTap: () => setState(() => _quantities[item.id ?? 0] = 0),
-              child: const Icon(Icons.close_rounded, size: 16, color: StyleConstants.textMuted),
+              child: const Icon(Icons.close_rounded, size: 16, color: StyleConstants.dangerColor),
             ),
           ],
         );
@@ -1230,7 +1334,7 @@ class _PesanPageState extends State<PesanPage> {
     );
   }
 
-  // --- INTEGRATED PAYMENT & TOTAL SECTION (PANE KANAN BAWAH) ---
+  // --- INTEGRATED PAYMENT & HIGH-CONTRAST TOTAL SECTION ---
   Widget _buildIntegratedPaymentSection(int total, int totalItems) {
     final change = _cashReceived - total;
     final isCashValid = total > 0 && _cashReceived >= total;
@@ -1245,30 +1349,46 @@ class _PesanPageState extends State<PesanPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Total Amount Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('TOTAL TAGIHAN:', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: StyleConstants.textMuted, letterSpacing: 0.5)),
-                  Text('$totalItems Layanan Dipilih', style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted)),
-                ],
-              ),
-              Text(
-                formatRp(total),
-                style: StyleConstants.tabularNumbers(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: StyleConstants.primaryColor,
+          // 1. High-Contrast Grand Total Banner (Slate 900 ground with bright Emerald text)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: StyleConstants.sidebarBackground, // Slate 900
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.account_balance_wallet_rounded, color: StyleConstants.accentCyan, size: 18),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'TOTAL TAGIHAN',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: StyleConstants.accentCyan, letterSpacing: 0.8),
+                        ),
+                        Text('$totalItems Layanan Terpilih', style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8))),
+                      ],
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                Text(
+                  formatRp(total),
+                  style: StyleConstants.tabularNumbers(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
+                    color: StyleConstants.successColor, // Emerald 500 Bright
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
 
-          // Payment Method Selector (3-Pills)
+          // 2. Payment Method Selector (3-Pills)
           Row(
             children: [
               Expanded(
@@ -1280,13 +1400,13 @@ class _PesanPageState extends State<PesanPage> {
               ),
               const SizedBox(width: 6),
               Expanded(
-                child: _methodTab(key: 'tempo', label: 'Tempo/DP', icon: Icons.schedule_rounded, color: const Color(0xFFF97316)),
+                child: _methodTab(key: 'tempo', label: 'Tempo/DP', icon: Icons.schedule_rounded, color: StyleConstants.warningColor),
               ),
             ],
           ),
           const SizedBox(height: 12),
 
-          // --- 1. CASH WORKBENCH ---
+          // --- CASH WORKBENCH ---
           if (_selectedPaymentTab == 'cash') ...[
             Container(
               decoration: BoxDecoration(
@@ -1304,7 +1424,7 @@ class _PesanPageState extends State<PesanPage> {
                       controller: _cashController,
                       keyboardType: TextInputType.number,
                       inputFormatters: [ThousandsSeparatorInputFormatter()],
-                      style: StyleConstants.tabularNumbers(fontSize: 19, fontWeight: FontWeight.w900),
+                      style: StyleConstants.tabularNumbers(fontSize: 19, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
                       decoration: const InputDecoration(hintText: '0', border: InputBorder.none),
                       onSubmitted: (_) {
                         if (isCashValid && !_isSubmitting) _processAllInOneCheckout();
@@ -1347,13 +1467,23 @@ class _PesanPageState extends State<PesanPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    (change >= 0) ? 'KEMBALIAN TUNAI:' : 'UANG KURANG:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 11,
-                      color: (change >= 0) ? const Color(0xFF047857) : const Color(0xFFB45309),
-                    ),
+                  Row(
+                    children: [
+                      Icon(
+                        (change >= 0) ? Icons.price_check_rounded : Icons.warning_amber_rounded,
+                        size: 20,
+                        color: (change >= 0) ? StyleConstants.successColor : StyleConstants.warningColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        (change >= 0) ? 'KEMBALIAN TUNAI:' : 'UANG KURANG:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                          color: (change >= 0) ? const Color(0xFF047857) : const Color(0xFFB45309),
+                        ),
+                      ),
+                    ],
                   ),
                   Text(
                     formatRp((change >= 0) ? change : change.abs()),
@@ -1379,15 +1509,22 @@ class _PesanPageState extends State<PesanPage> {
               ),
               child: _isSubmitting
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('BAYAR LUNAS & CETAK STRUK (ENTER)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.check_circle_rounded, size: 18),
+                        SizedBox(width: 8),
+                        Text('BAYAR LUNAS & CETAK STRUK (ENTER)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.3)),
+                      ],
+                    ),
             ),
           ],
 
-          // --- 2. QRIS WORKBENCH ---
+          // --- QRIS WORKBENCH ---
           if (_selectedPaymentTab == 'qris') ...[
             if (_qrisUrl == null) ...[
               if (_qrisError != null) ...[
-                Text('Error: $_qrisError', style: const TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text('Error: $_qrisError', style: const TextStyle(color: StyleConstants.dangerColor, fontSize: 11, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
               ],
               ElevatedButton.icon(
@@ -1433,7 +1570,7 @@ class _PesanPageState extends State<PesanPage> {
             ],
           ],
 
-          // --- 3. TEMPO / DP WORKBENCH ---
+          // --- TEMPO / DP WORKBENCH ---
           if (_selectedPaymentTab == 'tempo') ...[
             Row(
               children: [
