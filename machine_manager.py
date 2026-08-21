@@ -867,114 +867,44 @@ def start_machine_monitoring(entity_id, customer_name=None, customer_phone=None,
         ).start()
 
     return "monitoring_started", 200
-    config = lg_manager.load_lg_config()
-    monitoring_mode = config.get("monitoring_mode", "hybrid")
-    
-    # Log usage (all modes)
-    database.log_usage(entity_id, "MONITOR_START", source=source)
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    broadcast(f"LOG|{now_str}|{entity_id}|MONITOR_START|{entity_id}|{source}")
-    
-    # Initialize state tracker for the new transaction
-    with state_transitions_lock:
-        state_transitions[entity_id] = {
-            "last_state": "Ready",
-            "wa_start_sent": False,
-            "wa_completion_sent": False
-        }
-    
-    # --- SENSOR MODE (PAT/WideQ/Hybrid): Traditional booking window ---
-    duration_minutes = duration_seconds // 60
-    end_time = datetime.now() + timedelta(seconds=duration_seconds)
-    
-    # Set machine as unready (booking window)
-    set_machine_unready(
-        entity_id,
-        duration_seconds=duration_seconds,
-        source=source,
-        customer_name=customer_name,
-        customer_phone=customer_phone
-    )
-    
-    # Set initial state in SSE
-    is_lg_machine = entity_id in lg_manager.get_discovered_devices()
-    m = duration_seconds // 60
-    s = duration_seconds % 60
-    control_time = f"{m}:{s:02d}"
-    
-    if is_lg_machine:
-        existing_state = lg_manager.latest_state.get(entity_id, "")
-        existing_parts = existing_state.split("|") if existing_state else []
-        if len(existing_parts) >= 6 and "Menit" not in existing_parts[2]:
-            while len(existing_parts) < 7:
-                existing_parts.append("-")
-            if len(existing_parts) == 7:
-                existing_parts.append(control_time)
-            else:
-                existing_parts[7] = control_time
-            state = "|".join(existing_parts)
-        else:
-            state = f"{entity_id}|Ready|Idle|--:--|-|-|0|{control_time}"
-    else:
-        siklus_label = f"{duration_minutes} Menit"
-        state = f"{entity_id}|Ready|{siklus_label}|{control_time}|-|-|0|{control_time}"
-    
-    lg_manager.latest_state[entity_id] = state
-    broadcast(state)
-    
-    # Start countdown broadcast
-    _start_countdown_broadcast(entity_id, end_time, duration_minutes)
-    
-    # Set smart polling next time to 3 minutes from now (Booking window)
-    lg_manager.set_next_poll_time(entity_id, 180)
-    
-    # Send cucian masuk WA notification (in background)
-    if customer_phone:
-        threading.Thread(
-            target=wa_bridge.send_wa_cucian_masuk,
-            args=(customer_phone, customer_name or "Pelanggan", entity_id),
-            daemon=True
-        ).start()
-    
-    return "monitoring_started", 200
 
 
 def stop_machine_monitoring(entity_id, source='admin'):
     """Manually stop monitoring a machine and release it.
-    
+
     Returns:
         tuple (message, status_code)
     """
     print(f"[Monitor] Stopping monitoring for {entity_id} (source={source})")
-    
+
     # If Tuya device, turn it off physically
     if tuya_manager.resolve_tuya_device(entity_id) is not None:
         tuya_manager.stop_dryer(entity_id)
-    
+
     database.log_usage(entity_id, "MONITOR_STOP", source=source)
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     broadcast(f"LOG|{now_str}|{entity_id}|MONITOR_STOP|{entity_id}|{source}")
-    
+
     _release_machine(entity_id)
-    
+
     return "monitoring_stopped", 200
 
 
 def finish_and_notify(entity_id, send_wa=True, wa_message=None):
     """Manually stop monitoring and release a machine (Selesaikan).
-    
-    If it is the customer's last machine and send_wa is True, sends completion WA.
-    
+
+    Sends completion WA to customer if send_wa is True and phone number is available.
+
     Returns:
         tuple (message, status_code)
     """
     info = get_customer_info(entity_id)
     customer_name = info.get("name", "Pelanggan")
     customer_phone = info.get("phone")
-    
-    is_last = is_last_machine_for_customer(entity_id)
-    
-    if send_wa and customer_phone and is_last:
+
+    print(f"[Monitor] Finishing machine {entity_id} for {customer_name} (send_wa={send_wa}, phone={customer_phone})")
+
+    if send_wa and customer_phone:
         if wa_message:
             threading.Thread(
                 target=wa_bridge.send_wa_message,
@@ -987,11 +917,11 @@ def finish_and_notify(entity_id, send_wa=True, wa_message=None):
                 args=(customer_phone, customer_name, entity_id),
                 daemon=True
             ).start()
-            
+
     database.log_usage(entity_id, "MONITOR_STOP", source='kasir')
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     broadcast(f"LOG|{now_str}|{entity_id}|MONITOR_STOP|{entity_id}|kasir")
-    
+
     _release_machine(entity_id)
     return "monitoring_stopped", 200
 
@@ -999,30 +929,28 @@ def finish_and_notify(entity_id, send_wa=True, wa_message=None):
 def replace_customer(entity_id, new_customer_name, new_customer_phone=None,
                      send_wa_to_previous=False, wa_message=None):
     """Replace the customer on an occupied/active machine.
-    
+
     Used when kasir wants to assign a new customer to a machine that still
     has a previous customer.
-    
+
     Args:
         entity_id: Machine identifier
         new_customer_name: New customer's name
         new_customer_phone: New customer's phone (optional)
         send_wa_to_previous: Whether to send WA to previous customer
         wa_message: Custom WA message (None = use template)
-    
+
     Returns:
         tuple (message, status_code)
     """
     prev_info = get_customer_info(entity_id)
     prev_name = prev_info.get("name", "")
     prev_phone = prev_info.get("phone", "")
-    
-    is_last = is_last_machine_for_customer(entity_id)
-    
-    print(f"[Monitor] Replacing customer on {entity_id}: {prev_name} -> {new_customer_name}")
-    
-    # Send WA to previous customer if requested and it's their last active machine
-    if send_wa_to_previous and prev_phone and is_last:
+
+    print(f"[Monitor] Replacing customer on {entity_id}: {prev_name} -> {new_customer_name} (send_wa_prev={send_wa_to_previous}, prev_phone={prev_phone})")
+
+    # Send WA to previous customer if requested
+    if send_wa_to_previous and prev_phone:
         if wa_message:
             threading.Thread(
                 target=wa_bridge.send_wa_message,
@@ -1035,15 +963,15 @@ def replace_customer(entity_id, new_customer_name, new_customer_phone=None,
                 args=(prev_phone, prev_name or "Pelanggan", entity_id),
                 daemon=True
             ).start()
-            
+
     database.log_usage(entity_id, "CUSTOMER_REPLACE", source='kasir')
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     broadcast(f"LOG|{now_str}|{entity_id}|CUSTOMER_REPLACE|{prev_name}->{new_customer_name}|kasir")
-    
+
     # Release old customer state
     _release_machine(entity_id)
-    
-    # Start fresh monitoring for new customer (5-minute booking window)
+
+    # Start fresh monitoring for new customer
     return start_machine_monitoring(
         entity_id,
         customer_name=new_customer_name,

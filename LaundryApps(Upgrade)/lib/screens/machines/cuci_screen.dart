@@ -958,12 +958,33 @@ class _CuciContentState extends State<CuciContent> {
     dynamic entry,
   ) async {
     final String customerName = (entry?['customer_name'] ?? '').toString();
-    final String customerPhone = (entry?['customer_phone'] ?? '').toString();
+    String customerPhone = (entry?['customer_phone'] ?? '').toString();
     final bool waSent = entry?['wa_sent'] == true;
-    final bool isLastMachine = entry?['is_last_machine'] != false;
     final List<dynamic> otherMachines = entry?['other_machines'] != null
         ? List<dynamic>.from(entry['other_machines'])
         : [];
+
+    // If phone is missing in IoT state, look up phone number from local SQLite DB
+    if (customerPhone.isEmpty && customerName.isNotEmpty && customerName != '-' && customerName != 'null') {
+      try {
+        final db = await _db.database;
+        final res = await db.rawQuery(
+          'SELECT customer_phone FROM orders WHERE customer_name = ? AND customer_phone IS NOT NULL AND customer_phone != "" ORDER BY id DESC LIMIT 1',
+          [customerName],
+        );
+        if (res.isNotEmpty && res.first['customer_phone'] != null) {
+          customerPhone = res.first['customer_phone'].toString();
+        } else {
+          final custRes = await db.rawQuery(
+            'SELECT phone FROM customers WHERE name = ? AND phone IS NOT NULL AND phone != "" LIMIT 1',
+            [customerName],
+          );
+          if (custRes.isNotEmpty && custRes.first['phone'] != null) {
+            customerPhone = custRes.first['phone'].toString();
+          }
+        }
+      } catch (_) {}
+    }
 
     final Order? newOrder = _selectedOrderItem != null
         ? _selectedOrderItem!['order'] as Order
@@ -980,8 +1001,15 @@ class _CuciContentState extends State<CuciContent> {
     bool sendWa = !waSent; // default checked if not sent yet
     bool isCustomMessage = false;
 
-    final TextEditingController phoneCtrl = TextEditingController(text: '8');
+    final TextEditingController activePhoneCtrl = TextEditingController(
+      text: customerPhone.startsWith('+62')
+          ? customerPhone.substring(3)
+          : (customerPhone.startsWith('0') ? customerPhone.substring(1) : customerPhone),
+    );
+    final TextEditingController newPhoneCtrl = TextEditingController(text: '8');
     final TextEditingController msgCtrl = TextEditingController();
+
+    if (!mounted) return;
 
     await showDialog(
       context: context,
@@ -1048,8 +1076,8 @@ class _CuciContentState extends State<CuciContent> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Section 1: Other active machines warning (only if NOT last machine)
-                    if (!isLastMachine && otherMachines.isNotEmpty) ...[
+                    // Section 1: Other active machines warning (if any)
+                    if (otherMachines.isNotEmpty) ...[
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -1063,14 +1091,14 @@ class _CuciContentState extends State<CuciContent> {
                             Row(
                               children: [
                                 Icon(
-                                  Icons.warning_rounded,
-                                  color: Colors.amber.shade700,
+                                  Icons.info_outline_rounded,
+                                  color: Colors.amber.shade800,
                                   size: 18,
                                 ),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    '$customerName masih memiliki cucian aktif di:',
+                                    '$customerName juga memiliki cucian aktif di:',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
@@ -1100,106 +1128,150 @@ class _CuciContentState extends State<CuciContent> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'WA "cucian selesai" akan dikirim otomatis saat cucian terakhir $customerName selesai.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                          fontStyle: FontStyle.italic,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
                       const SizedBox(height: 16),
                     ],
 
-                    // Section 2: WA check (only if last machine)
-                    if (isLastMachine) ...[
-                      Text(
-                        'Ini adalah cucian terakhir $customerName.',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
+                    // Section 2: WhatsApp Notification Options (Always available for active customer)
+                    if (customerName.isNotEmpty && customerName != '-' && customerName != 'null') ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CheckboxListTile(
+                              title: Text(
+                                'Kirim Notifikasi WA ke $customerName',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              value: sendWa,
+                              contentPadding: EdgeInsets.zero,
+                              controlAffinity: ListTileControlAffinity.leading,
+                              activeColor: primaryColor,
+                              onChanged: (val) {
+                                setModalState(() {
+                                  sendWa = val ?? false;
+                                });
+                              },
+                            ),
+                            if (sendWa) ...[
+                              const SizedBox(height: 6),
+                              if (customerPhone.isNotEmpty) ...[
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.phone_android_rounded,
+                                        size: 16,
+                                        color: Color(0xFF059669),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Nomor WA: $customerPhone',
+                                        style: const TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF065F46),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ] else ...[
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Nomor WA belum terdaftar, masukkan nomor:',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFFD97706),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      TextField(
+                                        controller: activePhoneCtrl,
+                                        keyboardType: TextInputType.phone,
+                                        decoration: InputDecoration(
+                                          labelText: 'Nomor WA $customerName',
+                                          prefixText: '+62 ',
+                                          prefixStyle: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black,
+                                          ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 10,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              RadioListTile<bool>(
+                                title: const Text(
+                                  'Gunakan template cucian selesai',
+                                  style: TextStyle(fontSize: 12.5),
+                                ),
+                                value: false,
+                                groupValue: isCustomMessage,
+                                contentPadding: EdgeInsets.zero,
+                                activeColor: primaryColor,
+                                onChanged: (val) {
+                                  setModalState(() {
+                                    isCustomMessage = val ?? false;
+                                  });
+                                },
+                              ),
+                              RadioListTile<bool>(
+                                title: const Text(
+                                  'Ketik pesan sendiri',
+                                  style: TextStyle(fontSize: 12.5),
+                                ),
+                                value: true,
+                                groupValue: isCustomMessage,
+                                contentPadding: EdgeInsets.zero,
+                                activeColor: primaryColor,
+                                onChanged: (val) {
+                                  setModalState(() {
+                                    isCustomMessage = val ?? true;
+                                  });
+                                },
+                              ),
+                              if (isCustomMessage) ...[
+                                const SizedBox(height: 4),
+                                TextField(
+                                  controller: msgCtrl,
+                                  maxLines: 2,
+                                  decoration: InputDecoration(
+                                    hintText: 'Tulis pesan WhatsApp custom di sini...',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    contentPadding: const EdgeInsets.all(12),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      if (customerPhone.isNotEmpty) ...[
-                        CheckboxListTile(
-                          title: Text('Kirim WA selesai ke $customerName'),
-                          value: sendWa,
-                          contentPadding: EdgeInsets.zero,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          activeColor: primaryColor,
-                          onChanged: (val) {
-                            setModalState(() {
-                              sendWa = val ?? false;
-                            });
-                          },
-                        ),
-                        if (sendWa) ...[
-                          RadioListTile<bool>(
-                            title: const Text(
-                              'Gunakan template standar',
-                              style: TextStyle(fontSize: 13),
-                            ),
-                            value: false,
-                            groupValue: isCustomMessage,
-                            contentPadding: EdgeInsets.zero,
-                            activeColor: primaryColor,
-                            onChanged: (val) {
-                              setModalState(() {
-                                isCustomMessage = val ?? false;
-                              });
-                            },
-                          ),
-                          RadioListTile<bool>(
-                            title: const Text(
-                              'Ketik pesan sendiri',
-                              style: TextStyle(fontSize: 13),
-                            ),
-                            value: true,
-                            groupValue: isCustomMessage,
-                            contentPadding: EdgeInsets.zero,
-                            activeColor: primaryColor,
-                            onChanged: (val) {
-                              setModalState(() {
-                                isCustomMessage = val ?? true;
-                              });
-                            },
-                          ),
-                          if (isCustomMessage) ...[
-                            const SizedBox(height: 4),
-                            TextField(
-                              controller: msgCtrl,
-                              maxLines: 2,
-                              decoration: InputDecoration(
-                                hintText: 'Tulis pesan WhatsApp custom di sini...',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                contentPadding: const EdgeInsets.all(12),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ] else ...[
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8.0),
-                          child: Row(
-                            children: [
-                              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
-                              SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'Nomor WA pelanggan tidak terdaftar di sistem.',
-                                  style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
                       const SizedBox(height: 16),
                     ],
 
@@ -1209,10 +1281,10 @@ class _CuciContentState extends State<CuciContent> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: primaryColor.withOpacity(0.05),
+                          color: primaryColor.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: primaryColor.withOpacity(0.2),
+                            color: primaryColor.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Column(
@@ -1249,10 +1321,10 @@ class _CuciContentState extends State<CuciContent> {
                         ),
                         const SizedBox(height: 8),
                         TextField(
-                          controller: phoneCtrl,
+                          controller: newPhoneCtrl,
                           keyboardType: TextInputType.phone,
                           decoration: InputDecoration(
-                            labelText: 'Nomor WA',
+                            labelText: 'Nomor WA Baru',
                             prefixText: '+62 ',
                             prefixStyle: const TextStyle(
                               fontWeight: FontWeight.bold,
@@ -1295,10 +1367,15 @@ class _CuciContentState extends State<CuciContent> {
                           ? msgCtrl.text
                           : null;
 
+                      // If active customer phone was typed manually in dialog, save/use it
+                      if (sendWa && customerPhone.isEmpty && activePhoneCtrl.text.trim().isNotEmpty) {
+                        customerPhone = '+62${activePhoneCtrl.text.trim()}';
+                      }
+
                       if (isReplacing) {
                         String finalPhone = newOrder.customerPhone ?? '';
                         if (needsPhoneInput) {
-                          finalPhone = '+62${phoneCtrl.text.trim()}';
+                          finalPhone = '+62${newPhoneCtrl.text.trim()}';
                           // Update order in SQLite database
                           final db = await _db.database;
                           await db.rawUpdate(
@@ -1372,7 +1449,7 @@ class _CuciContentState extends State<CuciContent> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isReplacing
                         ? StyleConstants.primaryColor
-                        : (isLastMachine && sendWa ? StyleConstants.successColor : StyleConstants.primaryColor),
+                        : (sendWa ? StyleConstants.successColor : StyleConstants.primaryColor),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -1393,10 +1470,8 @@ class _CuciContentState extends State<CuciContent> {
                       const SizedBox(width: 8),
                       Text(
                         isReplacing
-                            ? 'Ganti Pelanggan'
-                            : (isLastMachine
-                                ? (sendWa ? 'Selesaikan & Kirim WA' : 'Selesaikan Mesin')
-                                : 'Selesaikan Mesin Ini'),
+                            ? (sendWa ? 'Ganti & Kirim WA' : 'Ganti Pelanggan')
+                            : (sendWa ? 'Selesaikan & Kirim WA' : 'Selesaikan Mesin'),
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
