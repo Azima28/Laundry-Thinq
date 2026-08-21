@@ -143,4 +143,19 @@ class UserRepository {
       return null;
     }
   }
+
+  Future<bool> verifyAdminPassword(String password) async {
+    try {
+      final db = await _databaseHelper.database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'users',
+        where: 'role = ? AND password = ? AND is_active = 1',
+        whereArgs: ['admin', password],
+      );
+      return maps.isNotEmpty;
+    } catch (e) {
+      print('Error verifying admin password: $e');
+      return false;
+    }
+  }
 }

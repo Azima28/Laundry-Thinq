@@ -83,7 +83,7 @@ class DatabaseHelper {
     };
   }
 
-  Future<String> createBackup() async {
+  Future<String> createBackup({String label = 'manual'}) async {
     final db = await database;
     // Checkpoint SQLite WAL to make sure all data is flushed to main disk file
     try {
@@ -98,7 +98,16 @@ class DatabaseHelper {
 
     final backupDirPath = await getBackupDirectoryPath();
     final timestamp = DateFormat('yyyy-MM-dd_HHmmss').format(DateTime.now());
-    final backupFileName = 'laundry_backup_$timestamp.db';
+
+    String prefix = 'laundry_backup';
+    if (label == 'pre_restore') {
+      prefix = 'laundry_snapshot_sebelum_restore';
+    } else if (label.isNotEmpty && label != 'manual') {
+      final sanitizedLabel = label.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
+      prefix = 'laundry_backup_$sanitizedLabel';
+    }
+
+    final backupFileName = '${prefix}_$timestamp.db';
     final targetPath = join(backupDirPath, backupFileName);
 
     await sourceFile.copy(targetPath);
@@ -122,30 +131,42 @@ class DatabaseHelper {
     return list;
   }
 
-  Future<bool> restoreDatabase(String backupFilePath) async {
+  Future<Map<String, String>> restoreDatabaseWithSnapshot(String backupFilePath) async {
     final backupFile = File(backupFilePath);
     if (!await backupFile.exists()) {
       throw Exception('File backup tidak ditemukan: $backupFilePath');
     }
 
-    // 1. Close current database
+    // 1. Auto-Snapshot: Create safety backup of current data before replacing
+    final snapshotPath = await createBackup(label: 'pre_restore');
+
+    // 2. Close current database
     if (_database != null && _database!.isOpen) {
       await _database!.close();
       _database = null;
     }
 
-    // 2. Overwrite current database file
+    // 3. Overwrite current database file
     final dbPath = await getDatabasePath();
     await backupFile.copy(dbPath);
 
-    // 3. Overwrite root database if present
+    // 4. Overwrite root database if present
     try {
       final rootDbFile = File(join(Directory.current.path, 'laundry.db'));
       await backupFile.copy(rootDbFile.path);
     } catch (_) {}
 
-    // 4. Reopen database and verify
+    // 5. Reopen database and verify
     _database = await _initDB('laundry.db');
+
+    return {
+      'restoredFile': backupFilePath,
+      'snapshotFile': snapshotPath,
+    };
+  }
+
+  Future<bool> restoreDatabase(String backupFilePath) async {
+    await restoreDatabaseWithSnapshot(backupFilePath);
     return true;
   }
 

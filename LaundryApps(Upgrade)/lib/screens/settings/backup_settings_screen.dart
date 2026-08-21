@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../database/models/database_helper.dart';
+import '../../transactions/user_repository.dart';
 import '../../utils/style_constants.dart';
 
 class BackupSettingsScreen extends StatefulWidget {
@@ -13,6 +14,8 @@ class BackupSettingsScreen extends StatefulWidget {
 
 class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
   final DatabaseHelper _db = DatabaseHelper.instance;
+  final UserRepository _userRepo = UserRepository();
+
   Map<String, dynamic>? _dbStats;
   List<File> _availableBackups = [];
   bool _isLoading = true;
@@ -48,10 +51,265 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     }
   }
 
-  Future<void> _createBackupNow() async {
+  /// Verification Modal for Admin Password (not PIN, actual admin login password)
+  Future<bool> _promptAdminPassword({
+    required String title,
+    required String subtitle,
+    required String actionButtonText,
+    required Color actionButtonColor,
+    required IconData actionIcon,
+  }) async {
+    final passwordCtrl = TextEditingController();
+    bool isObscure = true;
+    String? errorMessage;
+    bool isVerifying = false;
+
+    final verified = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+              actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: actionButtonColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(actionIcon, color: actionButtonColor, size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: Color(0xFF0F172A)),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Otorisasi Keamanan Hak Akses Admin',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 460,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      subtitle,
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Password Akun Admin',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF334155)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: passwordCtrl,
+                      obscureText: isObscure,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Masukkan password admin...',
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                        suffixIcon: IconButton(
+                          icon: Icon(isObscure ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
+                          onPressed: () {
+                            setModalState(() {
+                              isObscure = !isObscure;
+                            });
+                          },
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: actionButtonColor, width: 1.5),
+                        ),
+                      ),
+                      onSubmitted: (_) async {
+                        final pwd = passwordCtrl.text.trim();
+                        if (pwd.isEmpty) {
+                          setModalState(() => errorMessage = 'Password tidak boleh kosong');
+                          return;
+                        }
+                        setModalState(() {
+                          isVerifying = true;
+                          errorMessage = null;
+                        });
+                        final isValid = await _userRepo.verifyAdminPassword(pwd);
+                        if (isValid) {
+                          if (ctx.mounted) Navigator.pop(ctx, true);
+                        } else {
+                          setModalState(() {
+                            isVerifying = false;
+                            errorMessage = 'Password Admin salah! Otorisasi ditolak.';
+                          });
+                        }
+                      },
+                    ),
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline_rounded, size: 16, color: Color(0xFFEF4444)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                errorMessage!,
+                                style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626), fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isVerifying ? null : () => Navigator.pop(ctx, false),
+                  child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                ),
+                ElevatedButton.icon(
+                  onPressed: isVerifying
+                      ? null
+                      : () async {
+                          final pwd = passwordCtrl.text.trim();
+                          if (pwd.isEmpty) {
+                            setModalState(() => errorMessage = 'Password tidak boleh kosong');
+                            return;
+                          }
+                          setModalState(() {
+                            isVerifying = true;
+                            errorMessage = null;
+                          });
+                          final isValid = await _userRepo.verifyAdminPassword(pwd);
+                          if (isValid) {
+                            if (ctx.mounted) Navigator.pop(ctx, true);
+                          } else {
+                            setModalState(() {
+                              isVerifying = false;
+                              errorMessage = 'Password Admin salah! Otorisasi ditolak.';
+                            });
+                          }
+                        },
+                  icon: isVerifying
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : Icon(actionIcon, size: 18, color: Colors.white),
+                  label: Text(
+                    isVerifying ? 'Memverifikasi...' : actionButtonText,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: actionButtonColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    return verified ?? false;
+  }
+
+  /// Create Database Backup with Admin Password check & optional label
+  Future<void> _createBackupFlow() async {
+    // 1. Password Verification
+    final isAuthorized = await _promptAdminPassword(
+      title: 'Konfirmasi Buat Backup',
+      subtitle: 'Masukkan password admin untuk membuat salinan file cadangan database sistem.',
+      actionButtonText: 'Lanjutkan Backup',
+      actionButtonColor: const Color(0xFF10B981),
+      actionIcon: Icons.cloud_upload_rounded,
+    );
+
+    if (!isAuthorized) return;
+    if (!mounted) return;
+
+    // 2. Optional Label Dialog
+    final labelCtrl = TextEditingController();
+    final shouldProceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Beri Label Versi Backup (Opsional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+        content: SizedBox(
+          width: 440,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Anda dapat memberi catatan versi pada file backup ini (misal: Tutup_Buku_Agustus atau Sebelum_Update):',
+                style: TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: labelCtrl,
+                decoration: InputDecoration(
+                  hintText: 'Misal: Tutup_Buku_Mingguan',
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  prefixIcon: const Icon(Icons.bookmark_outline_rounded, size: 20),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+            child: const Text('Buat Backup Sekarang', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldProceed != true) return;
+
     setState(() => _isBackingUp = true);
     try {
-      final backupPath = await _db.createBackup();
+      final label = labelCtrl.text.trim();
+      final backupPath = await _db.createBackup(label: label.isNotEmpty ? label : 'manual');
       await _loadData();
 
       if (mounted) {
@@ -72,7 +330,7 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Seluruh data transaksi, pelanggan, layanan, dan pengeluaran berhasil dicadangkan dengan aman.',
+                  'Seluruh data transaksi, pelanggan, layanan, pengeluaran, dan riwayat mesin berhasil dicadangkan.',
                   style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
                 ),
                 const SizedBox(height: 16),
@@ -133,15 +391,201 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal membuat backup: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Gagal membuat backup: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
       if (mounted) {
         setState(() => _isBackingUp = false);
+      }
+    }
+  }
+
+  /// Restore Database with Auto Safety Snapshot & Admin Password verification
+  Future<void> _restoreBackupFlow(File backupFile) async {
+    final fileName = backupFile.path.split(Platform.pathSeparator).last;
+    final lastModified = DateFormat('dd/MM/yyyy HH:mm').format(backupFile.lastModifiedSync());
+
+    // 1. Strong Warning and Information Dialog
+    final proceedToPassword = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 28),
+            SizedBox(width: 12),
+            Text('PERINGATAN PEMULIHAN DATABASE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFFDC2626))),
+          ],
+        ),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Anda akan memulihkan database dari file cadangan terpilih. Data aktif saat ini akan digantikan oleh data dari file backup tersebut.',
+                style: TextStyle(fontSize: 13.5, color: Color(0xFF334155), height: 1.45),
+              ),
+              const SizedBox(height: 16),
+              // Target Restore File Info
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('File yang akan dipulihkan: $fileName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                    const SizedBox(height: 4),
+                    Text('Waktu Pembuatan Backup: $lastModified', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Auto-Snapshot Guarantee Banner
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.shield_rounded, color: Color(0xFF16A34A), size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Jaminan Keamanan Data (Auto-Snapshot):',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF15803D)),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Sistem akan otomatis mencadangkan versi data Anda saat ini sebelum restore dilakukan, sehingga data lama Anda TIDAK AKAN HILANG dan tetap tersimpan sebagai snapshot cadangan.',
+                            style: TextStyle(fontSize: 11.5, color: Color(0xFF166534), height: 1.35),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batalkan', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Lanjut Verifikasi Password', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (proceedToPassword != true) return;
+
+    // 2. Admin Password Verification
+    final isAuthorized = await _promptAdminPassword(
+      title: 'Otorisasi Pulihkan Database',
+      subtitle: 'Masukkan password admin untuk mengonfirmasi pemulihan database dari: $fileName',
+      actionButtonText: 'Pulihkan Database Sekarang',
+      actionButtonColor: const Color(0xFFDC2626),
+      actionIcon: Icons.restore_rounded,
+    );
+
+    if (!isAuthorized) return;
+
+    // 3. Execute Restore with Auto Snapshot
+    setState(() => _isRestoring = true);
+    try {
+      final result = await _db.restoreDatabaseWithSnapshot(backupFile.path);
+      await _loadData();
+
+      if (mounted) {
+        final snapshotFileName = result['snapshotFile']?.split(Platform.pathSeparator).last ?? 'snapshot.db';
+
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 28),
+                SizedBox(width: 12),
+                Text('Database Berhasil Dipulihkan!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              ],
+            ),
+            content: SizedBox(
+              width: 480,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Seluruh data sistem telah berhasil dikembalikan ke versi backup yang dipilih.',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.4),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('• Versi Dipulihkan: $fileName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0F172A))),
+                        const SizedBox(height: 4),
+                        Text('• Snapshot Data Lama Tersimpan: $snapshotFileName', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Selesai', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal memulihkan database: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isRestoring = false);
       }
     }
   }
@@ -165,152 +609,33 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     }
   }
 
-  Future<void> _restoreBackup(File backupFile) async {
-    final fileName = backupFile.path.split(Platform.pathSeparator).last;
-    final lastModified = DateFormat('dd/MM/yyyy HH:mm').format(backupFile.lastModifiedSync());
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B), size: 28),
-            SizedBox(width: 12),
-            Text('Pulihkan Database?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'PERHATIAN: Memulihkan database akan mengganti seluruh data yang ada saat ini dengan data dari file backup yang dipilih.',
-              style: TextStyle(fontSize: 13, color: Color(0xFFDC2626), fontWeight: FontWeight.w600, height: 1.4),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('File: $fileName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
-                  const SizedBox(height: 4),
-                  Text('Waktu Backup: $lastModified', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(ctx, true),
-            icon: const Icon(Icons.restore_rounded, size: 18, color: Colors.white),
-            label: const Text('Ya, Pulihkan Sekarang', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF59E0B),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      setState(() => _isRestoring = true);
-      try {
-        await _db.restoreDatabase(backupFile.path);
-        await _loadData();
-
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: const Row(
-                children: [
-                  Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 28),
-                  SizedBox(width: 12),
-                  Text('Database Berhasil Dipulihkan!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                ],
-              ),
-              content: const Text(
-                'Seluruh data transaksi dan sistem telah berhasil dikembalikan dari file cadangan.',
-                style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
-              ),
-              actions: [
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('Selesai', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Gagal memulihkan database: $e'), backgroundColor: Colors.red),
-          );
-        }
-      } finally {
-        if (mounted) {
-          setState(() => _isRestoring = false);
-        }
-      }
-    }
-  }
-
   Future<void> _deleteBackup(File backupFile) async {
     final fileName = backupFile.path.split(Platform.pathSeparator).last;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Hapus File Backup?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-        content: Text('Yakin ingin menghapus file backup $fileName?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
+    final isAuthorized = await _promptAdminPassword(
+      title: 'Konfirmasi Hapus File Backup',
+      subtitle: 'Masukkan password admin untuk menghapus file cadangan: $fileName',
+      actionButtonText: 'Hapus File',
+      actionButtonColor: Colors.red,
+      actionIcon: Icons.delete_outline_rounded,
     );
 
-    if (confirm == true) {
-      try {
-        if (await backupFile.exists()) {
-          await backupFile.delete();
-          await _loadData();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('File backup berhasil dihapus.'), backgroundColor: Colors.grey),
-            );
-          }
-        }
-      } catch (e) {
+    if (!isAuthorized) return;
+
+    try {
+      if (await backupFile.exists()) {
+        await backupFile.delete();
+        await _loadData();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Gagal menghapus file: $e'), backgroundColor: Colors.red),
+            const SnackBar(content: Text('File backup berhasil dihapus.'), backgroundColor: Colors.grey),
           );
         }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menghapus file: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -329,7 +654,7 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Masukkan path lengkap file database cadangan (misal dari USB Flashdisk):',
+                'Masukkan path lengkap file database cadangan (misal dari Flashdisk / Harddisk):',
                 style: TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
               ),
               const SizedBox(height: 12),
@@ -363,7 +688,7 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     if (customFile != null && customFile.isNotEmpty) {
       final f = File(customFile);
       if (await f.exists()) {
-        await _restoreBackup(f);
+        await _restoreBackupFlow(f);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -393,7 +718,7 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
                 _buildActionButtonsRow(),
                 const SizedBox(height: 28),
 
-                // 3. Backup History Table / Card
+                // 3. Backup History Table / Card with Version Badges
                 _buildBackupHistoryCard(),
               ],
             ),
@@ -564,7 +889,7 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
         Expanded(
           flex: 2,
           child: ElevatedButton.icon(
-            onPressed: _isBackingUp ? null : _createBackupNow,
+            onPressed: _isBackingUp ? null : _createBackupFlow,
             icon: _isBackingUp
                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                 : const Icon(Icons.cloud_upload_rounded, size: 22, color: Colors.white),
@@ -634,12 +959,12 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
                 const Icon(Icons.history_rounded, size: 22, color: Color(0xFF0F172A)),
                 const SizedBox(width: 10),
                 const Text(
-                  'Riwayat File Backup Tersimpan',
+                  'Riwayat File Backup & Versi Snapshot',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                 ),
                 const Spacer(),
                 Text(
-                  '${_availableBackups.length} File Cadangan Tersedia',
+                  '${_availableBackups.length} Versi Cadangan Tersedia',
                   style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                 ),
               ],
@@ -676,6 +1001,7 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
               itemBuilder: (context, index) {
                 final file = _availableBackups[index];
                 final fileName = file.path.split(Platform.pathSeparator).last;
+                final isSnapshot = fileName.contains('snapshot_sebelum_restore');
                 final modTime = file.lastModifiedSync();
                 final formattedDate = DateFormat('dd MMMM yyyy, HH:mm:ss').format(modTime);
                 final bytes = file.lengthSync();
@@ -688,14 +1014,41 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
+                      color: isSnapshot ? const Color(0xFFFFFBEB) : const Color(0xFFF0FDF4),
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: isSnapshot ? const Color(0xFFFDE68A) : const Color(0xFFBBF7D0)),
                     ),
-                    child: const Icon(Icons.save_rounded, color: Color(0xFF2563EB), size: 22),
+                    child: Icon(
+                      isSnapshot ? Icons.history_toggle_off_rounded : Icons.save_rounded,
+                      color: isSnapshot ? const Color(0xFFD97706) : const Color(0xFF16A34A),
+                      size: 22,
+                    ),
                   ),
-                  title: Text(
-                    fileName,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: Color(0xFF0F172A)),
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          fileName,
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: Color(0xFF0F172A)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isSnapshot ? const Color(0xFFFEF3C7) : const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          isSnapshot ? 'Auto-Snapshot Sebelum Restore' : 'Versi Cadangan',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: isSnapshot ? const Color(0xFF92400E) : const Color(0xFF166534),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   subtitle: Text(
                     'Dibuat pada: $formattedDate • Ukuran: $sizeStr',
@@ -705,11 +1058,11 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       ElevatedButton.icon(
-                        onPressed: _isRestoring ? null : () => _restoreBackup(file),
+                        onPressed: _isRestoring ? null : () => _restoreBackupFlow(file),
                         icon: const Icon(Icons.restore_rounded, size: 16, color: Colors.white),
-                        label: const Text('Pulihkan Data', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                        label: const Text('Pulihkan Versi Ini', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF59E0B),
+                          backgroundColor: isSnapshot ? const Color(0xFFD97706) : const Color(0xFF2563EB),
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
