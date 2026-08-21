@@ -37,7 +37,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   String _bizName = 'SMART LAUNDRY PRO';
   String _bizAddress = 'Layanan Cuci & Setrika Profesional';
   String _bizPhone = '';
-  late TextEditingController _phoneCtrl;
+  TextEditingController _phoneCtrl = TextEditingController();
 
   @override
   void initState() {
