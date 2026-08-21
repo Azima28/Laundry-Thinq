@@ -312,7 +312,10 @@ async function initializeClient() {
         if (client.pupPage) {
             client.pupPage.on('console', msg => {
                 const text = msg.text();
-                // Filter out verbose logs, keep only warnings and errors or relevant vote logs
+                // Filter out verbose internal Meta/Facebook telemetry and non-fatal logs
+                if (text.includes('Haste-supplied') || text.includes('fburl.com') || text.includes('QPL event')) {
+                    return;
+                }
                 if (text.includes('error') || text.includes('failed') || text.includes('Poll') || text.includes('WWebJS')) {
                     console.log('[Puppeteer Console]', text);
                 }
