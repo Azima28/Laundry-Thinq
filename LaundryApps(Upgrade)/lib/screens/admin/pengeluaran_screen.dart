@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../database/models/database_helper.dart';
+import '../../utils/currency_format.dart';
 import '../../utils/style_constants.dart';
 
 class PengeluaranScreen extends StatefulWidget {
@@ -73,14 +74,14 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
 
   Future<void> _saveExpense() async {
     final name = _nameController.text.trim();
-    final amountStr = _amountController.text.trim();
-    if (name.isEmpty || amountStr.isEmpty) {
+    final rawAmountStr = _amountController.text.replaceAll('.', '').replaceAll(',', '').trim();
+    if (name.isEmpty || rawAmountStr.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Harap isi nama dan jumlah uang pengeluaran.'), backgroundColor: Colors.orange),
       );
       return;
     }
-    final amount = int.tryParse(amountStr);
+    final amount = int.tryParse(rawAmountStr);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Jumlah uang pengeluaran tidak valid.'), backgroundColor: Colors.orange),
@@ -130,18 +131,28 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
   }
 
   String _formatRp(int amount) {
-    String s = amount.toString();
-    String result = '';
-    int count = 0;
-    for (int i = s.length - 1; i >= 0; i--) {
-      result = s[i] + result;
-      count++;
-      if (count == 3 && i > 0) {
-        result = '.' + result;
-        count = 0;
-      }
-    }
-    return 'Rp $result';
+    return formatRp(amount);
+  }
+
+  Widget _expenseQuickTag(String label) {
+    return InkWell(
+      onTap: () {
+        _nameController.text = label;
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: StyleConstants.borderLight),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: StyleConstants.textHeading),
+        ),
+      ),
+    );
   }
 
   InputDecoration _inputDecoration(String label, String hint, IconData icon, {String? prefixText}) {
@@ -257,7 +268,21 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
                   'Tambah Pengeluaran Baru',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF475569), letterSpacing: 0.5),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+
+                // Common expense tags (Quick click)
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _expenseQuickTag('Deterjen'),
+                    _expenseQuickTag('Pewangi / Parfum'),
+                    _expenseQuickTag('Token Listrik'),
+                    _expenseQuickTag('Plastik Packing'),
+                    _expenseQuickTag('Gas Pengering'),
+                  ],
+                ),
+                const SizedBox(height: 14),
 
                 // Name Input
                 TextField(
@@ -274,9 +299,10 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
                 TextField(
                   controller: _amountController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [ThousandsSeparatorInputFormatter()],
                   decoration: _inputDecoration(
                     'Jumlah Uang (Rp)',
-                    'Contoh: 50000',
+                    'Contoh: 50.000',
                     Icons.payments_rounded,
                     prefixText: 'Rp ',
                   ),

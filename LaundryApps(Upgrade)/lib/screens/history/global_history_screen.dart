@@ -464,50 +464,68 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     bool isHighlight = false,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: StyleConstants.cardDecoration(
-        background: isHighlight ? color.withValues(alpha: 0.05) : Colors.white,
-        border: isHighlight ? Border.all(color: color.withValues(alpha: 0.3), width: 1.5) : null,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w800,
-                    color: isHighlight ? color : StyleConstants.textMuted,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: StyleConstants.tabularNumbers(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: isHighlight ? color : StyleConstants.textHeading,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isHighlight ? color.withValues(alpha: 0.4) : StyleConstants.borderLight, width: isHighlight ? 1.5 : 1),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: isHighlight ? 0.12 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: color, width: 3),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        color: isHighlight ? color : StyleConstants.textMuted,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      value,
+                      style: StyleConstants.tabularNumbers(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: isHighlight ? color : StyleConstants.textHeading,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -552,7 +570,18 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
 
   Widget _buildLedgerTable(List<Map<String, dynamic>> items, int totalIn, int totalOut) {
     return Container(
-      decoration: StyleConstants.cardDecoration(),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: StyleConstants.borderLight),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -561,20 +590,17 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             decoration: const BoxDecoration(
               color: Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(StyleConstants.cardRadius),
-                topRight: Radius.circular(StyleConstants.cardRadius),
-              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
               border: Border(bottom: BorderSide(color: StyleConstants.borderLight)),
             ),
             child: const Row(
               children: [
-                SizedBox(width: 70, child: Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: StyleConstants.textMuted))),
-                Expanded(flex: 3, child: Text('DESKRIPSI / PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: StyleConstants.textMuted))),
-                Expanded(flex: 2, child: Text('KATEGORI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: StyleConstants.textMuted))),
-                Expanded(flex: 2, child: Text('STATUS BAYAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: StyleConstants.textMuted))),
-                SizedBox(width: 120, child: Text('KAS MASUK', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: StyleConstants.textMuted))),
-                SizedBox(width: 120, child: Text('PENGELUARAN', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: StyleConstants.textMuted))),
+                SizedBox(width: 75, child: Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted, letterSpacing: 0.5))),
+                Expanded(flex: 3, child: Text('DESKRIPSI / PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted, letterSpacing: 0.5))),
+                Expanded(flex: 2, child: Text('KATEGORI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted, letterSpacing: 0.5))),
+                Expanded(flex: 2, child: Text('STATUS BAYAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted, letterSpacing: 0.5))),
+                SizedBox(width: 130, child: Text('KAS MASUK', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.successColor, letterSpacing: 0.5))),
+                SizedBox(width: 130, child: Text('PENGELUARAN', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.dangerColor, letterSpacing: 0.5))),
               ],
             ),
           ),

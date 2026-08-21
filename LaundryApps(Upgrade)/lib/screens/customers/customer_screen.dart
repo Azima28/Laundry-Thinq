@@ -448,19 +448,26 @@ class _CustomerScreenState extends State<CustomerScreen> {
   Widget _buildCustomerListTile(Customer customer, bool isSelected) {
     return Container(
       decoration: BoxDecoration(
-        color: isSelected ? primaryColor.withValues(alpha: 0.04) : Colors.white,
+        color: isSelected ? StyleConstants.primaryColor.withValues(alpha: 0.06) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isSelected ? primaryColor : Colors.grey[200]!, width: isSelected ? 1.5 : 1),
+        border: Border.all(color: isSelected ? StyleConstants.primaryColor : StyleConstants.borderLight, width: isSelected ? 1.5 : 1),
+        boxShadow: [
+          BoxShadow(
+            color: isSelected ? StyleConstants.primaryColor.withValues(alpha: 0.1) : const Color(0xFF0F172A).withValues(alpha: 0.02),
+            blurRadius: isSelected ? 6 : 3,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         leading: CircleAvatar(
-          backgroundColor: isSelected ? primaryColor : Colors.grey[100],
+          backgroundColor: isSelected ? StyleConstants.primaryColor : const Color(0xFFF1F5F9),
           child: Text(
             customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
             style: TextStyle(
-              color: isSelected ? Colors.white : Colors.grey[700],
-              fontWeight: FontWeight.bold,
+              color: isSelected ? Colors.white : StyleConstants.primaryColor,
+              fontWeight: FontWeight.w900,
               fontSize: 14,
             ),
           ),
@@ -468,15 +475,18 @@ class _CustomerScreenState extends State<CustomerScreen> {
         title: Text(
           customer.name,
           style: TextStyle(
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w800,
             fontSize: 13.5,
-            color: isSelected ? primaryColor : const Color(0xFF0F172A),
+            color: isSelected ? StyleConstants.primaryColor : StyleConstants.textHeading,
           ),
         ),
         subtitle: Text(
           customer.phone,
-          style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+          style: const TextStyle(fontSize: 11.5, color: StyleConstants.textMuted),
         ),
+        trailing: isSelected
+            ? const Icon(Icons.check_circle_rounded, color: StyleConstants.primaryColor, size: 18)
+            : const Icon(Icons.chevron_right_rounded, color: StyleConstants.borderMedium, size: 18),
         onTap: () {
           setState(() {
             _selectedCustomer = customer;
