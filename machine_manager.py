@@ -21,8 +21,9 @@ machine_status_lock = threading.Lock()
 customer_info = {}
 customer_info_lock = threading.Lock()
 
-# Track active countdown threads to avoid duplicates
+# Track active countdown threads and generation tokens to cancel stale countdowns immediately
 active_countdown_threads = {}
+countdown_generation = {}
 
 # Track state transitions for WA notification triggers
 # Format: { "entity_id": { "last_state": "Idle", "wa_start_sent": False, "wa_completion_sent": False } }
@@ -250,6 +251,9 @@ def set_machine_unready(entity_id, duration_seconds=300, source='customer',
 
     with machine_status_lock:
         machine_status[entity_id] = end_time
+        gen = countdown_generation.get(entity_id, 0) + 1
+        countdown_generation[entity_id] = gen
+        active_countdown_threads[entity_id] = True
 
     # Save customer info
     if customer_name:
@@ -271,11 +275,20 @@ def set_machine_unready(entity_id, duration_seconds=300, source='customer',
             "wa_completion_sent": False
         }
 
-    def _timer_release():
+    def _timer_release(my_gen):
         """Handle expiration of booking window timer."""
         remaining = (end_time - datetime.now()).total_seconds()
         if remaining > 0:
             time.sleep(remaining)
+
+        # Check if booking timer was cancelled, replaced, or released early
+        if countdown_generation.get(entity_id) != my_gen:
+            print(f"[Timer] Booking timer for {entity_id} (gen={my_gen}) was superseded/released early, skipping auto-expire.")
+            return
+
+        with machine_status_lock:
+            if entity_id not in machine_status:
+                return
 
         # Check if the machine is actually running (ThinQ detected RUNNING or offline running)
         # If running, don't release — let completion handle it
@@ -288,18 +301,18 @@ def set_machine_unready(entity_id, duration_seconds=300, source='customer',
         _expire_booking(entity_id)
 
     # Start background timer
-    threading.Thread(target=_timer_release, daemon=True).start()
+    threading.Thread(target=_timer_release, args=(gen,), daemon=True).start()
 
 
 def _expire_booking(entity_id):
     """Handle expiration of booking window without starting (status goes READY, keeping customer)."""
     print(f"[Timer] Booking window expired for {entity_id}, setting READY (keeping customer)")
-    
+
     # Clean up memory status so get_machine_status() returns 'ready'
     with machine_status_lock:
         if entity_id in machine_status:
             del machine_status[entity_id]
-            
+
     # Broadcast READY/IDLE state (preserving customer name)
     info = get_customer_info(entity_id)
     cust_name = info.get("name") or "-"
@@ -310,22 +323,26 @@ def _expire_booking(entity_id):
 
 def _release_machine(entity_id):
     """Release a machine back to Ready status (internal)."""
+    # Cancel any active countdown thread & timer release
+    with machine_status_lock:
+        active_countdown_threads[entity_id] = False
+        countdown_generation[entity_id] = countdown_generation.get(entity_id, 0) + 1
+        if entity_id in machine_status:
+            del machine_status[entity_id]
+
     # Log the release
     database.log_usage(entity_id, "RELEASE", source='system')
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     broadcast(f"LOG|{now_str}|{entity_id}|RELEASE|{entity_id}|system")
-    
-    # Broadcast Ready state
+
+    # Broadcast Ready state immediately
     off_state = f"{entity_id}|Ready|Idle|--:--|-|-|0|-"
     lg_manager.latest_state[entity_id] = off_state
     broadcast(off_state)
-    
+
     # Remove from database and memory
     database.remove_active_timer(entity_id)
-    with machine_status_lock:
-        if entity_id in machine_status:
-            del machine_status[entity_id]
-    
+
     # Clear customer info and state transitions
     clear_customer_info(entity_id)
     with state_transitions_lock:
@@ -457,18 +474,29 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
     For manual-only machines: Creates full state with control time.
     Periodically checkpoints remaining seconds and timestamp to SQLite database.
     """
-    # Check if there's already an active countdown for this entity
-    if entity_id in active_countdown_threads:
-        return
+    with machine_status_lock:
+        gen = countdown_generation.get(entity_id, 0) + 1
+        countdown_generation[entity_id] = gen
+        active_countdown_threads[entity_id] = True
 
     # Determine if this is an LG ThinQ machine (by checking discovered devices list)
     is_lg_machine = entity_id in lg_manager.get_discovered_devices()
 
-    def _update_countdown(ent, end_dt, dur_min, is_lg):
-        active_countdown_threads[ent] = True
+    def _update_countdown(ent, end_dt, dur_min, is_lg, my_gen):
         is_tuya = tuya_manager.resolve_tuya_device(ent) is not None
+        cancelled = False
         try:
             while True:
+                # Check cancellation token & generation
+                if countdown_generation.get(ent) != my_gen or not active_countdown_threads.get(ent, False):
+                    cancelled = True
+                    break
+
+                with machine_status_lock:
+                    if ent not in machine_status:
+                        cancelled = True
+                        break
+
                 if is_tuya:
                     status = tuya_manager.get_dryer_status(ent)
                     if status.get("success"):
@@ -564,6 +592,10 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
 
                 time.sleep(5)  # Update and checkpoint every 5 seconds
 
+            if cancelled or countdown_generation.get(ent) != my_gen:
+                print(f"[Countdown] Thread for {ent} (gen={my_gen}) exiting silently (cancelled/superseded).")
+                return
+
             # Final OFF state - clear control time but preserve customer name
             cust_info = get_customer_info(ent)
             cust_name = cust_info.get("name") if cust_info else None
@@ -593,10 +625,12 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                     if ent in machine_status:
                         del machine_status[ent]
         finally:
-            if ent in active_countdown_threads:
-                del active_countdown_threads[ent]
+            with machine_status_lock:
+                if countdown_generation.get(ent) == my_gen:
+                    if ent in active_countdown_threads:
+                        del active_countdown_threads[ent]
 
-    threading.Thread(target=_update_countdown, args=(entity_id, end_time, duration_minutes, is_lg_machine), daemon=True).start()
+    threading.Thread(target=_update_countdown, args=(entity_id, end_time, duration_minutes, is_lg_machine, gen), daemon=True).start()
 
 
 def resume_active_timers():
