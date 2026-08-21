@@ -375,20 +375,20 @@ def on_thinq_state_change(entity_id, new_run_state, remain_time_str, is_complete
                 state_transitions[entity_id]["wa_start_sent"] = True
                 state_transitions[entity_id]["last_state"] = new_run_state
         
-        # Set target end time to exactly 55 minutes from now as a backup run timer
-        end_time = datetime.now() + timedelta(minutes=55)
+        # Set target end time to exactly 40 minutes from now as a backup run timer
+        end_time = datetime.now() + timedelta(minutes=40)
         with machine_status_lock:
             machine_status[entity_id] = end_time
-            
-        # Also persist the 55-minute backup timer to database
+
+        # Also persist the 40-minute backup timer to database
         try:
             db_timer = database.get_active_timer(entity_id)
             source = db_timer['source'] if db_timer and 'source' in db_timer else 'customer'
         except Exception:
             source = 'customer'
-            
+
         database.save_active_timer(
-            entity_id, end_time, source=source, duration_minutes=55,
+            entity_id, end_time, source=source, duration_minutes=40,
             customer_name=customer_name, customer_phone=customer_phone
         )
     
