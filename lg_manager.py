@@ -370,8 +370,16 @@ def _check_all_running_machines_fallback():
         import machine_manager
         with machine_manager.machine_status_lock:
             active_machines = list(machine_manager.machine_status.keys())
-            
+
         for target_name in active_machines:
+            existing = latest_state.get(target_name, "")
+            parts = existing.split("|") if existing else []
+            run_st = parts[2] if len(parts) > 2 else ""
+
+            # If the machine is ALREADY reporting live online sensor data from LG ThinQ, DO NOT overwrite with fallback!
+            if len(parts) >= 6 and run_st in ("Rinsing", "Spinning", "Washing", "Drying", "Running", "Completed", "Idle") and "Offline" not in run_st:
+                continue
+
             is_running_state = False
             try:
                 with machine_manager.state_transitions_lock:
@@ -379,7 +387,7 @@ def _check_all_running_machines_fallback():
                     is_running_state = tracker.get("wa_start_sent", False)
             except Exception:
                 pass
-                
+
             if is_running_state:
                 cust_name = _get_customer_name(target_name) or "-"
                 _update_running_machine_fallback(target_name, "unready", cust_name)

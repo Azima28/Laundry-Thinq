@@ -519,17 +519,22 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                     tracker = state_transitions.get(ent, {})
                     is_running_flag = tracker.get("wa_start_sent", False) or (tracker.get("last_state") == "Running (Offline)")
 
-                if is_running_flag:
-                    state = f"{ent}|Running|Running (Offline)|{control_time}|-|-|0|{cust_name_str}"
-                    lg_manager.latest_state[ent] = state
-                    broadcast(state)
-                elif is_lg and not is_degraded_or_bypass:
-                    # LG machine in booking window
+                if is_lg and not is_degraded_or_bypass:
+                    # Check if LG machine is currently reporting live sensor data from ThinQ cloud
                     existing_state = lg_manager.latest_state.get(ent, "")
                     existing_parts = existing_state.split("|") if existing_state else []
+                    run_st_val = existing_parts[2] if len(existing_parts) > 2 else ""
 
-                    # If LG state exists and has real LG data, just update control field
-                    if len(existing_parts) >= 6 and "Menit" not in existing_parts[2]:
+                    is_live_cloud_sensor = (
+                        len(existing_parts) >= 6 and
+                        run_st_val in ("Rinsing", "Washing", "Spinning", "Drying", "Running", "Completed", "Idle") and
+                        "Offline" not in run_st_val and
+                        "Menit" not in run_st_val
+                    )
+
+                    if is_live_cloud_sensor:
+                        # Machine is online and actively monitored by LG Cloud API!
+                        # Do NOT overwrite with fallback - let LG polling broadcast live sensor data!
                         while len(existing_parts) < 7:
                             existing_parts.append("-")
                         if len(existing_parts) == 7:
@@ -538,14 +543,22 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                             existing_parts[7] = control_time
                         state = "|".join(existing_parts)
                         lg_manager.latest_state[ent] = state
+                    elif is_running_flag:
+                        # Machine is offline / cloud degraded but has active customer run -> show fallback timer
+                        state = f"{ent}|Running|Running (Offline)|{control_time}|-|-|0|{cust_name_str}"
+                        lg_manager.latest_state[ent] = state
+                        broadcast(state)
                     else:
                         state = f"{ent}|Ready|Idle|--:--|-|-|0|{control_time}"
                         lg_manager.latest_state[ent] = state
                         broadcast(state)
                 else:
                     # Manual/Tuya machine or degraded/bypass LG machine - broadcast directly
-                    siklus_label = f"{dur_min} Menit"
-                    state = f"{ent}|Ready|{siklus_label}|{control_time}|-|-|0|{cust_name_str}"
+                    if is_running_flag:
+                        siklus_label = f"{dur_min} Menit"
+                        state = f"{ent}|Ready|{siklus_label}|{control_time}|-|-|0|{cust_name_str}"
+                    else:
+                        state = f"{ent}|Ready|Idle|--:--|-|-|0|{cust_name_str}"
                     lg_manager.latest_state[ent] = state
                     broadcast(state)
 
