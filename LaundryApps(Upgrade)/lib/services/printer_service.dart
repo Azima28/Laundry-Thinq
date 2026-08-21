@@ -15,7 +15,8 @@ import '../utils/currency_format.dart';
 
 class ReceiptLayoutConfig {
   final double pageWidthMm;
-  final double marginMm;
+  final double marginLeftMm;
+  final double marginRightMm;
   final double headerTitleSize;
   final double headerSubSize;
   final double sectionTitleSize;
@@ -27,7 +28,8 @@ class ReceiptLayoutConfig {
 
   const ReceiptLayoutConfig({
     required this.pageWidthMm,
-    required this.marginMm,
+    required this.marginLeftMm,
+    required this.marginRightMm,
     required this.headerTitleSize,
     required this.headerSubSize,
     required this.sectionTitleSize,
@@ -40,47 +42,50 @@ class ReceiptLayoutConfig {
 
   factory ReceiptLayoutConfig.forWidth(int widthMm) {
     if (widthMm == 76) {
-      // Epson TM-U220D: Paper Roll is 76mm, but Physical Print Head span is 63.5mm (180 pt)!
-      // Using 63.5mm page width with 1.8mm margin ensures zero clipping on left & right margins.
+      // Epson TM-U220D: Paper Roll is 76mm.
+      // Left and right margins balanced to center the 63.5mm printable area perfectly on the roll!
       return const ReceiptLayoutConfig(
-        pageWidthMm: 63.5,
-        marginMm: 1.8,
-        headerTitleSize: 12.0,
-        headerSubSize: 8.5,
-        sectionTitleSize: 9.5,
-        bodyTextSize: 9.0,
-        smallTextSize: 8.0,
-        totalTextSize: 11.0,
+        pageWidthMm: 76.0,
+        marginLeftMm: 6.0,
+        marginRightMm: 6.0,
+        headerTitleSize: 12.5,
+        headerSubSize: 9.0,
+        sectionTitleSize: 10.0,
+        bodyTextSize: 9.2,
+        smallTextSize: 8.2,
+        totalTextSize: 11.5,
         dividerThickness: 0.8,
         spacing: 2.5,
       );
     } else if (widthMm == 80) {
-      // 80mm Wide Thermal: Paper Roll 80mm, Printable span 72.0mm
+      // 80mm Wide Thermal: Paper Roll 80mm
       return const ReceiptLayoutConfig(
-        pageWidthMm: 72.0,
-        marginMm: 2.5,
-        headerTitleSize: 13.0,
-        headerSubSize: 9.0,
-        sectionTitleSize: 10.5,
-        bodyTextSize: 9.5,
-        smallTextSize: 8.5,
-        totalTextSize: 12.0,
-        dividerThickness: 0.8,
-        spacing: 3.0,
+        pageWidthMm: 80.0,
+        marginLeftMm: 4.5,
+        marginRightMm: 4.5,
+        headerTitleSize: 13.5,
+        headerSubSize: 9.5,
+        sectionTitleSize: 11.0,
+        bodyTextSize: 10.0,
+        smallTextSize: 8.8,
+        totalTextSize: 12.5,
+        dividerThickness: 1.0,
+        spacing: 3.5,
       );
     } else {
-      // 58mm Standard Thermal: Paper Roll 58mm, Printable span 48.0mm
+      // 58mm Standard Thermal: Paper Roll 58mm
       return const ReceiptLayoutConfig(
-        pageWidthMm: 48.0,
-        marginMm: 1.2,
-        headerTitleSize: 10.0,
-        headerSubSize: 7.8,
-        sectionTitleSize: 8.5,
-        bodyTextSize: 8.0,
-        smallTextSize: 7.0,
-        totalTextSize: 9.5,
-        dividerThickness: 0.7,
-        spacing: 2.0,
+        pageWidthMm: 58.0,
+        marginLeftMm: 4.5,
+        marginRightMm: 4.5,
+        headerTitleSize: 11.0,
+        headerSubSize: 8.5,
+        sectionTitleSize: 9.5,
+        bodyTextSize: 8.5,
+        smallTextSize: 7.5,
+        totalTextSize: 10.5,
+        dividerThickness: 0.8,
+        spacing: 2.5,
       );
     }
   }
@@ -222,7 +227,10 @@ class PrinterService {
       final pageFormat = PdfPageFormat(
         config.pageWidthMm * PdfPageFormat.mm,
         double.infinity,
-        marginAll: config.marginMm * PdfPageFormat.mm,
+        marginLeft: config.marginLeftMm * PdfPageFormat.mm,
+        marginRight: config.marginRightMm * PdfPageFormat.mm,
+        marginTop: 2 * PdfPageFormat.mm,
+        marginBottom: 4 * PdfPageFormat.mm,
       );
 
       final pdfBytes = await _generateReceiptPdf(
@@ -592,7 +600,10 @@ class PrinterService {
         final pageFormat = PdfPageFormat(
           config.pageWidthMm * PdfPageFormat.mm,
           double.infinity,
-          marginAll: config.marginMm * PdfPageFormat.mm,
+          marginLeft: config.marginLeftMm * PdfPageFormat.mm,
+          marginRight: config.marginRightMm * PdfPageFormat.mm,
+          marginTop: 2 * PdfPageFormat.mm,
+          marginBottom: 4 * PdfPageFormat.mm,
         );
 
         final doc = pw.Document();
