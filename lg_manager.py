@@ -296,12 +296,27 @@ def _get_fallback_remaining_time(target_name):
                 return f"{m}:{s:02d}", rem
             else:
                 return "0:00", rem
-    except Exception:
-        pass
+        else:
+            # Fallback to database active timer record if memory status was not populated
+            import database
+            db_timer = database.get_active_timer(target_name)
+            if db_timer:
+                last_remain = db_timer.get("last_remain_seconds")
+                if last_remain is not None and last_remain > 0:
+                    from datetime import datetime, timedelta
+                    now = datetime.now()
+                    new_end = now + timedelta(seconds=last_remain)
+                    with machine_manager.machine_status_lock:
+                        machine_manager.machine_status[target_name] = new_end
+                    m = int(last_remain) // 60
+                    s = int(last_remain) % 60
+                    return f"{m}:{s:02d}", last_remain
+    except Exception as e:
+        print(f"[Fallback] Error in _get_fallback_remaining_time for {target_name}: {e}")
     return None, 0
 
 def _update_running_machine_fallback(target_name, status_ready, cust_name):
-    if status_ready != "ready":
+    if status_ready != "ready" or (cust_name and cust_name not in ("", "-", "None", "null")):
         is_running_state = False
         try:
             import machine_manager
@@ -310,13 +325,35 @@ def _update_running_machine_fallback(target_name, status_ready, cust_name):
                 is_running_state = tracker.get("wa_start_sent", False)
         except Exception:
             pass
-            
+
+        # Also check if database indicates active run
+        if not is_running_state:
+            try:
+                import database
+                db_t = database.get_active_timer(target_name)
+                if db_t and (db_t.get("is_running") or db_t.get("customer_name")):
+                    is_running_state = True
+            except Exception:
+                pass
+
         if is_running_state:
             fb_time, fb_sec = _get_fallback_remaining_time(target_name)
             if fb_time:
                 output = f"{target_name}|Running|Running (Offline)|{fb_time}|-|-|0|{cust_name}"
                 latest_state[target_name] = output
                 broadcast(output)
+
+                # Update database checkpoint
+                try:
+                    import database
+                    database.update_active_timer_checkpoint(
+                        target_name,
+                        remain_seconds=fb_sec,
+                        run_state="Running (Offline)",
+                        is_running=1
+                    )
+                except Exception:
+                    pass
 
                 if fb_sec <= 0:
                     print(f"[Fallback] Backup timer expired for {target_name} while offline, triggering completion.")

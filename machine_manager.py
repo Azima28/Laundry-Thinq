@@ -238,7 +238,7 @@ def clear_customer_info(entity_id):
 def set_machine_unready(entity_id, duration_seconds=300, source='customer',
                         customer_name=None, customer_phone=None):
     """Set machine to unready status (monitoring booking window).
-    
+
     In v2 monitoring-only mode, this only:
     1. Sets the booking window timer (default 5 min)
     2. Saves customer info for WA notifications
@@ -247,20 +247,22 @@ def set_machine_unready(entity_id, duration_seconds=300, source='customer',
     """
     end_time = datetime.now() + timedelta(seconds=duration_seconds)
     duration_minutes = duration_seconds // 60
-    
+
     with machine_status_lock:
         machine_status[entity_id] = end_time
-    
+
     # Save customer info
     if customer_name:
         set_customer_info(entity_id, customer_name, customer_phone)
-    
-    # Save to database for persistence (include customer info)
+
+    # Save to database for persistence (include customer info and initial checkpoint)
     database.save_active_timer(
-        entity_id, end_time, source, duration_minutes,
-        customer_name=customer_name, customer_phone=customer_phone
+        entity_id, end_time, source=source, duration_minutes=duration_minutes,
+        customer_name=customer_name, customer_phone=customer_phone,
+        last_remain_seconds=duration_seconds, is_running=0, run_state="Idle",
+        wa_start_sent=0, wa_completion_sent=0
     )
-    
+
     # Initialize state transition tracker for WA notifications
     with state_transitions_lock:
         state_transitions[entity_id] = {
@@ -268,23 +270,23 @@ def set_machine_unready(entity_id, duration_seconds=300, source='customer',
             "wa_start_sent": False,
             "wa_completion_sent": False
         }
-    
+
     def _timer_release():
         """Handle expiration of booking window timer."""
         remaining = (end_time - datetime.now()).total_seconds()
         if remaining > 0:
             time.sleep(remaining)
-        
-        # Check if the machine is actually running (ThinQ detected RUNNING)
-        # If running, don't release — let ThinQ completion handle it
+
+        # Check if the machine is actually running (ThinQ detected RUNNING or offline running)
+        # If running, don't release — let completion handle it
         existing_state = lg_manager.latest_state.get(entity_id, "")
         if "Running" in existing_state:
-            print(f"[Timer] Machine {entity_id} is running (ThinQ), keeping active")
+            print(f"[Timer] Machine {entity_id} is running ({existing_state.split('|')[2]}), keeping active")
             return
-        
+
         # Booking window expired without starting -> expire booking (preserving customer)
         _expire_booking(entity_id)
-    
+
     # Start background timer
     threading.Thread(target=_timer_release, daemon=True).start()
 
@@ -450,17 +452,18 @@ def on_thinq_state_change(entity_id, new_run_state, remain_time_str, is_complete
 
 def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
     """Start a countdown broadcast thread for a machine.
-    
+
     For LG machines: Adds control time to existing LG state as position 7.
     For manual-only machines: Creates full state with control time.
+    Periodically checkpoints remaining seconds and timestamp to SQLite database.
     """
     # Check if there's already an active countdown for this entity
     if entity_id in active_countdown_threads:
         return
-    
+
     # Determine if this is an LG ThinQ machine (by checking discovered devices list)
     is_lg_machine = entity_id in lg_manager.get_discovered_devices()
-    
+
     def _update_countdown(ent, end_dt, dur_min, is_lg):
         active_countdown_threads[ent] = True
         is_tuya = tuya_manager.resolve_tuya_device(ent) is not None
@@ -485,20 +488,46 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                     remaining = (end_dt - datetime.now()).total_seconds()
                     if remaining <= 0:
                         break
-                
+
                 m = int(remaining) // 60
                 s = int(remaining) % 60
                 control_time = f"{m}:{s:02d}"
-                
+
+                # Periodic checkpointing to SQLite database on every tick!
+                try:
+                    curr_st = lg_manager.latest_state.get(ent, "")
+                    parts = curr_st.split("|") if curr_st else []
+                    curr_run_st = parts[2] if len(parts) > 2 else "Idle"
+                    is_run = 1 if (curr_run_st not in ("Idle", "-", "", "Ready") or "Offline" in curr_run_st) else 0
+                    database.update_active_timer_checkpoint(
+                        ent,
+                        remain_seconds=int(remaining),
+                        run_state=curr_run_st,
+                        is_running=is_run
+                    )
+                except Exception as db_err:
+                    pass
+
                 import lg_manager
                 config = lg_manager.load_lg_config()
                 is_degraded_or_bypass = lg_manager.thinq_degraded or config.get("monitoring_mode") == "bypass"
-                
-                if is_lg and not is_degraded_or_bypass:
-                    # LG machine - just update control field, let LG polling handle broadcast
+
+                cust_info = get_customer_info(ent)
+                cust_name_str = cust_info.get("name") if cust_info else "-"
+
+                with state_transitions_lock:
+                    tracker = state_transitions.get(ent, {})
+                    is_running_flag = tracker.get("wa_start_sent", False) or (tracker.get("last_state") == "Running (Offline)")
+
+                if is_running_flag:
+                    state = f"{ent}|Running|Running (Offline)|{control_time}|-|-|0|{cust_name_str}"
+                    lg_manager.latest_state[ent] = state
+                    broadcast(state)
+                elif is_lg and not is_degraded_or_bypass:
+                    # LG machine in booking window
                     existing_state = lg_manager.latest_state.get(ent, "")
                     existing_parts = existing_state.split("|") if existing_state else []
-                    
+
                     # If LG state exists and has real LG data, just update control field
                     if len(existing_parts) >= 6 and "Menit" not in existing_parts[2]:
                         while len(existing_parts) < 7:
@@ -509,28 +538,25 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                             existing_parts[7] = control_time
                         state = "|".join(existing_parts)
                         lg_manager.latest_state[ent] = state
-                        # Don't broadcast - LG polling will do it with fresh LG data + preserved control
                     else:
-                        # LG machine but no LG data yet - show placeholder with control
                         state = f"{ent}|Ready|Idle|--:--|-|-|0|{control_time}"
                         lg_manager.latest_state[ent] = state
                         broadcast(state)
                 else:
                     # Manual/Tuya machine or degraded/bypass LG machine - broadcast directly
                     siklus_label = f"{dur_min} Menit"
-                    state = f"{ent}|Ready|{siklus_label}|{control_time}|-|-|0|{control_time}"
+                    state = f"{ent}|Ready|{siklus_label}|{control_time}|-|-|0|{cust_name_str}"
                     lg_manager.latest_state[ent] = state
                     broadcast(state)
-                
-                time.sleep(10)  # Update every 10 seconds
-            
+
+                time.sleep(5)  # Update and checkpoint every 5 seconds
+
             # Final OFF state - clear control time but preserve customer name
             cust_info = get_customer_info(ent)
             cust_name = cust_info.get("name") if cust_info else None
             cust_name_str = cust_name if cust_name else "-"
-            
+
             if is_lg:
-                # LG machine - just clear control time
                 existing_state = lg_manager.latest_state.get(ent, "")
                 existing_parts = existing_state.split("|") if existing_state else []
                 if len(existing_parts) > 7:
@@ -539,12 +565,11 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                 else:
                     state = f"{ent}|Ready|Idle|--:--|-|-|0|{cust_name_str}"
             else:
-                # Manual/Tuya-only machine
                 state = f"{ent}|Ready|Idle|--:--|-|-|0|{cust_name_str}"
-            
+
             lg_manager.latest_state[ent] = state
             broadcast(state)
-            
+
             if is_tuya:
                 # Tuya device completion - release and notify
                 print(f"[Tuya] Autoclosing dryer {ent} and triggering notifications.")
@@ -557,125 +582,179 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
         finally:
             if ent in active_countdown_threads:
                 del active_countdown_threads[ent]
-    
+
     threading.Thread(target=_update_countdown, args=(entity_id, end_time, duration_minutes, is_lg_machine), daemon=True).start()
 
 
 def resume_active_timers():
-    """Resume active timers and restore customer info from database after server restart."""
+    """Resume active timers and restore customer info from database after server restart/relog.
+
+    Supports dual-mode recovery:
+    1. Real-time Clock Mode (when PC clock is valid & synchronized with CMOS/NTP)
+    2. Fallback State Mode (when PC clock is inaccurate / CMOS battery dead / clock reset)
+    """
     timers = database.get_all_active_timers()
     now = datetime.now()
     resumed_count = 0
-    
+
     for timer in timers:
         entity_id = timer['entity_id']
-        end_time_str = timer['end_time']
+        end_time_str = timer.get('end_time')
+        started_at_str = timer.get('started_at')
+        last_saved_str = timer.get('last_saved_time') or started_at_str
+        last_remain_seconds = timer.get('last_remain_seconds')
         source = timer.get('source', 'customer')
         customer_name = timer.get('customer_name')
         customer_phone = timer.get('customer_phone')
-        duration_minutes = timer.get('duration_minutes', 5)
-        
-        try:
-            end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
-        except:
-            database.remove_active_timer(entity_id)
-            continue
-            
+        duration_minutes = timer.get('duration_minutes', 40 if ('cuci' in entity_id.lower() or 'wash' in entity_id.lower()) else 45)
+        is_running = timer.get('is_running', 0) == 1
+        saved_run_state = timer.get('run_state') or ('Running (Offline)' if is_running else 'Idle')
+        wa_start_sent = timer.get('wa_start_sent', 0) == 1
+        wa_completion_sent = timer.get('wa_completion_sent', 0) == 1
+
         is_lg_machine = entity_id in lg_manager.get_discovered_devices()
-        
+
         # Restore customer info (always, even if timer expired, since machine is not released!)
         if customer_name:
             set_customer_info(entity_id, customer_name, customer_phone)
-            
-        # Determine if WA completion has been sent previously
-        wa_comp_sent = False
-        if customer_phone:
-            wa_comp_sent = database.has_wa_been_sent(entity_id, "complete", customer_phone)
-            
+
+        # Determine if WA completion or start has been sent previously
+        if not wa_completion_sent and customer_phone:
+            wa_completion_sent = database.has_wa_been_sent(entity_id, "complete", customer_phone)
+        if not wa_start_sent and customer_phone:
+            wa_start_sent = database.has_wa_been_sent(entity_id, "start", customer_phone)
+
         with state_transitions_lock:
             state_transitions[entity_id] = {
-                "last_state": "Idle",
-                "wa_start_sent": True if customer_phone and database.has_wa_been_sent(entity_id, "start", customer_phone) else False,
-                "wa_completion_sent": wa_comp_sent
+                "last_state": saved_run_state,
+                "wa_start_sent": wa_start_sent or is_running,
+                "wa_completion_sent": wa_completion_sent
             }
-            
-        remaining = (end_time - now).total_seconds()
-        if remaining > 0:
-            # Timer is still valid, resume it
-            print(f"[Timer] Resuming timer for {entity_id}: {int(remaining)}s remaining (ends at {end_time_str}, {duration_minutes} min, LG={is_lg_machine}, customer={customer_name})")
-            
-            with machine_status_lock:
-                machine_status[entity_id] = end_time
-                
-            # Set initial state
-            m = int(remaining) // 60
-            s = int(remaining) % 60
-            control_time = f"{m}:{s:02d}"
-            
-            if is_lg_machine:
-                existing_state = lg_manager.latest_state.get(entity_id, "")
-                existing_parts = existing_state.split("|") if existing_state else []
-                if len(existing_parts) >= 6 and "Menit" not in existing_parts[2]:
-                    while len(existing_parts) < 7:
-                        existing_parts.append("-")
-                    if len(existing_parts) == 7:
-                        existing_parts.append(control_time)
-                    else:
-                        existing_parts[7] = control_time
-                    state = "|".join(existing_parts)
-                else:
-                    state = f"{entity_id}|Ready|Idle|--:--|-|-|0|{control_time}"
+
+        # Parse timestamps
+        last_saved_dt = None
+        if last_saved_str:
+            try:
+                last_saved_dt = datetime.strptime(last_saved_str, "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+
+        end_time_dt = None
+        if end_time_str:
+            try:
+                end_time_dt = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+
+        # Fallback if last_remain_seconds is None or invalid
+        if last_remain_seconds is None or last_remain_seconds < 0:
+            if end_time_dt and last_saved_dt:
+                last_remain_seconds = max(0, int((end_time_dt - last_saved_dt).total_seconds()))
             else:
-                siklus_label = f"{duration_minutes} Menit"
-                state = f"{entity_id}|Ready|{siklus_label}|{control_time}|-|-|0|{control_time}"
-                
-            lg_manager.latest_state[entity_id] = state
-            _start_countdown_broadcast(entity_id, end_time, duration_minutes)
-            resumed_count += 1
-            
-            # Schedule auto-release when booking timer expires
-            def _timer_release(ent, end_dt):
-                rem = (end_dt - datetime.now()).total_seconds()
-                if rem > 0:
-                    time.sleep(rem)
-                existing_st = lg_manager.latest_state.get(ent, "")
-                if "Running" in existing_st:
-                    print(f"[Timer] Machine {ent} is running (ThinQ), keeping active (resumed)")
-                    return
-                print(f"[Timer] Booking window expired for {ent} (resumed), setting READY (preserving customer)")
-                _expire_booking(ent)
-                
-            threading.Thread(target=_timer_release, args=(entity_id, end_time), daemon=True).start()
+                last_remain_seconds = duration_minutes * 60
+
+        # Check clock validity:
+        # Clock is ACCURATE if:
+        # 1. now >= last_saved_dt - 60s (clock didn't jump backward)
+        # 2. now.year >= 2024 (valid modern year)
+        # 3. time difference is within reasonable bounds (< 30 days)
+        clock_is_accurate = False
+        if last_saved_dt:
+            time_diff = (now - last_saved_dt).total_seconds()
+            if -60 <= time_diff <= 86400 * 30 and now.year >= 2024:
+                clock_is_accurate = True
+
+        if clock_is_accurate:
+            # Case 1: RTC / System Clock is accurate
+            elapsed = max(0, (now - last_saved_dt).total_seconds())
+            effective_remaining = max(0, int(last_remain_seconds - elapsed))
+            print(f"[Timer Recovery] Real Clock Accurate: {entity_id} elapsed {int(elapsed)}s since {last_saved_str}. Remaining: {effective_remaining}s")
         else:
-            # Timer has expired but machine not released yet (Amber / Purple / Selesai state)
-            print(f"[Timer] Restored customer on expired machine {entity_id} (customer={customer_name})")
-            
-            # Broadcast state with customer info but no active countdown timer
-            completed_flag = "1" if wa_comp_sent else "0"
-            run_state = "Completed" if is_lg_machine else "Idle"
-            
+            # Case 2: Clock is inaccurate / CMOS dead / clock went backwards
+            # Fallback to last recorded state minutes/seconds as requested!
+            effective_remaining = int(last_remain_seconds)
+            print(f"[Timer Recovery] Clock Inaccurate/Reset detected (now={now.strftime('%Y-%m-%d %H:%M:%S')}, saved={last_saved_str}). Restoring state from last recorded time: {effective_remaining}s ({effective_remaining//60} min)")
+
+        if effective_remaining > 0:
+            # Calculate new target end_time based on current runtime reference
+            new_end_time = now + timedelta(seconds=effective_remaining)
+            with machine_status_lock:
+                machine_status[entity_id] = new_end_time
+
+            # Update database checkpoint with new reference
+            database.update_active_timer_checkpoint(
+                entity_id,
+                remain_seconds=effective_remaining,
+                run_state=saved_run_state,
+                is_running=1 if is_running else 0,
+                wa_start_sent=1 if (wa_start_sent or is_running) else 0,
+                wa_completion_sent=1 if wa_completion_sent else 0,
+                end_time=new_end_time
+            )
+
+            m = effective_remaining // 60
+            s = effective_remaining % 60
+            control_time = f"{m}:{s:02d}"
+
             cust_name_str = customer_name if customer_name else "-"
-            state = f"{entity_id}|Ready|{run_state}|--:--|-|-|{completed_flag}|{cust_name_str}"
-            
+
+            if is_running:
+                # If machine was running offline or in wash cycle
+                run_state_to_show = "Running (Offline)" if ("Offline" in saved_run_state or "offline" in saved_run_state.lower()) else saved_run_state
+                state = f"{entity_id}|Running|{run_state_to_show}|{control_time}|-|-|0|{cust_name_str}"
+            else:
+                # Booking state
+                if is_lg_machine:
+                    state = f"{entity_id}|Ready|Idle|--:--|-|-|0|{control_time}"
+                else:
+                    siklus_label = f"{duration_minutes} Menit"
+                    state = f"{entity_id}|Ready|{siklus_label}|{control_time}|-|-|0|{control_time}"
+
             lg_manager.latest_state[entity_id] = state
             broadcast(state)
-            
+
+            _start_countdown_broadcast(entity_id, new_end_time, duration_minutes)
+            resumed_count += 1
+
+            # If it's a booking timer (not running), schedule booking expiration
+            if not is_running:
+                def _timer_release(ent, end_dt):
+                    rem = (end_dt - datetime.now()).total_seconds()
+                    if rem > 0:
+                        time.sleep(rem)
+                    existing_st = lg_manager.latest_state.get(ent, "")
+                    if "Running" in existing_st:
+                        print(f"[Timer] Machine {ent} is running (ThinQ), keeping active (resumed)")
+                        return
+                    print(f"[Timer] Booking window expired for {ent} (resumed), setting READY (preserving customer)")
+                    _expire_booking(ent)
+
+                threading.Thread(target=_timer_release, args=(entity_id, new_end_time), daemon=True).start()
+        else:
+            # Timer has expired while system was off
+            print(f"[Timer Recovery] Timer expired for {entity_id} while offline. Customer: {customer_name}")
+            completed_flag = "1" if wa_completion_sent else "0"
+            run_state = "Completed" if is_lg_machine else "Idle"
+
+            cust_name_str = customer_name if customer_name else "-"
+            state = f"{entity_id}|Ready|{run_state}|0:00|-|-|{completed_flag}|{cust_name_str}"
+
+            lg_manager.latest_state[entity_id] = state
+            broadcast(state)
+
     print(f"[Timer] Resumed {resumed_count} active timer(s) and restored customer allocations from database")
 
 
 def start_machine_monitoring(entity_id, customer_name=None, customer_phone=None,
                               source='customer', duration_seconds=300):
     """Start monitoring a machine (v2 monitoring-only, no relay).
-    
+
     Mode-aware behavior:
     - Bypass mode: Instantly set to OCCUPIED (no timer, no countdown)
-    - PAT/WideQ/Hybrid: Traditional booking window with countdown
-    
-    Returns:
-        tuple (message, status_code)
+    - PAT/WideQ/Hybrid: Traditional booking window with countdown and offline fallback
     """
-    print(f"[Monitor] Starting monitoring for {entity_id} (customer={customer_name}, phone={customer_phone})")
-    
+    print(f"[Monitor] Starting monitoring for {entity_id} (customer={customer_name}, phone={customer_phone}, duration={duration_seconds}s)")
+
     is_tuya = tuya_manager.resolve_tuya_device(entity_id) is not None
     if is_tuya:
         duration_minutes = duration_seconds // 60
@@ -683,8 +762,98 @@ def start_machine_monitoring(entity_id, customer_name=None, customer_phone=None,
         if not res.get("success"):
             print(f"[Tuya] Failed to start smartplug {entity_id}: {res.get('error')}")
             return f"failed_to_start_smartplug: {res.get('error')}", 500
-    
+
     # Check monitoring mode
+    config = lg_manager.load_lg_config()
+    monitoring_mode = config.get("monitoring_mode", "hybrid")
+
+    # Log usage (all modes)
+    database.log_usage(entity_id, "MONITOR_START", source=source)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    broadcast(f"LOG|{now_str}|{entity_id}|MONITOR_START|{entity_id}|{source}")
+
+    # Determine if machine is offline or manual fallback
+    is_lg_machine = entity_id in lg_manager.get_discovered_devices()
+    existing_state = lg_manager.latest_state.get(entity_id, "")
+    is_currently_offline = (
+        not is_lg_machine or
+        "OFFLINE" in existing_state or
+        "Offline" in existing_state or
+        lg_manager.thinq_degraded
+    )
+
+    # For offline machines or manual wash, set default duration (40m for cuci, 45m for pengering)
+    if is_currently_offline and duration_seconds <= 300:
+        if 'cuci' in entity_id.lower() or 'wash' in entity_id.lower():
+            duration_seconds = 40 * 60
+        elif 'pengering' in entity_id.lower() or 'dry' in entity_id.lower() or 'kering' in entity_id.lower():
+            duration_seconds = 45 * 60
+
+    duration_minutes = duration_seconds // 60
+    end_time = datetime.now() + timedelta(seconds=duration_seconds)
+
+    # Initialize state tracker for the new transaction
+    is_running_now = is_currently_offline and duration_minutes > 5
+    run_state_init = "Running (Offline)" if is_running_now else "Idle"
+
+    with state_transitions_lock:
+        state_transitions[entity_id] = {
+            "last_state": run_state_init,
+            "wa_start_sent": True if is_running_now else False,
+            "wa_completion_sent": False
+        }
+
+    with machine_status_lock:
+        machine_status[entity_id] = end_time
+
+    if customer_name:
+        set_customer_info(entity_id, customer_name, customer_phone)
+
+    # Save to database with full checkpoint
+    database.save_active_timer(
+        entity_id, end_time, source=source, duration_minutes=duration_minutes,
+        customer_name=customer_name, customer_phone=customer_phone,
+        last_remain_seconds=duration_seconds,
+        is_running=1 if is_running_now else 0,
+        run_state=run_state_init,
+        wa_start_sent=1 if is_running_now else 0,
+        wa_completion_sent=0
+    )
+
+    m = duration_seconds // 60
+    s = duration_seconds % 60
+    control_time = f"{m}:{s:02d}"
+
+    cust_name_str = customer_name if customer_name else "-"
+
+    if is_running_now:
+        state = f"{entity_id}|Running|Running (Offline)|{control_time}|-|-|0|{cust_name_str}"
+    else:
+        if is_lg_machine:
+            state = f"{entity_id}|Ready|Idle|--:--|-|-|0|{control_time}"
+        else:
+            siklus_label = f"{duration_minutes} Menit"
+            state = f"{entity_id}|Ready|{siklus_label}|{control_time}|-|-|0|{cust_name_str}"
+
+    lg_manager.latest_state[entity_id] = state
+    broadcast(state)
+
+    # Start countdown broadcast with periodic checkpointing
+    _start_countdown_broadcast(entity_id, end_time, duration_minutes)
+
+    # Set smart polling next time (15s for offline machine to auto-detect online, or 180s for booking)
+    poll_interval = 15 if is_currently_offline else 180
+    lg_manager.set_next_poll_time(entity_id, poll_interval)
+
+    # Send cucian masuk WA notification (in background)
+    if customer_phone:
+        threading.Thread(
+            target=wa_bridge.send_wa_cucian_masuk,
+            args=(customer_phone, customer_name or "Pelanggan", entity_id),
+            daemon=True
+        ).start()
+
+    return "monitoring_started", 200
     config = lg_manager.load_lg_config()
     monitoring_mode = config.get("monitoring_mode", "hybrid")
     

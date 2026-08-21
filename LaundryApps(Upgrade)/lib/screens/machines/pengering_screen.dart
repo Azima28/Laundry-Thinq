@@ -1404,6 +1404,7 @@ class _PengeringContentState extends State<PengeringContent> {
       entityId: machine.name,
       customerName: name.isNotEmpty ? name : 'Pelanggan',
       customerPhone: phone.isNotEmpty ? phone : null,
+      durationMinutes: 45,
     ).then((res) {
       if (res['success'] != true) {
         Globals.showErrorSnackBar('Info IoT: ${res['error']}');

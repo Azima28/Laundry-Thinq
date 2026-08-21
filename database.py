@@ -62,10 +62,16 @@ def init_db():
             entity_id TEXT PRIMARY KEY,
             end_time DATETIME NOT NULL,
             started_at DATETIME NOT NULL,
+            last_saved_time DATETIME,
+            last_remain_seconds INTEGER,
             source TEXT DEFAULT 'customer',
             duration_minutes INTEGER DEFAULT 5,
             customer_name TEXT,
-            customer_phone TEXT
+            customer_phone TEXT,
+            is_running INTEGER DEFAULT 0,
+            run_state TEXT DEFAULT 'Idle',
+            wa_start_sent INTEGER DEFAULT 0,
+            wa_completion_sent INTEGER DEFAULT 0
         )
     ''')
     # WhatsApp outbox table (offline queue for pending messages)
@@ -96,8 +102,18 @@ def init_db():
         conn.commit()
     except sqlite3.OperationalError:
         pass  # Column already exists
-    # Add customer columns to active_timers if not present
-    for col in ['customer_name TEXT', 'customer_phone TEXT']:
+    # Add columns to active_timers if not present (automatic migration)
+    timer_columns = [
+        'customer_name TEXT',
+        'customer_phone TEXT',
+        'last_saved_time DATETIME',
+        'last_remain_seconds INTEGER',
+        'is_running INTEGER DEFAULT 0',
+        'run_state TEXT DEFAULT "Idle"',
+        'wa_start_sent INTEGER DEFAULT 0',
+        'wa_completion_sent INTEGER DEFAULT 0'
+    ]
+    for col in timer_columns:
         try:
             cursor.execute(f"ALTER TABLE active_timers ADD COLUMN {col}")
             conn.commit()
@@ -366,12 +382,15 @@ def get_machine_log_stats(machine=None, date=None):
         return {"today": 0, "week": 0, "month": 0, "by_machine": {}}
 
 # ----------------------
-# ACTIVE TIMERS (Persistence)
+# ACTIVE TIMERS (Persistence & Checkpoint Recovery)
 # ----------------------
 
-def save_active_timer(entity_id, end_time, source='customer', duration_minutes=5, customer_name=None, customer_phone=None):
-    """Save an active timer to database for persistence across restarts.
-    
+def save_active_timer(entity_id, end_time, source='customer', duration_minutes=5,
+                      customer_name=None, customer_phone=None, last_remain_seconds=None,
+                      is_running=0, run_state="Idle", wa_start_sent=0, wa_completion_sent=0,
+                      started_at=None):
+    """Save an active timer to database with full state checkpointing for persistence across restarts.
+
     Args:
         entity_id: Machine entity ID
         end_time: datetime object when the timer should end
@@ -379,28 +398,85 @@ def save_active_timer(entity_id, end_time, source='customer', duration_minutes=5
         duration_minutes: Original duration in minutes (for display)
         customer_name: Customer name (for WA notifications)
         customer_phone: Customer phone number (for WA notifications)
+        last_remain_seconds: Current remaining seconds recorded (state menit/detik)
+        is_running: 1 if running/offline run cycle, 0 if booking/idle
+        run_state: Machine state description (e.g. 'Running (Offline)', 'Washing')
+        wa_start_sent: 1 if start WA was sent
+        wa_completion_sent: 1 if completion WA was sent
+        started_at: Custom start timestamp or current datetime
     """
     try:
-        started_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
-        
+        now_dt = datetime.datetime.now()
+        started_at_str = started_at if started_at else now_dt.strftime("%Y-%m-%d %H:%M:%S")
+        last_saved_time_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+        end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S") if isinstance(end_time, datetime.datetime) else str(end_time)
+
+        if last_remain_seconds is None and isinstance(end_time, datetime.datetime):
+            last_remain_seconds = max(0, int((end_time - now_dt).total_seconds()))
+        elif last_remain_seconds is None:
+            last_remain_seconds = duration_minutes * 60
+
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT OR REPLACE INTO active_timers (entity_id, end_time, started_at, source, duration_minutes, customer_name, customer_phone)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (entity_id, end_time_str, started_at, source, duration_minutes, encrypt_val(customer_name), encrypt_val(customer_phone)))
+            INSERT OR REPLACE INTO active_timers (
+                entity_id, end_time, started_at, last_saved_time, last_remain_seconds,
+                source, duration_minutes, customer_name, customer_phone,
+                is_running, run_state, wa_start_sent, wa_completion_sent
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            entity_id, end_time_str, started_at_str, last_saved_time_str, int(last_remain_seconds),
+            source, duration_minutes, encrypt_val(customer_name), encrypt_val(customer_phone),
+            1 if is_running else 0, run_state, 1 if wa_start_sent else 0, 1 if wa_completion_sent else 0
+        ))
         conn.commit()
         conn.close()
-        print(f"[DB] Active timer saved: {entity_id} -> ends at {end_time_str} ({duration_minutes} min, customer={customer_name})")
+        print(f"[DB] Active timer saved: {entity_id} -> {last_saved_time_str} (ends: {end_time_str}, remain: {last_remain_seconds}s, state: {run_state}, running: {is_running}, cust: {customer_name})")
     except Exception as e:
         print(f"[DB] Error saving active timer: {e}")
 
+def update_active_timer_checkpoint(entity_id, remain_seconds, run_state=None, is_running=None,
+                                   wa_start_sent=None, wa_completion_sent=None, end_time=None):
+    """Fast periodic checkpoint of remaining time and timestamp to SQLite database."""
+    try:
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        updates = ["last_saved_time = ?", "last_remain_seconds = ?"]
+        params = [now_str, max(0, int(remain_seconds))]
+
+        if run_state is not None:
+            updates.append("run_state = ?")
+            params.append(str(run_state))
+        if is_running is not None:
+            updates.append("is_running = ?")
+            params.append(1 if is_running else 0)
+        if wa_start_sent is not None:
+            updates.append("wa_start_sent = ?")
+            params.append(1 if wa_start_sent else 0)
+        if wa_completion_sent is not None:
+            updates.append("wa_completion_sent = ?")
+            params.append(1 if wa_completion_sent else 0)
+        if end_time is not None:
+            end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S") if isinstance(end_time, datetime.datetime) else str(end_time)
+            updates.append("end_time = ?")
+            params.append(end_time_str)
+
+        params.append(entity_id)
+        query = f"UPDATE active_timers SET {', '.join(updates)} WHERE entity_id = ?"
+        cursor.execute(query, params)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[DB] Error updating active timer checkpoint for {entity_id}: {e}")
+
 def get_active_timer(entity_id):
     """Get active timer for a specific entity.
-    
+
     Returns:
-        dict with end_time, started_at, source or None if not found
+        dict with timer and customer fields or None if not found
     """
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -421,9 +497,9 @@ def get_active_timer(entity_id):
 
 def get_all_active_timers():
     """Get all active timers from database.
-    
+
     Returns:
-        list of dicts with entity_id, end_time, started_at, source
+        list of dicts with all timer fields
     """
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -441,6 +517,7 @@ def get_all_active_timers():
         return res
     except Exception as e:
         print(f"[DB] Error getting all active timers: {e}")
+        return []
         return []
 
 def remove_active_timer(entity_id):

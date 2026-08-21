@@ -345,7 +345,14 @@ def api_machine_start():
     if not data.get('bypass_cooldown') and machine_manager.get_machine_status(entity) == "unready":
         return jsonify({"error": "Machine in cooldown", "bypass_available": True}), 423
     
-    duration_minutes = data.get('duration', 5)
+    duration_minutes = data.get('duration')
+    if not duration_minutes or duration_minutes <= 5:
+        # If not specified or default small window, use full cycle duration based on machine category
+        if 'pengering' in entity.lower() or 'dry' in entity.lower() or 'kering' in entity.lower():
+            duration_minutes = 45
+        else:
+            duration_minutes = 40
+
     res, code = machine_manager.start_machine_monitoring(
         entity,
         customer_name=data.get('customer_name'),
