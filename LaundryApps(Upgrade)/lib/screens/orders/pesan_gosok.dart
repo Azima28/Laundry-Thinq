@@ -39,9 +39,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
   final TextEditingController _searchProductController = TextEditingController();
   List<Customer> _allCustomers = [];
 
-  // ==========================================
-  // REAL-TIME INTEGRATED PAYMENT STUDIO STATE
-  // ==========================================
+  // Payment Studio State
   String _selectedPaymentTab = 'cash'; // 'cash', 'qris', 'tempo'
   String _tempoSubMode = 'piutang'; // 'piutang', 'dp'
   final TextEditingController _cashController = TextEditingController();
@@ -466,7 +464,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
   }
 
   // =========================================================
-  // INTEGRATED ALL-IN-ONE DIRECT CHECKOUT & PAYMENT ENGINE
+  // INTEGRATED DIRECT CHECKOUT & PAYMENT ENGINE
   // =========================================================
   Future<void> _processAllInOneCheckout() async {
     final total = _calculateTotal();
@@ -716,7 +714,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
   }
 
   // =========================================================
-  // MAIN VIEW: ALL-IN-ONE 3-PANE POS WORKSTATION
+  // MAIN VIEW: INTEGRATED SPLIT WORKSTATION (60% : 40%)
   // =========================================================
   @override
   Widget build(BuildContext context) {
@@ -730,122 +728,148 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
       child: Focus(
         autofocus: true,
         child: Scaffold(
-          backgroundColor: StyleConstants.backgroundColor,
+          backgroundColor: const Color(0xFFF1F5F9), // Slate 100 Workbench Ground
           body: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // 1. Top POS Header Bar
+                    // Top Header Bar
                     _buildHeaderBar(),
 
-                    // 2. All-in-One 3-Pane Workstation Split
+                    // Main 2-Container Workspace (60% : 40%)
                     Expanded(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // ==========================================
-                          // PANE 1: KATALOG SETRIKA (Flex 44)
-                          // ==========================================
-                          Expanded(
-                            flex: 44,
-                            child: Container(
-                              color: StyleConstants.backgroundColor,
-                              child: _filteredItems.isEmpty
-                                  ? const Center(
-                                      child: Text(
-                                        'Belum ada paket tarif setrika.',
-                                        style: TextStyle(color: StyleConstants.textMuted),
-                                      ),
-                                    )
-                                  : GridView.builder(
-                                      padding: const EdgeInsets.all(16),
-                                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                                        maxCrossAxisExtent: 260,
-                                        crossAxisSpacing: 12,
-                                        mainAxisSpacing: 12,
-                                        childAspectRatio: 1.30,
-                                      ),
-                                      itemCount: _filteredItems.length,
-                                      itemBuilder: (context, index) {
-                                        final item = _filteredItems[index];
-                                        final weight = _weights[item.id ?? 0] ?? 0.0;
-                                        return _buildIronProductCard(item, weight);
-                                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(14.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // =========================================================
+                            // CONTAINER KIRI: KATALOG SETRIKA KOMPAK & PADAT (58%)
+                            // =========================================================
+                            Expanded(
+                              flex: 58,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: StyleConstants.borderLight),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
                                     ),
-                            ),
-                          ),
-
-                          // VERTICAL DIVIDER 1
-                          Container(width: 1, color: StyleConstants.borderLight),
-
-                          // ==========================================
-                          // PANE 2: NOTA TIKET TRANSAKSI (330px)
-                          // ==========================================
-                          SizedBox(
-                            width: 330,
-                            child: Container(
-                              color: Colors.white,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  // Customer Selector Card
-                                  _buildCustomerTicketSection(),
-
-                                  const Divider(height: 1, color: StyleConstants.borderLight),
-
-                                  // Cart Items Scrollable List
-                                  Expanded(
-                                    child: _buildCartItemsList(),
-                                  ),
-
-                                  const Divider(height: 1, color: StyleConstants.borderLight),
-
-                                  // Ledger Quick Recap Bar
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                    color: const Color(0xFFF8FAFC),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text('TOTAL TAGIHAN:', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: StyleConstants.textMuted, letterSpacing: 0.5)),
-                                            Text('$totalWeight Kg Dipilih', style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted)),
-                                          ],
-                                        ),
-                                        Text(
-                                          formatRp(total),
-                                          style: StyleConstants.tabularNumbers(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.w900,
-                                            color: const Color(0xFFF97316),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    // Catalog Section Header
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFF8FAFC),
+                                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                        border: Border(bottom: BorderSide(color: StyleConstants.borderLight)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.iron_rounded, size: 18, color: Color(0xFFF97316)),
+                                          const SizedBox(width: 8),
+                                          const Text(
+                                            'Katalog Tarif Gosok & Setrika Uap',
+                                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
                                           ),
-                                        ),
-                                      ],
+                                          const Spacer(),
+                                          Text(
+                                            '${_filteredItems.length} Paket Tarif Tersedia',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: StyleConstants.textMuted),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
+
+                                    // Catalog Grid
+                                    Expanded(
+                                      child: _filteredItems.isEmpty
+                                          ? Center(
+                                              child: Column(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(Icons.inventory_2_outlined, size: 42, color: Colors.grey[300]),
+                                                  const SizedBox(height: 10),
+                                                  const Text(
+                                                    'Belum ada paket tarif setrika.',
+                                                    style: TextStyle(color: StyleConstants.textMuted, fontSize: 13, fontWeight: FontWeight.w600),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          : GridView.builder(
+                                              padding: const EdgeInsets.all(14),
+                                              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                                maxCrossAxisExtent: 220,
+                                                crossAxisSpacing: 10,
+                                                mainAxisSpacing: 10,
+                                                childAspectRatio: 1.52,
+                                              ),
+                                              itemCount: _filteredItems.length,
+                                              itemBuilder: (context, index) {
+                                                final item = _filteredItems[index];
+                                                final weight = _weights[item.id ?? 0] ?? 0.0;
+                                                return _buildIronProductCard(item, weight);
+                                              },
+                                            ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
 
-                          // VERTICAL DIVIDER 2
-                          Container(width: 1, color: StyleConstants.borderLight),
+                            const SizedBox(width: 14),
 
-                          // ==========================================
-                          // PANE 3: STUDIO PEMBAYARAN LANGSUNG (Flex 32)
-                          // ==========================================
-                          Expanded(
-                            flex: 32,
-                            child: Container(
-                              color: Colors.white,
-                              padding: const EdgeInsets.all(22),
-                              child: _buildDirectPaymentPane(total),
+                            // =========================================================
+                            // CONTAINER KANAN: NOTA STRUK & PEMBAYARAN TERPADU (42%)
+                            // =========================================================
+                            Expanded(
+                              flex: 42,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: StyleConstants.borderLight),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    // 1. Customer Header Badge
+                                    _buildCustomerTicketSection(),
+
+                                    const Divider(height: 1, color: StyleConstants.borderLight),
+
+                                    // 2. Scrollable Cart Items Slip
+                                    Expanded(
+                                      child: _buildCartItemsList(),
+                                    ),
+
+                                    const Divider(height: 1, color: StyleConstants.borderLight),
+
+                                    // 3. Integrated Payment & Total Section
+                                    _buildIntegratedPaymentSection(total, totalWeight),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -876,7 +900,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'KASIR POS: PESAN SETRIKA & BAYAR LANGSUNG',
+                'KASIR POS: PESAN SETRIKA & PEMBAYARAN',
                 style: TextStyle(
                   fontSize: 14.5,
                   fontWeight: FontWeight.w900,
@@ -885,7 +909,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
                 ),
               ),
               Text(
-                'All-in-One POS Studio: Pakaian Kiloan Gosok Saja / Uap Rapi',
+                'Workstation Kasir Terpadu: Pakaian Kiloan Gosok Saja / Uap Rapi',
                 style: TextStyle(fontSize: 10.5, color: StyleConstants.textMuted),
               ),
             ],
@@ -903,7 +927,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
               child: TextField(
                 controller: _searchProductController,
                 decoration: InputDecoration(
-                  hintText: 'Cari paket tarif setrika (F2)...',
+                  hintText: 'Cari paket tarif setrika...',
                   hintStyle: const TextStyle(fontSize: 12.5, color: StyleConstants.textMuted),
                   prefixIcon: const Icon(Icons.search_rounded, size: 18, color: StyleConstants.textMuted),
                   suffixIcon: _searchProductController.text.isNotEmpty
@@ -943,7 +967,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
     return Container(
       decoration: BoxDecoration(
         color: isSelected ? const Color(0xFFFFF7ED) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isSelected ? const Color(0xFFF97316) : StyleConstants.borderLight,
           width: isSelected ? 2 : 1,
@@ -952,9 +976,9 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
           BoxShadow(
             color: isSelected
                 ? const Color(0xFFF97316).withValues(alpha: 0.12)
-                : const Color(0xFF0F172A).withValues(alpha: 0.04),
-            blurRadius: isSelected ? 12 : 6,
-            offset: const Offset(0, 3),
+                : const Color(0xFF0F172A).withValues(alpha: 0.02),
+            blurRadius: isSelected ? 8 : 4,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -962,211 +986,108 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _updateWeight(item.id, 0.5),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Top Row: Icon Avatar + Service Title & Badge
+                // Top Title & Icon
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 36,
-                      height: 36,
+                      width: 28,
+                      height: 28,
                       decoration: BoxDecoration(
                         color: isSelected
                             ? const Color(0xFFF97316)
                             : const Color(0xFFF97316).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(7),
                       ),
                       child: Icon(
                         isExpress ? Icons.bolt_rounded : Icons.iron_rounded,
                         color: isSelected ? Colors.white : const Color(0xFFF97316),
-                        size: 19,
+                        size: 16,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isExpress
-                                  ? const Color(0xFFFEF3C7)
-                                  : const Color(0xFFFFF7ED),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              isExpress ? 'EXPRESS GOSOK' : 'SETRIKA UAP',
-                              style: const TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFFC2410C),
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            item.nama,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              color: StyleConstants.textHeading,
-                              letterSpacing: -0.3,
-                              height: 1.15,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                      child: Text(
+                        item.nama,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          color: StyleConstants.textHeading,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (_notes[item.id]?.isNotEmpty == true)
-                      Tooltip(
-                        message: 'Catatan: ${_notes[item.id]}',
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF97316).withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.sticky_note_2_rounded, size: 14, color: Color(0xFFF97316)),
-                        ),
+                      InkWell(
+                        onTap: () => _showNoteDialog(item.id ?? 0, item.nama),
+                        child: const Icon(Icons.sticky_note_2_rounded, size: 14, color: Color(0xFFF97316)),
+                      )
+                    else
+                      InkWell(
+                        onTap: () => _showNoteDialog(item.id ?? 0, item.nama),
+                        child: const Icon(Icons.note_add_outlined, size: 14, color: StyleConstants.textMuted),
                       ),
                   ],
                 ),
 
-                // Middle: Big Bold Price
-                Text(
-                  formatRp(item.harga),
-                  style: StyleConstants.tabularNumbers(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w900,
-                    color: const Color(0xFFF97316),
-                  ),
-                ),
-
-                // Bottom Controls: Manual Kg Pill & Note & Weight Stepper
+                // Bottom Price & Stepper
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Manual Weight Input Button
-                        InkWell(
-                          onTap: () => _setCustomWeight(item.id ?? 0, item.nama),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: StyleConstants.borderLight),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.edit_rounded, size: 12, color: StyleConstants.textMuted),
-                                SizedBox(width: 3),
-                                Text(
-                                  'Kg',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: StyleConstants.textHeading,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        // Note Button
-                        InkWell(
-                          onTap: () => _showNoteDialog(item.id ?? 0, item.nama),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                            decoration: BoxDecoration(
-                              color: _notes[item.id]?.isNotEmpty == true
-                                  ? const Color(0xFFFFF7ED)
-                                  : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: _notes[item.id]?.isNotEmpty == true
-                                    ? const Color(0xFFF97316).withValues(alpha: 0.4)
-                                    : StyleConstants.borderLight,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.sticky_note_2_rounded,
-                                  size: 12,
-                                  color: _notes[item.id]?.isNotEmpty == true
-                                      ? const Color(0xFFF97316)
-                                      : StyleConstants.textMuted,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'Nota',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: _notes[item.id]?.isNotEmpty == true
-                                        ? const Color(0xFFC2410C)
-                                        : StyleConstants.textHeading,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      formatRp(item.harga),
+                      style: StyleConstants.tabularNumbers(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFFF97316),
+                      ),
                     ),
 
                     // Counter Stepper (- Kg +)
                     Container(
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: StyleConstants.borderLight),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.remove_rounded, size: 15),
-                            padding: const EdgeInsets.all(3),
-                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                            icon: const Icon(Icons.remove_rounded, size: 14),
+                            padding: const EdgeInsets.all(2),
+                            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                             color: weight > 0 ? StyleConstants.dangerColor : Colors.grey[400],
                             onPressed: weight > 0 ? () => _updateWeight(item.id, -0.5) : null,
                             tooltip: 'Kurangi 0.5 Kg',
                           ),
-                          Container(
-                            constraints: const BoxConstraints(minWidth: 30),
-                            alignment: Alignment.center,
-                            child: Text(
-                              '$weight',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 13.5,
-                                color: isSelected ? const Color(0xFFF97316) : StyleConstants.textHeading,
+                          InkWell(
+                            onTap: () => _setCustomWeight(item.id ?? 0, item.nama),
+                            child: Container(
+                              constraints: const BoxConstraints(minWidth: 24),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '$weight',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12.5,
+                                  color: isSelected ? const Color(0xFFF97316) : StyleConstants.textHeading,
+                                ),
                               ),
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.add_rounded, size: 15),
-                            padding: const EdgeInsets.all(3),
-                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                            icon: const Icon(Icons.add_rounded, size: 14),
+                            padding: const EdgeInsets.all(2),
+                            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                             color: const Color(0xFFF97316),
                             onPressed: () => _updateWeight(item.id, 0.5),
                             tooltip: 'Tambah 0.5 Kg',
@@ -1186,81 +1107,62 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
 
   Widget _buildCustomerTicketSection() {
     return Container(
-      padding: const EdgeInsets.all(14),
-      color: const Color(0xFFF8FAFC),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(12),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'DATA PELANGGAN',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                  color: StyleConstants.textMuted,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              if (_customerNameController.text.isNotEmpty)
-                InkWell(
-                  onTap: _clearCustomer,
-                  child: const Text(
-                    'Ganti',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFF97316)),
-                  ),
-                ),
-            ],
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: const Color(0xFFF97316).withValues(alpha: 0.1),
+            child: const Icon(Icons.person_rounded, size: 16, color: Color(0xFFF97316)),
           ),
-          const SizedBox(height: 6),
-
-          InkWell(
-            onTap: _showCustomerPicker,
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: _customerNameController.text.isNotEmpty ? const Color(0xFFF97316).withValues(alpha: 0.4) : StyleConstants.borderLight,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _customerNameController.text.isEmpty
+                      ? 'Pilih Pelanggan...'
+                      : _customerNameController.text,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    color: _customerNameController.text.isEmpty ? StyleConstants.textMuted : StyleConstants.textHeading,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 13,
-                    backgroundColor: const Color(0xFFF97316).withValues(alpha: 0.1),
-                    child: const Icon(Icons.person_rounded, size: 15, color: Color(0xFFF97316)),
+                if (_customerPhoneController.text.isNotEmpty)
+                  Text(
+                    _customerPhoneController.text,
+                    style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _customerNameController.text.isEmpty
-                              ? 'Pilih Pelanggan (Klik di sini)...'
-                              : _customerNameController.text,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12.5,
-                            color: _customerNameController.text.isEmpty ? StyleConstants.textMuted : StyleConstants.textHeading,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (_customerPhoneController.text.isNotEmpty)
-                          Text(
-                            _customerPhoneController.text,
-                            style: const TextStyle(fontSize: 10.5, color: StyleConstants.textMuted),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.arrow_drop_down_rounded, color: StyleConstants.textMuted),
-                ],
-              ),
+              ],
+            ),
+          ),
+          if (_customerNameController.text.isNotEmpty) ...[
+            IconButton(
+              icon: const Icon(Icons.close_rounded, size: 16, color: StyleConstants.dangerColor),
+              onPressed: _clearCustomer,
+              tooltip: 'Hapus Pelanggan',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            const SizedBox(width: 8),
+          ],
+          OutlinedButton(
+            onPressed: _showCustomerPicker,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              side: const BorderSide(color: StyleConstants.borderLight),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            child: Text(
+              _customerNameController.text.isEmpty ? 'Pilih (+)' : 'Ganti',
+              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFFF97316)),
             ),
           ),
         ],
@@ -1272,18 +1174,18 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
     final cartItems = _allItems.where((it) => (_weights[it.id ?? 0] ?? 0.0) > 0).toList();
 
     if (cartItems.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.shopping_cart_outlined, size: 34, color: Color(0xFFCBD5E1)),
-            SizedBox(height: 8),
-            Text(
-              'Nota masih kosong.',
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: StyleConstants.textMuted),
+            Icon(Icons.shopping_bag_outlined, size: 36, color: Colors.grey[300]),
+            const SizedBox(height: 8),
+            const Text(
+              'Nota Pesanan Masih Kosong',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: StyleConstants.textMuted),
             ),
-            Text(
-              'Pilih tarif setrika di kiri.',
+            const Text(
+              'Pilih tarif setrika di sebelah kiri.',
               style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
             ),
           ],
@@ -1292,233 +1194,191 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       itemCount: cartItems.length,
-      separatorBuilder: (_, __) => const Divider(height: 14, color: StyleConstants.borderLight),
+      separatorBuilder: (_, __) => const Divider(height: 12, color: StyleConstants.borderLight),
       itemBuilder: (context, index) {
         final item = cartItems[index];
         final w = _weights[item.id ?? 0] ?? 0.0;
         final subtotal = (item.harga * w).round();
         final note = _notes[item.id];
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        return Row(
           children: [
-            Row(
-              children: [
-                Text(
-                  '$w kg x ',
-                  style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFF97316), fontSize: 12.5),
-                ),
-                Expanded(
-                  child: Text(
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF97316).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$w kg',
+                style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFF97316), fontSize: 12),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
                     item.nama,
                     style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: StyleConstants.textHeading),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Text(
-                  formatRp(subtotal),
-                  style: StyleConstants.tabularNumbers(fontSize: 12.5, fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 15, color: StyleConstants.textMuted),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: () => setState(() => _weights[item.id ?? 0] = 0.0),
-                  tooltip: 'Hapus Item',
-                ),
-              ],
-            ),
-            if (note != null && note.trim().isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 3, left: 20),
-                child: Text(
-                  'Catatan: $note',
-                  style: const TextStyle(fontSize: 10.5, fontStyle: FontStyle.italic, color: Color(0xFFF97316)),
-                ),
+                  if (note != null && note.trim().isNotEmpty)
+                    Text(
+                      'Catatan: $note',
+                      style: const TextStyle(fontSize: 10.5, fontStyle: FontStyle.italic, color: Color(0xFFF97316)),
+                    ),
+                ],
               ),
+            ),
+            Text(
+              formatRp(subtotal),
+              style: StyleConstants.tabularNumbers(fontSize: 12.5, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(width: 6),
+            InkWell(
+              onTap: () => setState(() => _weights[item.id ?? 0] = 0.0),
+              child: const Icon(Icons.close_rounded, size: 16, color: StyleConstants.textMuted),
+            ),
           ],
         );
       },
     );
   }
 
-  // =========================================================
-  // SUB-WIDGET: DIRECT PAYMENT STUDIO (PANE 3)
-  // =========================================================
-  Widget _buildDirectPaymentPane(int total) {
+  // --- INTEGRATED PAYMENT & TOTAL SECTION (PANE KANAN BAWAH) ---
+  Widget _buildIntegratedPaymentSection(int total, double totalWeight) {
     final change = _cashReceived - total;
     final isCashValid = total > 0 && _cashReceived >= total;
     final isDpValid = total > 0 && _dpAmount > 0 && _dpAmount < total;
 
-    return SingleChildScrollView(
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header Studio
-          const Row(
-            children: [
-              Icon(Icons.point_of_sale_rounded, color: Color(0xFFF97316), size: 20),
-              SizedBox(width: 8),
-              Text(
-                'STUDIO PEMBAYARAN LANGSUNG',
-                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: StyleConstants.textHeading, letterSpacing: -0.2),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Payment Method Tabs (3-Pills)
+          // Total Amount Header
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: _paymentMethodTabBtn(
-                  key: 'cash',
-                  label: 'Tunai (Cash)',
-                  icon: Icons.payments_rounded,
-                  color: StyleConstants.successColor,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('TOTAL TAGIHAN:', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: StyleConstants.textMuted, letterSpacing: 0.5)),
+                  Text('$totalWeight Kg Dipilih', style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted)),
+                ],
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _paymentMethodTabBtn(
-                  key: 'qris',
-                  label: 'QRIS',
-                  icon: Icons.qr_code_scanner_rounded,
-                  color: StyleConstants.primaryColor,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _paymentMethodTabBtn(
-                  key: 'tempo',
-                  label: 'Tempo/DP',
-                  icon: Icons.schedule_rounded,
+              Text(
+                formatRp(total),
+                style: StyleConstants.tabularNumbers(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
                   color: const Color(0xFFF97316),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
 
-          // --- MODE 1: TUNAI / CASH ---
+          // Payment Method Selector (3-Pills)
+          Row(
+            children: [
+              Expanded(
+                child: _methodTab(key: 'cash', label: 'Tunai', icon: Icons.payments_rounded, color: StyleConstants.successColor),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _methodTab(key: 'qris', label: 'QRIS', icon: Icons.qr_code_scanner_rounded, color: StyleConstants.primaryColor),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _methodTab(key: 'tempo', label: 'Tempo/DP', icon: Icons.schedule_rounded, color: const Color(0xFFF97316)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // --- 1. CASH WORKBENCH ---
           if (_selectedPaymentTab == 'cash') ...[
-            const Text(
-              'Input Nominal Uang Tunai Diterima:',
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: StyleConstants.textHeading),
-            ),
-            const SizedBox(height: 8),
-
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isCashValid ? StyleConstants.successColor : StyleConstants.borderFocus,
-                  width: 2,
-                ),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: isCashValid ? StyleConstants.successColor : StyleConstants.borderFocus, width: 1.5),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
               child: Row(
                 children: [
-                  const Text('Rp', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)),
-                  const SizedBox(width: 10),
+                  const Text('Rp', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
                       controller: _cashController,
                       keyboardType: TextInputType.number,
                       inputFormatters: [ThousandsSeparatorInputFormatter()],
-                      style: StyleConstants.tabularNumbers(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: StyleConstants.textHeading,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: '0',
-                        hintStyle: TextStyle(color: Color(0xFFCBD5E1), fontSize: 24, fontWeight: FontWeight.w900),
-                        border: InputBorder.none,
-                      ),
+                      style: StyleConstants.tabularNumbers(fontSize: 19, fontWeight: FontWeight.w900),
+                      decoration: const InputDecoration(hintText: '0', border: InputBorder.none),
                       onSubmitted: (_) {
                         if (isCashValid && !_isSubmitting) _processAllInOneCheckout();
                       },
                     ),
                   ),
                   if (_cashReceived > 0)
-                    IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 18, color: StyleConstants.textMuted),
-                      onPressed: () => _cashController.clear(),
-                      tooltip: 'Reset Input',
+                    InkWell(
+                      onTap: () => _cashController.clear(),
+                      child: const Icon(Icons.clear_rounded, size: 16, color: StyleConstants.textMuted),
                     ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
+            // Quick Cash Denomination Chips
             Wrap(
               spacing: 6,
-              runSpacing: 6,
+              runSpacing: 4,
               children: [
-                _quickCashPill(total, 'Uang Pas', isExact: true),
-                _quickCashPill(10000, '10k'),
-                _quickCashPill(20000, '20k'),
-                _quickCashPill(50000, '50k'),
-                _quickCashPill(100000, '100k'),
-                _quickCashPill(200000, '200k'),
-                _quickCashPill(500000, '500k'),
+                _quickCashChip(total, 'Uang Pas', isExact: true),
+                _quickCashChip(10000, '10k'),
+                _quickCashChip(20000, '20k'),
+                _quickCashChip(50000, '50k'),
+                _quickCashChip(100000, '100k'),
+                _quickCashChip(200000, '200k'),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
 
+            // Kembalian Banner
             Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: (change >= 0) ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: (change >= 0) ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A),
-                ),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: (change >= 0) ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        (change >= 0) ? Icons.price_check_rounded : Icons.warning_amber_rounded,
-                        size: 22,
-                        color: (change >= 0) ? StyleConstants.successColor : StyleConstants.warningColor,
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            (change >= 0) ? 'KEMBALIAN TUNAI' : 'UANG KURANG',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 11,
-                              color: (change >= 0) ? const Color(0xFF047857) : const Color(0xFFB45309),
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          Text(
-                            (change >= 0) ? 'Harus diserahkan ke pelanggan' : 'Belum cukup untuk lunas',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              color: (change >= 0) ? const Color(0xFF065F46) : const Color(0xFF92400E),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  Text(
+                    (change >= 0) ? 'KEMBALIAN TUNAI:' : 'UANG KURANG:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11,
+                      color: (change >= 0) ? const Color(0xFF047857) : const Color(0xFFB45309),
+                    ),
                   ),
                   Text(
                     formatRp((change >= 0) ? change : change.abs()),
                     style: StyleConstants.tabularNumbers(
-                      fontSize: 22,
+                      fontSize: 16,
                       fontWeight: FontWeight.w900,
                       color: (change >= 0) ? const Color(0xFF047857) : const Color(0xFFB45309),
                     ),
@@ -1526,128 +1386,66 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
 
             ElevatedButton(
               onPressed: (isCashValid && !_isSubmitting) ? _processAllInOneCheckout : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: StyleConstants.successColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 elevation: 0,
               ),
               child: _isSubmitting
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.check_circle_rounded, size: 18),
-                        SizedBox(width: 8),
-                        Text('BAYAR LUNAS & CETAK STRUK', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.4)),
-                      ],
-                    ),
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('BAYAR LUNAS & CETAK STRUK (ENTER)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
             ),
           ],
 
-          // --- MODE 2: QRIS DINAMIS MIDTRANS ---
+          // --- 2. QRIS WORKBENCH ---
           if (_selectedPaymentTab == 'qris') ...[
             if (_qrisUrl == null) ...[
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: StyleConstants.borderLight),
-                ),
-                child: Column(
-                  children: [
-                    const Icon(Icons.qr_code_2_rounded, size: 54, color: StyleConstants.primaryColor),
-                    const SizedBox(height: 10),
-                    const Text('QRIS Dinamis Midtrans', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Buat barcode QRIS instan sebesar ${formatRp(total)}.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 11.5, color: StyleConstants.textMuted),
-                    ),
-                    if (_qrisError != null) ...[
-                      const SizedBox(height: 8),
-                      Text('Error: $_qrisError', style: const TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold)),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
+              if (_qrisError != null) ...[
+                Text('Error: $_qrisError', style: const TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+              ],
               ElevatedButton.icon(
                 onPressed: _isGeneratingQris ? null : _generateQrisBarcode,
                 icon: _isGeneratingQris
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                label: const Text('GENERATE BARCODE QRIS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.qr_code_scanner_rounded, size: 16),
+                label: const Text('BUAT QRIS MIDTRANS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: StyleConstants.primaryColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
             ] else ...[
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: StyleConstants.borderLight),
-                  ),
-                  child: QrImageView(
-                    data: _qrisUrl!,
-                    version: QrVersions.auto,
-                    size: 170.0,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
-                  const SizedBox(width: 8),
-                  Text('Menunggu scan pelanggan (${_lastQrisStatus ?? "pending"})...', style: const TextStyle(fontSize: 11.5, color: StyleConstants.warningColor, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 16),
               Row(
                 children: [
+                  QrImageView(data: _qrisUrl!, version: QrVersions.auto, size: 90),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        _qrisTimer?.cancel();
-                        setState(() {
-                          _qrisUrl = null;
-                          _qrisId = null;
-                        });
-                      },
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: const Text('Batal QRIS', style: TextStyle(color: StyleConstants.dangerColor, fontWeight: FontWeight.bold, fontSize: 12)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _processAllInOneCheckout,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: StyleConstants.successColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: const Text('Manual Selesai', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Scan QRIS Pelanggan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        Text('Status: ${_lastQrisStatus ?? "Menunggu"}', style: const TextStyle(fontSize: 11, color: StyleConstants.warningColor, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 6),
+                        OutlinedButton(
+                          onPressed: () {
+                            _qrisTimer?.cancel();
+                            setState(() {
+                              _qrisUrl = null;
+                              _qrisId = null;
+                            });
+                          },
+                          child: const Text('Batal QRIS', style: TextStyle(fontSize: 11, color: StyleConstants.dangerColor)),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -1655,54 +1453,44 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
             ],
           ],
 
-          // --- MODE 3: TEMPO (PIUTANG) & DP ---
+          // --- 3. TEMPO / DP WORKBENCH ---
           if (_selectedPaymentTab == 'tempo') ...[
             Row(
               children: [
                 Expanded(
                   child: InkWell(
                     onTap: () => setState(() => _tempoSubMode = 'piutang'),
-                    borderRadius: BorderRadius.circular(8),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
                         color: _tempoSubMode == 'piutang' ? const Color(0xFFFEF2F2) : Colors.white,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: _tempoSubMode == 'piutang' ? StyleConstants.dangerColor : StyleConstants.borderLight),
                       ),
                       child: Center(
                         child: Text(
                           '100% Piutang (Tempo)',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            color: _tempoSubMode == 'piutang' ? StyleConstants.dangerColor : StyleConstants.textMuted,
-                          ),
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _tempoSubMode == 'piutang' ? StyleConstants.dangerColor : StyleConstants.textMuted),
                         ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(
                   child: InkWell(
                     onTap: () => setState(() => _tempoSubMode = 'dp'),
-                    borderRadius: BorderRadius.circular(8),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
                         color: _tempoSubMode == 'dp' ? const Color(0xFFFFFBEB) : Colors.white,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: _tempoSubMode == 'dp' ? StyleConstants.warningColor : StyleConstants.borderLight),
                       ),
                       child: Center(
                         child: Text(
-                          'Bayar Uang Muka (DP)',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            color: _tempoSubMode == 'dp' ? StyleConstants.warningColor : StyleConstants.textMuted,
-                          ),
+                          'Bayar DP Sebagian',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _tempoSubMode == 'dp' ? StyleConstants.warningColor : StyleConstants.textMuted),
                         ),
                       ),
                     ),
@@ -1710,102 +1498,45 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
 
             if (_tempoSubMode == 'dp') ...[
-              const Text('Input Jumlah Uang Muka (DP):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: StyleConstants.warningColor, width: 1.5),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: StyleConstants.warningColor),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                child: Row(
-                  children: [
-                    const Text('Rp', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: StyleConstants.warningColor)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _dpController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [ThousandsSeparatorInputFormatter()],
-                        style: StyleConstants.tabularNumbers(fontSize: 20, fontWeight: FontWeight.w900),
-                        decoration: const InputDecoration(hintText: '0', border: InputBorder.none),
-                      ),
-                    ),
-                  ],
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                child: TextField(
+                  controller: _dpController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [ThousandsSeparatorInputFormatter()],
+                  style: StyleConstants.tabularNumbers(fontSize: 16, fontWeight: FontWeight.bold),
+                  decoration: const InputDecoration(hintText: 'Nominal DP...', border: InputBorder.none),
                 ),
               ),
               const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: StyleConstants.borderLight),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Sisa Jadi Piutang:', style: TextStyle(fontSize: 12, color: StyleConstants.textMuted)),
-                    Text(
-                      formatRp((total - _dpAmount).clamp(0, total)),
-                      style: StyleConstants.tabularNumbers(fontSize: 15, fontWeight: FontWeight.w900, color: StyleConstants.warningColor),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: (isDpValid && !_isSubmitting) ? _processAllInOneCheckout : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: StyleConstants.warningColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: _isSubmitting
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('KONFIRMASI BAYAR DP (CICILAN)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+                child: const Text('KONFIRMASI BAYAR DP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
               ),
             ] else ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF2F2),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFECACA)),
-                ),
-                child: Column(
-                  children: [
-                    const Icon(Icons.access_time_filled_rounded, color: StyleConstants.dangerColor, size: 36),
-                    const SizedBox(height: 8),
-                    const Text('Bayar Nanti Saat Ambil Setrika', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.dangerColor)),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Total tagihan ${formatRp(total)} akan dicatat sebagai piutang penuh atas nama "${_customerNameController.text.isNotEmpty ? _customerNameController.text : "Pelanggan"}".',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: (total > 0 && !_isSubmitting) ? _processAllInOneCheckout : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: StyleConstants.dangerColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: _isSubmitting
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('SIMPAN SEBAGAI PIUTANG', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+                child: const Text('SIMPAN NOTA PIUTANG (TEMPO)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
               ),
             ],
           ],
@@ -1814,35 +1545,27 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
     );
   }
 
-  Widget _paymentMethodTabBtn({
-    required String key,
-    required String label,
-    required IconData icon,
-    required Color color,
-  }) {
+  Widget _methodTab({required String key, required String label, required IconData icon, required Color color}) {
     final isSelected = _selectedPaymentTab == key;
     return InkWell(
       onTap: () => setState(() => _selectedPaymentTab = key),
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? color : Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: isSelected ? color : StyleConstants.borderLight),
-          boxShadow: isSelected
-              ? [BoxShadow(color: color.withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(0, 2))]
-              : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 15, color: isSelected ? Colors.white : color),
-            const SizedBox(width: 5),
+            Icon(icon, size: 14, color: isSelected ? Colors.white : color),
+            const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 11,
                 fontWeight: FontWeight.w800,
                 color: isSelected ? Colors.white : StyleConstants.textHeading,
               ),
@@ -1853,18 +1576,18 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
     );
   }
 
-  Widget _quickCashPill(int amount, String label, {bool isExact = false}) {
+  Widget _quickCashChip(int amount, String label, {bool isExact = false}) {
     final isSelected = _cashReceived == amount;
     return InkWell(
       onTap: () => _setQuickCash(amount),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
           color: isExact
-              ? (isSelected ? const Color(0xFFF97316) : const Color(0xFFF97316).withValues(alpha: 0.08))
-              : (isSelected ? StyleConstants.textHeading : const Color(0xFFF1F5F9)),
-          borderRadius: BorderRadius.circular(8),
+              ? (isSelected ? const Color(0xFFF97316) : const Color(0xFFF97316).withValues(alpha: 0.1))
+              : (isSelected ? StyleConstants.textHeading : Colors.white),
+          borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: isExact
                 ? const Color(0xFFF97316)
@@ -1874,7 +1597,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 11.5,
+            fontSize: 11,
             fontWeight: FontWeight.w800,
             color: isExact
                 ? (isSelected ? Colors.white : const Color(0xFFF97316))
