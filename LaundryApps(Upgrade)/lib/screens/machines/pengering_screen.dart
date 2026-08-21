@@ -587,8 +587,15 @@ class _PengeringContentState extends State<PengeringContent> {
                             runState != '-' &&
                             runState != 'unknown');
 
+    final bool isOfflineRunning = isRunning && (
+      runState.toLowerCase().contains('offline') ||
+      (entry != null && entry['is_offline'] == true) ||
+      (remain.contains(':') && remain.length >= 4 && !remain.startsWith('0:'))
+    );
+
     Color iconColor;
     Color iconBg;
+    IconData machineIcon = Icons.wb_sunny_rounded;
     Color border;
     Gradient cardGradient;
     String badgeText;
@@ -608,11 +615,30 @@ class _PengeringContentState extends State<PengeringContent> {
       border = const Color(0xFFFCA5A5);
       iconBg = const Color(0xFFEF4444);
       iconColor = Colors.white;
+      machineIcon = Icons.error_outline_rounded;
       badgeBg = const Color(0xFFDC2626);
       badgeTextColor = Colors.white;
       titleColor = const Color(0xFF7F1D1D);
       subColor = const Color(0xFF991B1B);
       badgeText = "ERROR";
+      canClick = true;
+    } else if (isOfflineRunning) {
+      // OFFLINE RUNNING (Amber / Warm Orange Gradient)
+      cardGradient = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
+      );
+      border = const Color(0xFFFDBA74);
+      iconBg = const Color(0xFFEA580C);
+      iconColor = Colors.white;
+      machineIcon = Icons.cloud_off_rounded;
+      badgeBg = const Color(0xFFC2410C);
+      badgeTextColor = Colors.white;
+      titleColor = const Color(0xFF7C2D12);
+      subColor = const Color(0xFF9A3412);
+      final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
+      badgeText = "OFFLINE$timeText";
       canClick = true;
     } else if (isRunning) {
       // RUNNING (Blue/Amber Electric Full Gradient)
@@ -624,6 +650,7 @@ class _PengeringContentState extends State<PengeringContent> {
       border = const Color(0xFF93C5FD);
       iconBg = const Color(0xFF2563EB);
       iconColor = Colors.white;
+      machineIcon = Icons.wb_sunny_rounded;
       badgeBg = const Color(0xFF1D4ED8);
       badgeTextColor = Colors.white;
       titleColor = const Color(0xFF1E3A8A);
@@ -769,7 +796,7 @@ class _PengeringContentState extends State<PengeringContent> {
                                 ),
                               )
                             : Icon(
-                                Icons.wb_sunny_rounded,
+                                machineIcon,
                                 color: iconColor,
                                 size: 22,
                               ),

@@ -314,10 +314,10 @@ def _update_running_machine_fallback(target_name, status_ready, cust_name):
         if is_running_state:
             fb_time, fb_sec = _get_fallback_remaining_time(target_name)
             if fb_time:
-                output = f"{target_name}|Running|Running|{fb_time}|-|-|0|{cust_name}"
+                output = f"{target_name}|Running|Running (Offline)|{fb_time}|-|-|0|{cust_name}"
                 latest_state[target_name] = output
                 broadcast(output)
-                
+
                 if fb_sec <= 0:
                     print(f"[Fallback] Backup timer expired for {target_name} while offline, triggering completion.")
                     try:
@@ -576,15 +576,17 @@ async def lg_polling_loop():
                         else:
                             is_running = run_state not in ("Idle", "-", "", "Ready")
                             if not is_running:
-                                interval = cfg_booking  # Booking state
+                                interval = 15  # Active order but machine idle -> poll every 15s to catch when user presses START!
                             else:
-                                if remain_minutes > 8:
+                                if "Offline" in run_state:
+                                    interval = 15  # Fallback offline mode -> check every 15s to see if machine comes online!
+                                elif remain_minutes > 8:
                                     interval = cfg_run_high  # Running > 8 minutes
                                 elif remain_minutes > 4:
                                     interval = cfg_run_low  # Running 4-8 minutes
                                 else:
                                     interval = cfg_run_high  # Running <= 4 minutes
-                        
+
                         with per_machine_next_poll_lock:
                             per_machine_next_poll[target_name] = current_time + interval
                         print(f"[SmartPoll PAT] Next poll for {target_name} in {interval}s (state={run_state}, remain={remain_time})")
@@ -593,6 +595,8 @@ async def lg_polling_loop():
                         if not _update_running_machine_fallback(target_name, status_ready, cust_name):
                             latest_state[target_name] = f"{target_name}|OFFLINE|-|-|-|-|-"
                             broadcast(latest_state[target_name])
+                        with per_machine_next_poll_lock:
+                            per_machine_next_poll[target_name] = current_time + 15  # Retry offline machine in 15s
                         register_failure()
                 except Exception as ex:
                     print(f"[LG PAT] Error polling {target_name}: {ex}")
@@ -601,6 +605,8 @@ async def lg_polling_loop():
                     if not _update_running_machine_fallback(target_name, status_ready, cust_name):
                         latest_state[target_name] = f"{target_name}|ERROR|-|-|-|-|-"
                         broadcast(latest_state[target_name])
+                    with per_machine_next_poll_lock:
+                        per_machine_next_poll[target_name] = current_time + 15  # Retry offline machine in 15s
             
             loop = asyncio.get_running_loop()
             tasks = [loop.run_in_executor(None, poll_pat_device, d) for d in devices_info]

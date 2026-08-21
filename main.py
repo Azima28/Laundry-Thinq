@@ -92,6 +92,8 @@ def machines_json():
         status_ready = machine_manager.get_machine_status(sensor)
         customer = machine_manager.get_customer_info(sensor)
         
+        is_offline = "offline" in parts[2].lower() or (parts[3] != "--:--" and ":" in parts[3] and len(parts[3]) >= 4 and not parts[3].startswith("0:"))
+
         result[sensor] = {
             "name": m.get("name"),
             "url": url,
@@ -109,6 +111,7 @@ def machines_json():
             "wa_sent": machine_manager.is_wa_completion_sent(sensor),
             "other_machines": machine_manager.get_other_active_machines(sensor),
             "is_last_machine": machine_manager.is_last_machine_for_customer(sensor),
+            "is_offline": is_offline,
         }
     return Response(json.dumps(result, indent=2, ensure_ascii=False), mimetype='application/json')
 

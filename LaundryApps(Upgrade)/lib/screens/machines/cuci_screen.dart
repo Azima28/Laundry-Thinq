@@ -599,6 +599,7 @@ class _CuciContentState extends State<CuciContent> {
 
     Color iconColor;
     Color iconBg;
+    IconData machineIcon = Icons.local_laundry_service_rounded;
     Color border;
     Gradient cardGradient;
     String badgeText;
@@ -617,6 +618,12 @@ class _CuciContentState extends State<CuciContent> {
                             runState != '-' &&
                             runState != 'unknown');
 
+    final bool isOfflineRunning = isRunning && (
+      runState.toLowerCase().contains('offline') ||
+      (entry != null && entry['is_offline'] == true) ||
+      (remain.contains(':') && remain.length >= 4 && !remain.startsWith('0:'))
+    );
+
     if (isError) {
       // ERROR (Red Full Gradient)
       cardGradient = const LinearGradient(
@@ -627,14 +634,33 @@ class _CuciContentState extends State<CuciContent> {
       border = const Color(0xFFFCA5A5);
       iconBg = const Color(0xFFEF4444);
       iconColor = Colors.white;
+      machineIcon = Icons.error_outline_rounded;
       badgeBg = const Color(0xFFDC2626);
       badgeTextColor = Colors.white;
       titleColor = const Color(0xFF7F1D1D);
       subColor = const Color(0xFF991B1B);
       badgeText = "ERROR";
       canClick = true;
+    } else if (isOfflineRunning) {
+      // OFFLINE RUNNING (Amber / Warm Orange Gradient with Cloud Off Icon)
+      cardGradient = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
+      );
+      border = const Color(0xFFFDBA74);
+      iconBg = const Color(0xFFEA580C);
+      iconColor = Colors.white;
+      machineIcon = Icons.cloud_off_rounded;
+      badgeBg = const Color(0xFFC2410C);
+      badgeTextColor = Colors.white;
+      titleColor = const Color(0xFF7C2D12);
+      subColor = const Color(0xFF9A3412);
+      final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
+      badgeText = "OFFLINE$timeText";
+      canClick = true;
     } else if (isRunning) {
-      // RUNNING (Blue Electric Full Gradient)
+      // RUNNING ONLINE (Blue Electric Full Gradient from Real LG Cloud Sensor)
       cardGradient = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
@@ -643,6 +669,7 @@ class _CuciContentState extends State<CuciContent> {
       border = const Color(0xFF93C5FD);
       iconBg = const Color(0xFF2563EB);
       iconColor = Colors.white;
+      machineIcon = Icons.local_laundry_service_rounded;
       badgeBg = const Color(0xFF1D4ED8);
       badgeTextColor = Colors.white;
       titleColor = const Color(0xFF1E3A8A);
@@ -660,6 +687,7 @@ class _CuciContentState extends State<CuciContent> {
       border = const Color(0xFF86EFAC);
       iconBg = const Color(0xFF10B981);
       iconColor = Colors.white;
+      machineIcon = Icons.local_laundry_service_rounded;
       badgeBg = const Color(0xFF059669);
       badgeTextColor = Colors.white;
       titleColor = const Color(0xFF065F46);
@@ -678,6 +706,7 @@ class _CuciContentState extends State<CuciContent> {
         border = const Color(0xFFFDE68A);
         iconBg = const Color(0xFFF59E0B);
         iconColor = Colors.white;
+        machineIcon = Icons.hourglass_top_rounded;
         badgeBg = const Color(0xFFD97706);
         badgeTextColor = Colors.white;
         titleColor = const Color(0xFF78350F);
@@ -696,6 +725,7 @@ class _CuciContentState extends State<CuciContent> {
           border = const Color(0xFF99F6E4);
           iconBg = const Color(0xFF0D9488);
           iconColor = Colors.white;
+          machineIcon = Icons.mark_chat_read_rounded;
           badgeBg = const Color(0xFF0F766E);
           badgeTextColor = Colors.white;
           titleColor = const Color(0xFF134E4A);
@@ -712,6 +742,7 @@ class _CuciContentState extends State<CuciContent> {
           border = const Color(0xFFFDE047);
           iconBg = const Color(0xFFEAB308);
           iconColor = Colors.white;
+          machineIcon = Icons.check_circle_rounded;
           badgeBg = const Color(0xFFA16207);
           badgeTextColor = Colors.white;
           titleColor = const Color(0xFF713F12);
@@ -790,7 +821,7 @@ class _CuciContentState extends State<CuciContent> {
                               ),
                             )
                           : Icon(
-                              Icons.local_laundry_service_rounded,
+                              machineIcon,
                               color: iconColor,
                               size: 22,
                             ),
