@@ -31,6 +31,10 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   // --- Sub-filters for Buku Besar ---
   String _bukuBesarSubTab = 'semua'; // 'semua', 'cuci', 'gosok', 'pengeluaran'
 
+  // --- Sub-filters for Mesin Cuci / Pengering (Orders vs IoT Logs) ---
+  String _cuciViewMode = 'orders'; // 'orders' or 'iot_logs'
+  String _pengeringViewMode = 'orders'; // 'orders' or 'iot_logs'
+
   // --- Sub-filters for Orders / Gosok ---
   String _orderStatusFilter = 'Semua'; // 'Semua', 'Pending', 'Proses', 'Selesai'
   String _orderPaymentFilter = 'Semua'; // 'Semua', 'Lunas', 'Belum Lunas', 'Cicilan'
@@ -50,6 +54,8 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   List<Map<String, dynamic>> _combinedLedgerEntries = [];
 
   List<Order> _allOrders = [];
+  List<Order> _cuciOrders = [];
+  List<Order> _pengeringOrders = [];
   List<Order> _ironOrders = [];
 
   List<Map<String, dynamic>> _washerUsageHistory = [];
@@ -69,6 +75,39 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     _orderSearchCtrl.dispose();
     _machineSearchCtrl.dispose();
     super.dispose();
+  }
+
+  bool _isCuciItem(OrderItem it) {
+    final name = it.itemName.toLowerCase();
+    return name.contains('cuci') ||
+        name.contains('wash') ||
+        name.contains('kiloan') ||
+        name.contains('bedcover') ||
+        name.contains('selimut') ||
+        name.contains('sprei') ||
+        name.contains('karpet') ||
+        name.contains('boneka') ||
+        name.contains('sepatu') ||
+        name.contains('tas') ||
+        name.contains('jas');
+  }
+
+  bool _isPengeringItem(OrderItem it) {
+    final name = it.itemName.toLowerCase();
+    return name.contains('kering') ||
+        name.contains('pengering') ||
+        name.contains('dry') ||
+        name.contains('jemur');
+  }
+
+  bool _isGosokItem(OrderItem it, Set<int?> ironItemIds) {
+    final name = it.itemName.toLowerCase();
+    return ironItemIds.contains(it.itemId) ||
+        name.contains('gosok') ||
+        name.contains('setrika') ||
+        name.contains('iron') ||
+        name.contains('uap') ||
+        name.contains('rapi');
   }
 
   Future<void> _loadAllData() async {
@@ -107,15 +146,24 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       _CategoryData gosok = _CategoryData();
       List<Map<String, dynamic>> laundryList = [];
       List<Map<String, dynamic>> gosokList = [];
+
+      List<Order> cuciOrders = [];
+      List<Order> pengeringOrders = [];
       List<Order> ironOrders = [];
 
       for (var order in orders) {
-        bool isGosok = order.items.isNotEmpty &&
-            order.items.every((item) => ironItemIds.contains(item.itemId));
+        final bool hasCuci = order.items.any((it) => _isCuciItem(it)) ||
+            (!order.items.any((it) => _isGosokItem(it, ironItemIds)) &&
+                !order.items.any((it) => _isPengeringItem(it)));
+        final bool hasPengering = order.items.any((it) => _isPengeringItem(it));
+        final bool hasGosok = order.items.any((it) => _isGosokItem(it, ironItemIds));
 
-        if (isGosok) {
-          ironOrders.add(order);
-        }
+        if (hasCuci) cuciOrders.add(order);
+        if (hasPengering) pengeringOrders.add(order);
+        if (hasGosok) ironOrders.add(order);
+
+        bool isPureGosok = order.items.isNotEmpty &&
+            order.items.every((item) => ironItemIds.contains(item.itemId));
 
         int unpaid = (order.totalAmount - order.paidAmount).clamp(0, order.totalAmount);
 
@@ -129,7 +177,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         Map<String, dynamic> itemData = {
           'id': order.id,
           'title': order.customerName,
-          'category': isGosok ? 'Setrika / Gosok' : 'Cuci & Kering',
+          'category': isPureGosok ? 'Setrika / Gosok' : 'Cuci & Kering',
           'status': paymentStatus,
           'payment_method': order.paymentMethod.toUpperCase(),
           'income_amount': order.paidAmount,
@@ -140,7 +188,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           'items_count': order.items.fold<int>(0, (s, it) => s + it.quantity),
         };
 
-        _CategoryData target = isGosok ? gosok : laundry;
+        _CategoryData target = isPureGosok ? gosok : laundry;
         target.totalPendapatan += order.totalAmount;
         target.totalDiterima += order.paidAmount;
         if (unpaid > 0) {
@@ -156,14 +204,15 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         }
 
         if (order.paidAmount > 0) {
-          if (order.paymentMethod.toLowerCase() == 'cash' || order.paymentMethod.toLowerCase().contains('tunai')) {
+          if (order.paymentMethod.toLowerCase() == 'cash' ||
+              order.paymentMethod.toLowerCase().contains('tunai')) {
             target.totalCash += order.paidAmount;
           } else {
             target.totalQRIS += order.paidAmount;
           }
         }
 
-        if (isGosok) {
+        if (isPureGosok) {
           gosokList.add(itemData);
         } else {
           laundryList.add(itemData);
@@ -183,16 +232,16 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       final dayWasherUsages = allWasherUsages.where((record) {
         final startedAt = DateTime.parse(record['started_at'] as String).toLocal();
         return startedAt.year == _selectedDate.year &&
-               startedAt.month == _selectedDate.month &&
-               startedAt.day == _selectedDate.day;
+            startedAt.month == _selectedDate.month &&
+            startedAt.day == _selectedDate.day;
       }).toList();
 
       final allDryerUsages = await _db.getMachineUsageHistory(type: 'pengering');
       final dayDryerUsages = allDryerUsages.where((record) {
         final startedAt = DateTime.parse(record['started_at'] as String).toLocal();
         return startedAt.year == _selectedDate.year &&
-               startedAt.month == _selectedDate.month &&
-               startedAt.day == _selectedDate.day;
+            startedAt.month == _selectedDate.month &&
+            startedAt.day == _selectedDate.day;
       }).toList();
 
       if (mounted) {
@@ -206,6 +255,8 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           _combinedLedgerEntries = combined;
 
           _allOrders = orders;
+          _cuciOrders = cuciOrders;
+          _pengeringOrders = pengeringOrders;
           _ironOrders = ironOrders;
 
           _washerUsageHistory = dayWasherUsages;
@@ -293,7 +344,10 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                   tileColor: const Color(0xFFF8FAFC),
                   leading: const Icon(Icons.date_range_rounded, color: StyleConstants.secondaryColor),
                   title: const Text('Laporan Mingguan (7 Hari Terakhir)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                  subtitle: Text('${DateFormat('dd MMM').format(_selectedDate.subtract(const Duration(days: 6)))} - ${DateFormat('dd MMM yyyy').format(_selectedDate)}', style: const TextStyle(fontSize: 12)),
+                  subtitle: Text(
+                    '${DateFormat('dd MMM').format(_selectedDate.subtract(const Duration(days: 6)))} - ${DateFormat('dd MMM yyyy').format(_selectedDate)}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                   onTap: () {
                     Navigator.pop(context);
@@ -479,7 +533,12 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                     _mSectionTitle('PENGGUNAAN PER MESIN', color),
                     const SizedBox(height: 10),
                     if (machineCount.isEmpty)
-                      Center(child: Padding(padding: const EdgeInsets.all(20), child: Text('Belum ada data penggunaan mesin pada tanggal ini.', style: TextStyle(color: Colors.grey[500]))))
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Text('Belum ada data penggunaan mesin pada tanggal ini.', style: TextStyle(color: Colors.grey[500])),
+                        ),
+                      )
                     else
                       ...(machineCount.keys.toList()..sort()).map((name) {
                         final total = machineCount[name] ?? 0;
@@ -573,10 +632,10 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   }
 
   Widget _mSectionTitle(String t, Color color) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-    decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
-    child: Text(t, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: color, letterSpacing: 0.5)),
-  );
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
+        child: Text(t, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: color, letterSpacing: 0.5)),
+      );
 
   Widget _mStatusBar(IconData icon, String label, int count, Color color, int total) {
     final pct = total > 0 ? (count / total) : 0.0;
@@ -650,7 +709,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
 
     if (confirmed != true) return;
 
-    // Show loading
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -676,7 +734,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       }
 
       final resp = await http.get(Uri.parse(fullUrl)).timeout(const Duration(seconds: 15));
-      if (mounted) Navigator.pop(context); // Close loading
+      if (mounted) Navigator.pop(context);
 
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         await _db.updateMachineUsageStatus(
@@ -837,15 +895,15 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
               const Text('Daftar Layanan & Item:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
               const SizedBox(height: 6),
               ...order.items.map((item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  children: [
-                    Text('${item.quantity}x ', style: const TextStyle(fontWeight: FontWeight.bold, color: StyleConstants.primaryColor)),
-                    Expanded(child: Text(item.itemName, style: const TextStyle(fontSize: 13))),
-                    Text(formatRp(item.price * item.quantity), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                  ],
-                ),
-              )),
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      children: [
+                        Text('${item.quantity}x ', style: const TextStyle(fontWeight: FontWeight.bold, color: StyleConstants.primaryColor)),
+                        Expanded(child: Text(item.itemName, style: const TextStyle(fontSize: 13))),
+                        Text(formatRp(item.price * item.quantity), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                      ],
+                    ),
+                  )),
               const SizedBox(height: 12),
               const Divider(height: 1),
               const SizedBox(height: 8),
@@ -1000,9 +1058,9 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       const SizedBox(width: 6),
                       _categoryTabButton('order', 'Riwayat Order', Icons.receipt_long_rounded, '${_allOrders.length}'),
                       const SizedBox(width: 6),
-                      _categoryTabButton('cuci', 'Mesin Cuci', Icons.local_laundry_service_rounded, '${_washerUsageHistory.length}'),
+                      _categoryTabButton('cuci', 'Mesin Cuci', Icons.local_laundry_service_rounded, '${_cuciOrders.length}'),
                       const SizedBox(width: 6),
-                      _categoryTabButton('pengering', 'Mesin Pengering', Icons.wb_sunny_rounded, '${_dryerUsageHistory.length}'),
+                      _categoryTabButton('pengering', 'Mesin Pengering', Icons.wb_sunny_rounded, '${_pengeringOrders.length}'),
                       const SizedBox(width: 6),
                       _categoryTabButton('gosok', 'Riwayat Gosok', Icons.iron_rounded, '${_ironOrders.length}'),
                     ],
@@ -1117,13 +1175,13 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       case 'buku_besar':
         return _buildBukuBesarView();
       case 'order':
-        return _buildOrdersView(isIronOnly: false);
+        return _buildOrdersView(title: 'Semua Pesanan', ordersList: _allOrders);
       case 'cuci':
-        return _buildMachineUsageView(isWasher: true);
+        return _buildCuciCombinedView();
       case 'pengering':
-        return _buildMachineUsageView(isWasher: false);
+        return _buildPengeringCombinedView();
       case 'gosok':
-        return _buildOrdersView(isIronOnly: true);
+        return _buildOrdersView(title: 'Riwayat Gosok / Setrika', ordersList: _ironOrders, isIronOnly: true);
       default:
         return _buildBukuBesarView();
     }
@@ -1486,13 +1544,168 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   }
 
   // ==========================================
-  // VIEW 2: RIWAYAT ORDER / GOSOK (TRANSAKSI)
+  // VIEW 2: MESIN CUCI WORKSTATION (ORDERS + IOT LOGS)
   // ==========================================
-  Widget _buildOrdersView({required bool isIronOnly}) {
-    final baseList = isIronOnly ? _ironOrders : _allOrders;
+  Widget _buildCuciCombinedView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Mode Selector: Pesanan Cuci vs Log Sinyal IoT
+        Row(
+          children: [
+            _viewModeButton(
+              title: 'Daftar Pesanan Cuci',
+              count: _cuciOrders.length,
+              icon: Icons.receipt_long_rounded,
+              isActive: _cuciViewMode == 'orders',
+              activeColor: StyleConstants.primaryColor,
+              onTap: () => setState(() => _cuciViewMode = 'orders'),
+            ),
+            const SizedBox(width: 10),
+            _viewModeButton(
+              title: 'Log Aktivasi Mesin IoT',
+              count: _washerUsageHistory.length,
+              icon: Icons.memory_rounded,
+              isActive: _cuciViewMode == 'iot_logs',
+              activeColor: StyleConstants.primaryColor,
+              onTap: () => setState(() => _cuciViewMode = 'iot_logs'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        Expanded(
+          child: _cuciViewMode == 'orders'
+              ? _buildOrdersView(
+                  title: 'Pesanan Layanan Cuci',
+                  ordersList: _cuciOrders,
+                  accentColor: StyleConstants.primaryColor,
+                )
+              : _buildMachineUsageView(isWasher: true),
+        ),
+      ],
+    );
+  }
+
+  // ==========================================
+  // VIEW 3: MESIN PENGERING WORKSTATION
+  // ==========================================
+  Widget _buildPengeringCombinedView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            _viewModeButton(
+              title: 'Daftar Pesanan Pengering',
+              count: _pengeringOrders.length,
+              icon: Icons.receipt_long_rounded,
+              isActive: _pengeringViewMode == 'orders',
+              activeColor: const Color(0xFFF59E0B),
+              onTap: () => setState(() => _pengeringViewMode = 'orders'),
+            ),
+            const SizedBox(width: 10),
+            _viewModeButton(
+              title: 'Log Aktivasi Pengering IoT',
+              count: _dryerUsageHistory.length,
+              icon: Icons.memory_rounded,
+              isActive: _pengeringViewMode == 'iot_logs',
+              activeColor: const Color(0xFFF59E0B),
+              onTap: () => setState(() => _pengeringViewMode = 'iot_logs'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        Expanded(
+          child: _pengeringViewMode == 'orders'
+              ? _buildOrdersView(
+                  title: 'Pesanan Layanan Pengering',
+                  ordersList: _pengeringOrders,
+                  accentColor: const Color(0xFFF59E0B),
+                )
+              : _buildMachineUsageView(isWasher: false),
+        ),
+      ],
+    );
+  }
+
+  Widget _viewModeButton({
+    required String title,
+    required int count,
+    required IconData icon,
+    required bool isActive,
+    required Color activeColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isActive ? StyleConstants.sidebarBackground : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isActive ? StyleConstants.sidebarBackground : StyleConstants.borderLight,
+          ),
+          boxShadow: [
+            if (isActive)
+              BoxShadow(
+                color: const Color(0xFF0F172A).withValues(alpha: 0.12),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: isActive ? StyleConstants.accentCyan : StyleConstants.textMuted),
+            const SizedBox(width: 7),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                color: isActive ? Colors.white : StyleConstants.textBody,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: isActive ? StyleConstants.accentCyan.withValues(alpha: 0.25) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  color: isActive ? StyleConstants.accentCyan : StyleConstants.textMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==========================================
+  // VIEW 4: GENERIC ORDERS VIEW
+  // ==========================================
+  Widget _buildOrdersView({
+    required String title,
+    required List<Order> ordersList,
+    bool isIronOnly = false,
+    Color? accentColor,
+  }) {
+    final color = accentColor ?? (isIronOnly ? const Color(0xFFF97316) : StyleConstants.primaryColor);
     final query = _orderSearchCtrl.text.toLowerCase().trim();
 
-    final filtered = baseList.where((order) {
+    final filtered = ordersList.where((order) {
       final matchesQuery = query.isEmpty ||
           order.customerName.toLowerCase().contains(query) ||
           (order.customerPhone ?? '').contains(query) ||
@@ -1537,10 +1750,10 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           children: [
             Expanded(
               child: _buildFinancialKpiCard(
-                title: isIronOnly ? 'TOTAL PESANAN GOSOK' : 'TOTAL PESANAN LAUNDRY',
+                title: 'TOTAL PESANAN (${title.toUpperCase()})',
                 value: '${filtered.length} Nota',
-                icon: isIronOnly ? Icons.iron_rounded : Icons.receipt_long_rounded,
-                color: isIronOnly ? const Color(0xFFF97316) : StyleConstants.primaryColor,
+                icon: Icons.receipt_long_rounded,
+                color: color,
               ),
             ),
             const SizedBox(width: 10),
@@ -1584,7 +1797,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                   controller: _orderSearchCtrl,
                   style: const TextStyle(fontSize: 12.5),
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search_rounded, size: 18, color: StyleConstants.primaryColor),
+                    prefixIcon: Icon(Icons.search_rounded, size: 18, color: color),
                     hintText: 'Cari nama pelanggan, nomor WhatsApp, nomor nota, atau item...',
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: StyleConstants.borderLight)),
@@ -1620,7 +1833,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         // Data Table
         Expanded(
           child: filtered.isEmpty
-              ? _buildEmptyState('Tidak ada pesanan yang sesuai dengan filter tanggal atau pencarian.')
+              ? _buildEmptyState('Tidak ada pesanan $title yang sesuai dengan filter tanggal atau pencarian.')
               : _buildOrdersTable(filtered),
         ),
       ],
@@ -1853,7 +2066,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   }
 
   // ==========================================
-  // VIEW 3 & 4: LOG MESIN CUCI & PENGERING
+  // VIEW 5: LOG MESIN CUCI & PENGERING (IOT)
   // ==========================================
   Widget _buildMachineUsageView({required bool isWasher}) {
     final baseList = isWasher ? _washerUsageHistory : _dryerUsageHistory;
@@ -1871,8 +2084,11 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     int successCount = 0;
     int failedCount = 0;
     for (var r in filtered) {
-      if (r['status'] == 'Success') successCount++;
-      else if (r['status'] == 'Failed') failedCount++;
+      if (r['status'] == 'Success') {
+        successCount++;
+      } else if (r['status'] == 'Failed') {
+        failedCount++;
+      }
     }
 
     return Column(
@@ -1883,7 +2099,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           children: [
             Expanded(
               child: _buildFinancialKpiCard(
-                title: isWasher ? 'TOTAL SIKLUS CUCI' : 'TOTAL SIKLUS PENGERING',
+                title: isWasher ? 'TOTAL SIKLUS CUCI IOT' : 'TOTAL SIKLUS PENGERING IOT',
                 value: '${filtered.length} Kali Berjalan',
                 icon: icon,
                 color: accentColor,
@@ -1948,7 +2164,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         // Machine Usage Records Table
         Expanded(
           child: filtered.isEmpty
-              ? _buildEmptyState('Belum ada riwayat penggunaan mesin pada tanggal ini.')
+              ? _buildEmptyState('Belum ada riwayat siklus mesin IoT pada tanggal ini.')
               : _buildMachineUsageTable(filtered, accentColor, isWasher),
         ),
       ],
@@ -2119,8 +2335,8 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF1F5F9),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.inbox_rounded, size: 36, color: StyleConstants.textMuted),
