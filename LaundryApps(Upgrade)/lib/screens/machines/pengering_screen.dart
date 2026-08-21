@@ -587,14 +587,16 @@ class _PengeringContentState extends State<PengeringContent> {
                             runState != '-' &&
                             runState != 'unknown');
 
-    final bool isOfflineRunning = isRunning && (
+    final bool isDetecting = runState.toLowerCase() == 'detecting';
+
+    final bool isOfflineRunning = !isDetecting && isRunning && (
       runState.toLowerCase().contains('offline') ||
       (entry != null && entry['is_offline'] == true)
     );
 
     Color iconColor;
     Color iconBg;
-    IconData machineIcon = Icons.wb_sunny_rounded;
+    IconData machineIcon = isDetecting ? Icons.scale_rounded : Icons.wb_sunny_rounded;
     Color border;
     Gradient cardGradient;
     String badgeText;
@@ -649,13 +651,13 @@ class _PengeringContentState extends State<PengeringContent> {
       border = const Color(0xFF93C5FD);
       iconBg = const Color(0xFF2563EB);
       iconColor = Colors.white;
-      machineIcon = Icons.wb_sunny_rounded;
+      machineIcon = isDetecting ? Icons.scale_rounded : Icons.wb_sunny_rounded;
       badgeBg = const Color(0xFF1D4ED8);
       badgeTextColor = Colors.white;
       titleColor = const Color(0xFF1E3A8A);
       subColor = const Color(0xFF1D4ED8);
       final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
-      badgeText = "RUNNING$timeText";
+      badgeText = isDetecting ? "MENIMBANG" : "RUNNING$timeText";
       canClick = true;
     } else if (customerName.isEmpty) {
       // READY (Green Emerald Full Gradient)
