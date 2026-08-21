@@ -620,8 +620,7 @@ class _CuciContentState extends State<CuciContent> {
 
     final bool isOfflineRunning = isRunning && (
       runState.toLowerCase().contains('offline') ||
-      (entry != null && entry['is_offline'] == true) ||
-      (remain.contains(':') && remain.length >= 4 && !remain.startsWith('0:'))
+      (entry != null && entry['is_offline'] == true)
     );
 
     if (isError) {
@@ -870,7 +869,13 @@ class _CuciContentState extends State<CuciContent> {
 
                 // Subtitle/Remain
                 Text(
-                  minutes > 0 ? '$remain ($runState)' : ((runState == 'Idle' || runState == 'Standby' || runState == 'Initial') ? 'Siap Digunakan ($runState)' : runState),
+                  runState == 'Detecting'
+                      ? 'Menimbang Beban (Detecting)...'
+                      : (minutes > 0
+                          ? '$remain ($runState)'
+                          : ((runState == 'Idle' || runState == 'Standby' || runState == 'Initial')
+                              ? 'Siap Digunakan ($runState)'
+                              : runState)),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,

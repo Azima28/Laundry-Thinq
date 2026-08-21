@@ -589,8 +589,7 @@ class _PengeringContentState extends State<PengeringContent> {
 
     final bool isOfflineRunning = isRunning && (
       runState.toLowerCase().contains('offline') ||
-      (entry != null && entry['is_offline'] == true) ||
-      (remain.contains(':') && remain.length >= 4 && !remain.startsWith('0:'))
+      (entry != null && entry['is_offline'] == true)
     );
 
     Color iconColor;
@@ -841,7 +840,13 @@ class _PengeringContentState extends State<PengeringContent> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    minutes > 0 ? '$remain ($runState)' : ((runState == 'Idle' || runState == 'Standby' || runState == 'Initial') ? 'Siap Digunakan ($runState)' : runState),
+                    runState == 'Detecting'
+                        ? 'Menimbang Beban (Detecting)...'
+                        : (minutes > 0
+                            ? '$remain ($runState)'
+                            : ((runState == 'Idle' || runState == 'Standby' || runState == 'Initial')
+                                ? 'Siap Digunakan ($runState)'
+                                : runState)),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,

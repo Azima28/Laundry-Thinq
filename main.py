@@ -92,7 +92,7 @@ def machines_json():
         status_ready = machine_manager.get_machine_status(sensor)
         customer = machine_manager.get_customer_info(sensor)
         
-        is_offline = "offline" in parts[2].lower() or (parts[3] != "--:--" and ":" in parts[3] and len(parts[3]) >= 4 and not parts[3].startswith("0:"))
+        is_offline = "offline" in parts[2].lower() or parts[1].upper() == "OFFLINE"
 
         result[sensor] = {
             "name": m.get("name"),

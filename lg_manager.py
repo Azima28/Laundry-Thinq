@@ -565,7 +565,7 @@ async def lg_polling_loop():
 
                         remain_time = f"{rem_h}:{rem_m:02d}" if (rem_h or rem_m) else "--:--"
                         
-                        if (remain_time == "--:--" or not remain_time) and state == "Running":
+                        if (remain_time == "--:--" or not remain_time) and state == "Running" and run_state != "Detecting":
                             fb_time, fb_sec = _get_fallback_remaining_time(target_name)
                             if fb_time:
                                 remain_time = fb_time
@@ -620,7 +620,9 @@ async def lg_polling_loop():
                         cfg_run_low = int(config.get("interval_running_low", 120))
                         
                         # Calculate and set dynamic interval
-                        if run_state in ("Standby", "Initial") or raw_state_str in ["INITIAL", "INIT"]:
+                        if run_state == "Detecting" or raw_state_str == "DETECTING":
+                            interval = 15  # Active load weighing -> poll every 15s to get calculated wash time immediately!
+                        elif run_state in ("Standby", "Initial") or raw_state_str in ["INITIAL", "INIT"]:
                             interval = 60  # Initial / Standby state -> 1 menit (60 detik)
                         elif status_ready == "ready":
                             interval = cfg_idle  # Idle / Off state -> 300s (5 menit)
