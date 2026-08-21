@@ -982,475 +982,707 @@ class _PengeringContentState extends State<PengeringContent> {
 
     await showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return AlertDialog(
+            return Dialog(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(22),
               ),
-              title: Row(
-                children: [
-                  Icon(
-                    isReplacing
-                        ? Icons.swap_horiz_rounded
-                        : Icons.info_outline_rounded,
-                    color: primaryColor,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    isReplacing ? 'Ganti Pelanggan' : 'Detail Pemantauan',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
+              elevation: 16,
+              backgroundColor: Colors.white,
+              child: Container(
+                width: 580,
+                constraints: const BoxConstraints(maxHeight: 700),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Machine info
-                    Text(
-                      'Mesin: $displayName',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Pelanggan Aktif: $customerName',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Text(
-                          'Status WA: ',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: Color(0xFF475569),
+                    // 1. Desktop Header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 20, 20, 16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isReplacing
+                                  ? primaryColor.withValues(alpha: 0.1)
+                                  : const Color(0xFF10B981).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              isReplacing
+                                  ? Icons.swap_horiz_rounded
+                                  : Icons.tune_rounded,
+                              color: isReplacing ? primaryColor : const Color(0xFF059669),
+                              size: 22,
+                            ),
                           ),
-                        ),
-                        Text(
-                          waSent ? 'Sudah di-WA' : 'Belum di-WA',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: waSent ? const Color(0xFF8B5CF6) : const Color(0xFFF59E0B),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Section 1: Other active machines warning (if any)
-                    if (otherMachines.isNotEmpty) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.amber.shade200),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(
-                                  Icons.info_outline_rounded,
-                                  color: Colors.amber.shade800,
-                                  size: 18,
+                                Text(
+                                  isReplacing
+                                      ? 'Ganti Pelanggan ($displayName)'
+                                      : 'Kelola Mesin: $displayName',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 17,
+                                    color: Color(0xFF0F172A),
+                                    letterSpacing: -0.2,
+                                  ),
                                 ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    '$customerName juga memiliki cucian aktif di:',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                      color: Colors.amber.shade900,
-                                    ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  isReplacing
+                                      ? 'Selesaikan pengeringan aktif & alihkan ke pesanan antrian'
+                                      : 'Selesaikan pengeringan & kirim notifikasi WhatsApp ke pelanggan',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF64748B),
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 6),
-                            ...otherMachines.map(
-                              (m) => Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 24,
-                                  bottom: 2,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                            splashRadius: 18,
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+                    // 2. Scrollable Body Content
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Machine & Active Customer Info Tile
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: primaryColor.withValues(alpha: 0.12),
+                                    child: Text(
+                                      customerName.isNotEmpty ? customerName[0].toUpperCase() : '?',
+                                      style: TextStyle(
+                                        color: primaryColor,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              customerName.isNotEmpty ? customerName : 'Tanpa Pelanggan',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 14.5,
+                                                color: Color(0xFF0F172A),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFE2E8F0),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: const Text(
+                                                'Pelanggan Aktif',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFF475569),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          customerPhone.isNotEmpty ? customerPhone : 'Nomor WA belum tercatat',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: customerPhone.isNotEmpty ? const Color(0xFF059669) : const Color(0xFF94A3B8),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: waSent ? const Color(0xFFEDE9FE) : const Color(0xFFFEF3C7),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: waSent ? const Color(0xFFDDD6FE) : const Color(0xFFFDE68A),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          waSent ? Icons.mark_chat_read_rounded : Icons.schedule_rounded,
+                                          size: 13,
+                                          color: waSent ? const Color(0xFF7C3AED) : const Color(0xFFD97706),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          waSent ? 'Sudah di-WA' : 'Belum di-WA',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            color: waSent ? const Color(0xFF6D28D9) : const Color(0xFFB45309),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // If other active machines exist for this customer
+                            if (otherMachines.isNotEmpty) ...[
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFFBEB),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFFDE68A)),
                                 ),
-                                child: Text(
-                                  '• $m',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.amber.shade900,
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '$customerName juga masih aktif di: ${otherMachines.join(", ")}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                              color: Color(0xFF92400E),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+
+                            // WhatsApp Studio Card (Compact & Modern)
+                            if (customerName.isNotEmpty && customerName != '-' && customerName != 'null') ...[
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: sendWa ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: sendWa ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                                    width: sendWa ? 1.5 : 1.0,
                                   ),
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // Section 2: WhatsApp Notification Options (Always available for active customer)
-                    if (customerName.isNotEmpty && customerName != '-' && customerName != 'null') ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            CheckboxListTile(
-                              title: Text(
-                                'Kirim Notifikasi WA ke $customerName',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: Color(0xFF0F172A),
-                                ),
-                              ),
-                              value: sendWa,
-                              contentPadding: EdgeInsets.zero,
-                              controlAffinity: ListTileControlAffinity.leading,
-                              activeColor: primaryColor,
-                              onChanged: (val) {
-                                setModalState(() {
-                                  sendWa = val ?? false;
-                                });
-                              },
-                            ),
-                            if (sendWa) ...[
-                              const SizedBox(height: 6),
-                              if (customerPhone.isNotEmpty) ...[
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.phone_android_rounded,
-                                        size: 16,
-                                        color: Color(0xFF059669),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Header Toggle Row
+                                    InkWell(
+                                      borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                                      onTap: () => setModalState(() => sendWa = !sendWa),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: sendWa ? const Color(0xFF22C55E) : const Color(0xFFCBD5E1),
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              child: const Icon(Icons.chat_rounded, color: Colors.white, size: 16),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'Kirim WhatsApp Selesai ke $customerName',
+                                                    style: const TextStyle(
+                                                      fontWeight: FontWeight.w800,
+                                                      fontSize: 13.5,
+                                                      color: Color(0xFF0F172A),
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    sendWa ? 'Otomatis kirim pesan konfirmasi cucian selesai' : 'Matikan jika tidak ingin mengirim notifikasi',
+                                                    style: TextStyle(
+                                                      fontSize: 11.5,
+                                                      color: sendWa ? const Color(0xFF15803D) : const Color(0xFF64748B),
+                                                      fontWeight: FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Switch.adaptive(
+                                              value: sendWa,
+                                              activeThumbColor: const Color(0xFF16A34A),
+                                              activeTrackColor: const Color(0xFF86EFAC),
+                                              onChanged: (v) => setModalState(() => sendWa = v),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Nomor WA: $customerPhone',
-                                        style: const TextStyle(
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF065F46),
+                                    ),
+
+                                    if (sendWa) ...[
+                                      const Divider(height: 1, color: Color(0xFFDCFCE7)),
+                                      Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // Manual Phone Input if missing
+                                            if (customerPhone.isEmpty) ...[
+                                              const Text(
+                                                'Nomor WhatsApp belum tercatat. Masukkan nomor:',
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFFD97706),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              TextField(
+                                                controller: activePhoneCtrl,
+                                                keyboardType: TextInputType.phone,
+                                                decoration: InputDecoration(
+                                                  labelText: 'Nomor WhatsApp $customerName',
+                                                  prefixText: '+62 ',
+                                                  prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                  filled: true,
+                                                  fillColor: Colors.white,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                            ],
+
+                                            // Modern Segmented Option Buttons (Template vs Custom)
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: InkWell(
+                                                    onTap: () => setModalState(() => isCustomMessage = false),
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                                                      decoration: BoxDecoration(
+                                                        color: !isCustomMessage ? Colors.white : Colors.transparent,
+                                                        borderRadius: BorderRadius.circular(10),
+                                                        border: Border.all(
+                                                          color: !isCustomMessage ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1),
+                                                          width: !isCustomMessage ? 1.5 : 1.0,
+                                                        ),
+                                                        boxShadow: !isCustomMessage ? [
+                                                          BoxShadow(
+                                                            color: const Color(0xFF16A34A).withValues(alpha: 0.1),
+                                                            blurRadius: 4,
+                                                            offset: const Offset(0, 2),
+                                                          ),
+                                                        ] : null,
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisAlignment: MainAxisAlignment.center,
+                                                        children: [
+                                                          Icon(
+                                                            !isCustomMessage ? Icons.radio_button_checked : Icons.radio_button_off,
+                                                            size: 15,
+                                                            color: !isCustomMessage ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+                                                          ),
+                                                          const SizedBox(width: 6),
+                                                          const Text(
+                                                            'Template Standar',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              fontWeight: FontWeight.w700,
+                                                              color: Color(0xFF0F172A),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: InkWell(
+                                                    onTap: () => setModalState(() => isCustomMessage = true),
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                                                      decoration: BoxDecoration(
+                                                        color: isCustomMessage ? Colors.white : Colors.transparent,
+                                                        borderRadius: BorderRadius.circular(10),
+                                                        border: Border.all(
+                                                          color: isCustomMessage ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1),
+                                                          width: isCustomMessage ? 1.5 : 1.0,
+                                                        ),
+                                                        boxShadow: isCustomMessage ? [
+                                                          BoxShadow(
+                                                            color: const Color(0xFF16A34A).withValues(alpha: 0.1),
+                                                            blurRadius: 4,
+                                                            offset: const Offset(0, 2),
+                                                          ),
+                                                        ] : null,
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisAlignment: MainAxisAlignment.center,
+                                                        children: [
+                                                          Icon(
+                                                            isCustomMessage ? Icons.radio_button_checked : Icons.radio_button_off,
+                                                            size: 15,
+                                                            color: isCustomMessage ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+                                                          ),
+                                                          const SizedBox(width: 6),
+                                                          const Text(
+                                                            'Pesan Sendiri',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              fontWeight: FontWeight.w700,
+                                                              color: Color(0xFF0F172A),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+
+                                            if (isCustomMessage) ...[
+                                              const SizedBox(height: 10),
+                                              TextField(
+                                                controller: msgCtrl,
+                                                maxLines: 2,
+                                                style: const TextStyle(fontSize: 12.5),
+                                                decoration: InputDecoration(
+                                                  hintText: 'Tulis pesan WhatsApp custom di sini...',
+                                                  border: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                                  ),
+                                                  filled: true,
+                                                  fillColor: Colors.white,
+                                                  contentPadding: const EdgeInsets.all(12),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
                                         ),
                                       ),
                                     ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+
+                            // If Replacing with New Customer
+                            if (isReplacing) ...[
+                              Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: primaryColor.withValues(alpha: 0.25),
+                                    width: 1.2,
                                   ),
                                 ),
-                              ] else ...[
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 8.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.arrow_forward_rounded, size: 16, color: primaryColor),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Alihkan Mesin ke Pelanggan Baru:',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            color: primaryColor,
+                                            fontSize: 12.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 16,
+                                          backgroundColor: primaryColor,
+                                          child: Text(
+                                            newOrder.customerName.isNotEmpty ? newOrder.customerName[0].toUpperCase() : '?',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                newOrder.customerName,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w900,
+                                                  fontSize: 14.5,
+                                                  color: Color(0xFF0F172A),
+                                                ),
+                                              ),
+                                              Text(
+                                                'Nota #${newOrder.id} • ${newOrder.customerPhone ?? "Belum ada No. WA"}',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: Color(0xFF64748B),
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (needsPhoneInput) ...[
+                                      const SizedBox(height: 12),
                                       const Text(
-                                        'Nomor WA belum terdaftar, masukkan nomor:',
+                                        'Pelanggan baru belum memiliki nomor WA. Masukkan nomor:',
                                         style: TextStyle(
                                           fontSize: 11.5,
                                           fontWeight: FontWeight.bold,
-                                          color: Color(0xFFD97706),
+                                          color: Color(0xFF64748B),
                                         ),
                                       ),
                                       const SizedBox(height: 6),
                                       TextField(
-                                        controller: activePhoneCtrl,
+                                        controller: newPhoneCtrl,
                                         keyboardType: TextInputType.phone,
                                         decoration: InputDecoration(
-                                          labelText: 'Nomor WA $customerName',
+                                          labelText: 'Nomor WhatsApp Baru',
                                           prefixText: '+62 ',
-                                          prefixStyle: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black,
-                                          ),
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          contentPadding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 10,
-                                          ),
+                                          prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                          filled: true,
+                                          fillColor: Colors.white,
                                         ),
                                       ),
                                     ],
-                                  ),
+                                  ],
                                 ),
-                              ],
-                              RadioListTile<bool>(
-                                title: const Text(
-                                  'Gunakan template cucian selesai',
-                                  style: TextStyle(fontSize: 12.5),
-                                ),
-                                value: false,
-                                groupValue: isCustomMessage,
-                                contentPadding: EdgeInsets.zero,
-                                activeColor: primaryColor,
-                                onChanged: (val) {
-                                  setModalState(() {
-                                    isCustomMessage = val ?? false;
-                                  });
-                                },
                               ),
-                              RadioListTile<bool>(
-                                title: const Text(
-                                  'Ketik pesan sendiri',
-                                  style: TextStyle(fontSize: 12.5),
-                                ),
-                                value: true,
-                                groupValue: isCustomMessage,
-                                contentPadding: EdgeInsets.zero,
-                                activeColor: primaryColor,
-                                onChanged: (val) {
-                                  setModalState(() {
-                                    isCustomMessage = val ?? true;
-                                  });
-                                },
-                              ),
-                              if (isCustomMessage) ...[
-                                const SizedBox(height: 4),
-                                TextField(
-                                  controller: msgCtrl,
-                                  maxLines: 2,
-                                  decoration: InputDecoration(
-                                    hintText: 'Tulis pesan WhatsApp custom di sini...',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    contentPadding: const EdgeInsets.all(12),
-                                  ),
-                                ),
-                              ],
                             ],
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-                    ],
+                    ),
 
-                    // Section 3: New Customer info (only if isReplacing)
-                    if (isReplacing) ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: primaryColor.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: primaryColor.withValues(alpha: 0.2),
+                    // 3. Desktop Footer Action Bar
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
+                      child: Row(
+                        children: [
+                          OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF64748B),
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'Batal',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                            ),
                           ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Ganti ke Pelanggan Baru:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: primaryColor,
-                                fontSize: 13,
+                          const Spacer(),
+                          ElevatedButton(
+                            onPressed: () async {
+                              Navigator.pop(ctx); // Close dialog
+
+                              final service = MachineStatusService.instance;
+                              final int machineId = machine.id ?? 0;
+                              service.setActivating(machineId, true);
+
+                              try {
+                                String? customMsg =
+                                    isCustomMessage && msgCtrl.text.isNotEmpty
+                                    ? msgCtrl.text
+                                    : null;
+
+                                // If active customer phone was typed manually in dialog, save/use it
+                                if (sendWa && customerPhone.isEmpty && activePhoneCtrl.text.trim().isNotEmpty) {
+                                  customerPhone = '+62${activePhoneCtrl.text.trim()}';
+                                }
+
+                                if (isReplacing) {
+                                  String finalPhone = newOrder.customerPhone ?? '';
+                                  if (needsPhoneInput) {
+                                    finalPhone = '+62${newPhoneCtrl.text.trim()}';
+                                    // Update order in SQLite database
+                                    final db = await _db.database;
+                                    await db.rawUpdate(
+                                      'UPDATE orders SET customer_phone = ? WHERE id = ?',
+                                      [finalPhone, newOrder.id],
+                                    );
+                                    // Update active order item in local memory state
+                                    final updatedOrder = newOrder.copyWith(
+                                      customerPhone: finalPhone,
+                                    );
+                                    _selectedOrderItem!['order'] = updatedOrder;
+                                  }
+
+                                  // Complete local SQLite state trigger immediately
+                                  await _handleSuccessfulStart(
+                                    _selectedOrderItem!['order'] as Order,
+                                    machineId,
+                                    machine,
+                                  );
+                                  Globals.showSuccessSnackBar(
+                                    'Mesin pengering ${machine.name} berhasil diganti ke ${newOrder.customerName}!',
+                                  );
+                                  setState(() {
+                                    _selectedOrderItem = null;
+                                  });
+
+                                  // Call replaceCustomer in background
+                                  service.replaceCustomer(
+                                    entityId: machine.name,
+                                    newCustomerName: newOrder.customerName,
+                                    newCustomerPhone: finalPhone,
+                                    sendWaToPrevious: sendWa,
+                                    waMessage: customMsg,
+                                  ).then((res) {
+                                    if (res['success'] != true) {
+                                      Globals.showErrorSnackBar('Info IoT: ${res['error']}');
+                                    }
+                                  }).catchError((e) {
+                                    Globals.showErrorSnackBar('Koneksi IoT error: $e');
+                                  }).whenComplete(() {
+                                    service.setActivating(machineId, false);
+                                    if (mounted) setState(() {});
+                                  });
+                                } else {
+                                  // Just finish the monitoring (Selesaikan) immediately
+                                  Globals.showSuccessSnackBar(
+                                    'Mesin pengering ${machine.name} berhasil diselesaikan!',
+                                  );
+
+                                  service.finishAndNotify(
+                                    entityId: machine.name,
+                                    sendWa: sendWa,
+                                    waMessage: customMsg,
+                                  ).then((res) {
+                                    if (res['success'] != true) {
+                                      Globals.showErrorSnackBar('Info IoT: ${res['error']}');
+                                    }
+                                  }).catchError((e) {
+                                    Globals.showErrorSnackBar('Koneksi IoT error: $e');
+                                  }).whenComplete(() {
+                                    service.setActivating(machineId, false);
+                                    if (mounted) setState(() {});
+                                  });
+                                }
+                              } catch (e) {
+                                Globals.showErrorSnackBar('Error: $e');
+                                service.setActivating(machineId, false);
+                                if (mounted) setState(() {});
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isReplacing
+                                  ? primaryColor
+                                  : (sendWa ? const Color(0xFF059669) : primaryColor),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
+                              elevation: 2,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              newOrder.customerName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isReplacing
+                                      ? Icons.swap_horiz_rounded
+                                      : (sendWa ? Icons.send_rounded : Icons.check_circle_rounded),
+                                  size: 17,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isReplacing
+                                      ? (sendWa ? 'Ganti & Kirim WA' : 'Ganti Pelanggan')
+                                      : (sendWa ? 'Selesaikan & Kirim WA' : 'Selesaikan Mesin'),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13.5,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      if (needsPhoneInput) ...[
-                        const Text(
-                          'Pelanggan baru belum memiliki nomor WA. Masukkan nomor:',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: newPhoneCtrl,
-                          keyboardType: TextInputType.phone,
-                          decoration: InputDecoration(
-                            labelText: 'Nomor WA Baru',
-                            prefixText: '+62 ',
-                            prefixStyle: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                    ],
+                    ),
                   ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text(
-                    'Batal',
-                    style: TextStyle(color: Color(0xFF64748B)),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(ctx); // Close dialog
-
-                    final service = MachineStatusService.instance;
-                    final int machineId = machine.id ?? 0;
-                    service.setActivating(machineId, true);
-
-                    try {
-                      String? customMsg =
-                          isCustomMessage && msgCtrl.text.isNotEmpty
-                          ? msgCtrl.text
-                          : null;
-
-                      // If active customer phone was typed manually in dialog, save/use it
-                      if (sendWa && customerPhone.isEmpty && activePhoneCtrl.text.trim().isNotEmpty) {
-                        customerPhone = '+62${activePhoneCtrl.text.trim()}';
-                      }
-
-                      if (isReplacing) {
-                        String finalPhone = newOrder.customerPhone ?? '';
-                        if (needsPhoneInput) {
-                          finalPhone = '+62${newPhoneCtrl.text.trim()}';
-                          // Update order in SQLite database
-                          final db = await _db.database;
-                          await db.rawUpdate(
-                            'UPDATE orders SET customer_phone = ? WHERE id = ?',
-                            [finalPhone, newOrder.id],
-                          );
-                          // Update active order item in local memory state
-                          final updatedOrder = newOrder.copyWith(
-                            customerPhone: finalPhone,
-                          );
-                          _selectedOrderItem!['order'] = updatedOrder;
-                        }
-
-                        // Complete local SQLite state trigger immediately
-                        await _handleSuccessfulStart(
-                          _selectedOrderItem!['order'] as Order,
-                          machineId,
-                          machine,
-                        );
-                        Globals.showSuccessSnackBar(
-                          'Mesin pengering ${machine.name} berhasil diganti ke ${newOrder.customerName}!',
-                        );
-                        setState(() {
-                          _selectedOrderItem = null;
-                        });
-
-                        // Call replaceCustomer in background
-                        service.replaceCustomer(
-                          entityId: machine.name,
-                          newCustomerName: newOrder.customerName,
-                          newCustomerPhone: finalPhone,
-                          sendWaToPrevious: sendWa,
-                          waMessage: customMsg,
-                        ).then((res) {
-                          if (res['success'] != true) {
-                            Globals.showErrorSnackBar('Info IoT: ${res['error']}');
-                          }
-                        }).catchError((e) {
-                          Globals.showErrorSnackBar('Koneksi IoT error: $e');
-                        }).whenComplete(() {
-                          service.setActivating(machineId, false);
-                          if (mounted) setState(() {});
-                        });
-                      } else {
-                        // Just finish the monitoring (Selesaikan) immediately
-                        Globals.showSuccessSnackBar(
-                          'Mesin pengering ${machine.name} berhasil diselesaikan!',
-                        );
-
-                        service.finishAndNotify(
-                          entityId: machine.name,
-                          sendWa: sendWa,
-                          waMessage: customMsg,
-                        ).then((res) {
-                          if (res['success'] != true) {
-                            Globals.showErrorSnackBar('Info IoT: ${res['error']}');
-                          }
-                        }).catchError((e) {
-                          Globals.showErrorSnackBar('Koneksi IoT error: $e');
-                        }).whenComplete(() {
-                          service.setActivating(machineId, false);
-                          if (mounted) setState(() {});
-                        });
-                      }
-                    } catch (e) {
-                      Globals.showErrorSnackBar('Error: $e');
-                      service.setActivating(machineId, false);
-                      if (mounted) setState(() {});
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isReplacing
-                        ? StyleConstants.primaryColor
-                        : (sendWa ? StyleConstants.successColor : StyleConstants.primaryColor),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isReplacing
-                            ? Icons.swap_horiz_rounded
-                            : (sendWa ? Icons.send_rounded : Icons.check_circle_rounded),
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isReplacing
-                            ? (sendWa ? 'Ganti & Kirim WA' : 'Ganti Pelanggan')
-                            : (sendWa ? 'Selesaikan & Kirim WA' : 'Selesaikan Mesin'),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             );
           },
         );
