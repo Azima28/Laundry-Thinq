@@ -324,28 +324,11 @@ async function initializeClient() {
     }
 }
 
-// QR Code event - store for API (do not print ASCII QR to debug logs)
+// QR Code event - store for API and keep waiting for scan from either Settings screen or Web window
 client.on('qr', (qr) => {
     currentQR = qr;
     isInitializing = false;
-    console.log('[WA] New QR code generated. Waiting for scan...');
-    
-    // Stop QR generation and close Puppeteer if settings menu hasn't been opened recently (last 15s)
-    const now = Date.now();
-    if (now - lastRequestTime > 15000) {
-        console.log('[WA] Settings menu is not open. Stopping client to save resources...');
-        isReady = false;
-        isInitializing = false;
-        currentQR = null;
-        isDestroying = true;
-        client.destroy().then(() => {
-            isDestroying = false;
-            console.log('[WA] Client stopped and resources released.');
-        }).catch((err) => {
-            isDestroying = false;
-            console.error('[WA] Error while stopping client:', err.message);
-        });
-    }
+    console.log('[WA] New QR code generated. Siap dipindai dari layar Pengaturan maupun jendela Web.');
 });
 
 // Ready event
