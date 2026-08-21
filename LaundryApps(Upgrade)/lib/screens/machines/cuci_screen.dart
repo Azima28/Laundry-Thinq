@@ -376,27 +376,29 @@ class _CuciContentState extends State<CuciContent> {
     );
     final bool isFailed = MachineStatusService.instance.isOrderFailed(orderKey);
 
-    Color borderCol = isSelected ? primaryColor : Colors.grey[200]!;
-    Color bgCol = isSelected ? primaryColor.withValues(alpha: 0.04) : Colors.white;
+    Color borderCol = isSelected ? primaryColor : const Color(0xFFCBD5E1);
+    Color bgCol = isSelected ? const Color(0xFFEFF6FF) : Colors.white;
 
     if (isProcessing) {
-      bgCol = Colors.yellow.shade50;
-      borderCol = Colors.yellow.shade400;
+      bgCol = const Color(0xFFFEFCE8);
+      borderCol = const Color(0xFFFACC15);
     } else if (isFailed) {
-      bgCol = Colors.red.shade50;
-      borderCol = Colors.red.shade400;
+      bgCol = const Color(0xFFFEF2F2);
+      borderCol = const Color(0xFFF87171);
     }
 
     return Container(
       decoration: BoxDecoration(
         color: bgCol,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderCol, width: isSelected ? 2 : 1),
+        border: Border.all(color: borderCol, width: isSelected ? 2 : 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: isSelected
+                ? primaryColor.withValues(alpha: 0.15)
+                : const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: isSelected ? 10 : 6,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -422,14 +424,14 @@ class _CuciContentState extends State<CuciContent> {
                       radius: 16,
                       backgroundColor: isSelected
                           ? primaryColor
-                          : Colors.grey[100],
+                          : const Color(0xFFF1F5F9),
                       child: Text(
                         order.customerName.isNotEmpty
                             ? order.customerName[0].toUpperCase()
                             : '?',
                         style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.grey[700],
-                          fontWeight: FontWeight.bold,
+                          color: isSelected ? Colors.white : primaryColor,
+                          fontWeight: FontWeight.w900,
                           fontSize: 14,
                         ),
                       ),
@@ -442,8 +444,8 @@ class _CuciContentState extends State<CuciContent> {
                           Text(
                             order.customerName,
                             style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14.5,
                               color: Color(0xFF0F172A),
                             ),
                             maxLines: 1,
@@ -452,9 +454,10 @@ class _CuciContentState extends State<CuciContent> {
                           const SizedBox(height: 2),
                           Text(
                             'Nota #${order.id}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[500],
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF475569),
                             ),
                           ),
                         ],
@@ -462,22 +465,30 @@ class _CuciContentState extends State<CuciContent> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Text(
                   order.items
                       .map((e) => "${e.itemName} x${e.quantity}")
                       .join(', '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF334155),
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       _formatDateTime(date),
-                      style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
                     ),
                     if (isProcessing)
                       const SizedBox(
@@ -490,8 +501,8 @@ class _CuciContentState extends State<CuciContent> {
                         isSelected
                             ? Icons.check_circle_rounded
                             : Icons.arrow_forward_rounded,
-                        size: 16,
-                        color: isSelected ? primaryColor : Colors.grey[400],
+                        size: 18,
+                        color: isSelected ? primaryColor : const Color(0xFF94A3B8),
                       ),
                   ],
                 ),
@@ -573,7 +584,6 @@ class _CuciContentState extends State<CuciContent> {
     String machineStatus = 'ready';
     String remain = '';
     String customerName = '';
-    String customerPhone = '';
 
     if (entry != null) {
       state = (entry['state'] ?? 'Ready').toString().toUpperCase();
@@ -581,13 +591,11 @@ class _CuciContentState extends State<CuciContent> {
       machineStatus = (entry['status'] ?? 'ready').toString().toLowerCase();
       remain = (entry['remain_time'] ?? '').toString();
       customerName = (entry['customer_name'] ?? '').toString();
-      customerPhone = (entry['customer_phone'] ?? '').toString();
     }
 
     final int minutes = _parseRemainMinutes(remain);
     final bool waSent = entry != null && entry['wa_sent'] == true;
     final bool isError = state == 'ERROR' || state == 'OFFLINE';
-    final bool isManual = entry != null && entry['is_manual'] == true;
 
     Color iconColor;
     Color iconBg;
@@ -641,7 +649,7 @@ class _CuciContentState extends State<CuciContent> {
       subColor = const Color(0xFF1D4ED8);
       final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
       badgeText = "RUNNING$timeText";
-      canClick = !service.thinqOk || isManual;
+      canClick = true;
     } else if (customerName.isEmpty) {
       // READY (Green Emerald Full Gradient)
       cardGradient = const LinearGradient(
@@ -657,7 +665,7 @@ class _CuciContentState extends State<CuciContent> {
       titleColor = const Color(0xFF065F46);
       subColor = const Color(0xFF047857);
       badgeText = "READY";
-      canClick = _selectedOrderItem != null;
+      canClick = true;
     } else {
       // We have a customer name but not running
       if (machineStatus == 'unready') {
@@ -676,7 +684,7 @@ class _CuciContentState extends State<CuciContent> {
         subColor = const Color(0xFFB45309);
         final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
         badgeText = "BOOKING$timeText";
-        canClick = !service.thinqOk || isManual;
+        canClick = true;
       } else {
         if (waSent) {
           // WA TERKIRIM (Teal/Cyan Full Gradient)
