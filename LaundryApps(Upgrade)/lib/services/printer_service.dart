@@ -40,46 +40,47 @@ class ReceiptLayoutConfig {
 
   factory ReceiptLayoutConfig.forWidth(int widthMm) {
     if (widthMm == 76) {
-      // Specialized Optimal Settings for Epson TM-U220D (76mm Impact Dot Matrix)
+      // Epson TM-U220D: Paper Roll is 76mm, but Physical Print Head span is 63.5mm (180 pt)!
+      // Using 63.5mm page width with 1.8mm margin ensures zero clipping on left & right margins.
       return const ReceiptLayoutConfig(
-        pageWidthMm: 76.0,
-        marginMm: 3.5,
-        headerTitleSize: 13.5,
-        headerSubSize: 9.5,
-        sectionTitleSize: 10.8,
-        bodyTextSize: 9.8,
-        smallTextSize: 8.8,
-        totalTextSize: 12.5,
-        dividerThickness: 1.0,
-        spacing: 3.5,
-      );
-    } else if (widthMm == 80) {
-      // 80mm Wide Thermal (Epson TM-T82, POS-80)
-      return const ReceiptLayoutConfig(
-        pageWidthMm: 80.0,
-        marginMm: 4.0,
-        headerTitleSize: 14.0,
-        headerSubSize: 10.0,
-        sectionTitleSize: 11.5,
-        bodyTextSize: 10.5,
-        smallTextSize: 9.0,
-        totalTextSize: 13.0,
-        dividerThickness: 1.0,
-        spacing: 4.0,
-      );
-    } else {
-      // 58mm Standard Thermal (POS-58)
-      return const ReceiptLayoutConfig(
-        pageWidthMm: 58.0,
-        marginMm: 2.0,
-        headerTitleSize: 11.0,
+        pageWidthMm: 63.5,
+        marginMm: 1.8,
+        headerTitleSize: 12.0,
         headerSubSize: 8.5,
         sectionTitleSize: 9.5,
-        bodyTextSize: 8.5,
-        smallTextSize: 7.5,
-        totalTextSize: 10.5,
+        bodyTextSize: 9.0,
+        smallTextSize: 8.0,
+        totalTextSize: 11.0,
         dividerThickness: 0.8,
         spacing: 2.5,
+      );
+    } else if (widthMm == 80) {
+      // 80mm Wide Thermal: Paper Roll 80mm, Printable span 72.0mm
+      return const ReceiptLayoutConfig(
+        pageWidthMm: 72.0,
+        marginMm: 2.5,
+        headerTitleSize: 13.0,
+        headerSubSize: 9.0,
+        sectionTitleSize: 10.5,
+        bodyTextSize: 9.5,
+        smallTextSize: 8.5,
+        totalTextSize: 12.0,
+        dividerThickness: 0.8,
+        spacing: 3.0,
+      );
+    } else {
+      // 58mm Standard Thermal: Paper Roll 58mm, Printable span 48.0mm
+      return const ReceiptLayoutConfig(
+        pageWidthMm: 48.0,
+        marginMm: 1.2,
+        headerTitleSize: 10.0,
+        headerSubSize: 7.8,
+        sectionTitleSize: 8.5,
+        bodyTextSize: 8.0,
+        smallTextSize: 7.0,
+        totalTextSize: 9.5,
+        dividerThickness: 0.7,
+        spacing: 2.0,
       );
     }
   }
