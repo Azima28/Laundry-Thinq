@@ -1,10 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../../database/models/database_helper.dart';
 import '../../database/models/order_model.dart';
 import '../../database/models/db_encryption_helper.dart';
+import '../../services/machine_status_service.dart';
 import '../../transactions/order_repository.dart';
 import '../../utils/style_constants.dart';
-import 'dart:async';
 
 class HubungiPelangganScreen extends StatefulWidget {
   const HubungiPelangganScreen({Key? key}) : super(key: key);
@@ -145,7 +148,7 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
 
     return showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Edit Nomor Telepon'),
         content: Form(
@@ -166,7 +169,7 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogCtx),
             child: const Text('Batal', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
@@ -175,14 +178,14 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
               if (formKey.currentState!.validate()) {
                 final phone = controller.text.trim();
                 final db = await _db.database;
-                
+
                 await db.update(
                   'orders',
                   {'customer_phone': phone},
                   where: 'id = ?',
                   whereArgs: [order.id],
                 );
-                
+
                 await db.update(
                   'customers',
                   {'phone': phone},
@@ -190,11 +193,13 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
                   whereArgs: [order.customerName],
                 );
 
-                Navigator.pop(context);
+                if (dialogCtx.mounted) Navigator.pop(dialogCtx);
                 _loadReadyOrders();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Nomor WhatsApp berhasil diubah.'), backgroundColor: Colors.green),
-                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Nomor WhatsApp berhasil diubah.'), backgroundColor: Colors.green),
+                  );
+                }
               }
             },
             child: const Text('Simpan'),
@@ -204,41 +209,286 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
     );
   }
 
+  Future<bool> _sendWhatsAppMessageOnline({
+    required String phone,
+    required String message,
+  }) async {
+    String cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '62${cleanPhone.substring(1)}';
+    } else if (!cleanPhone.startsWith('62')) {
+      cleanPhone = '62$cleanPhone';
+    }
+
+    bool sentOnline = false;
+
+    try {
+      final base = MachineStatusService.instance.dashboardUrl;
+      final cleanBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+      final uri = Uri.parse('$cleanBase/api/wa/send-custom');
+
+      final resp = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'phone': cleanPhone,
+          'message': message,
+        }),
+      ).timeout(const Duration(seconds: 8));
+
+      if (resp.statusCode == 200) {
+        final data = json.decode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+        if (data['success'] == true) {
+          sentOnline = true;
+        }
+      }
+    } catch (_) {}
+
+    if (!sentOnline) {
+      try {
+        final db = await _db.database;
+        await db.insert('wa_outbox', {
+          'phone': DbEncryptionHelper.encrypt(cleanPhone),
+          'message': DbEncryptionHelper.encrypt(message),
+          'status': 'pending',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('[HubungiPelanggan] Gagal menyimpan ke wa_outbox: $e');
+      }
+    }
+
+    return sentOnline;
+  }
+
   Future<void> _notifyCustomer(Order order) async {
     if (order.customerPhone == null || order.customerPhone!.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nomor WhatsApp pelanggan belum diatur.'), backgroundColor: Colors.orange),
+        SnackBar(
+          content: const Text('Nomor WhatsApp pelanggan belum diatur. Silakan klik ikon pensil untuk mengisi nomor.'),
+          backgroundColor: Colors.orange,
+          action: SnackBarAction(
+            label: 'Isi Nomor',
+            textColor: Colors.white,
+            onPressed: () => _editPhoneNumber(order),
+          ),
+        ),
       );
       return;
     }
 
-    final String message = "Halo Kak ${order.customerName},\n\nPesanan Laundry Anda dengan Nota #${order.id} telah *SELESAI* dan siap untuk diambil/diantarkan.\n\nTerima kasih banyak telah mencuci di Smart Laundry!";
+    final defaultMessage = "Halo Kak ${order.customerName},\n\nPesanan Laundry Anda dengan Nota #${order.id} telah *SELESAI* dan siap untuk diambil/diantarkan.\n\nTerima kasih banyak telah mencuci di Smart Laundry!";
+    final msgCtrl = TextEditingController(text: defaultMessage);
+    bool isProcessing = false;
 
-    // Save to wa_outbox queue in python database or directly open link
-    final db = await _db.database;
-    await db.insert('wa_outbox', {
-      'phone': order.customerPhone != null ? DbEncryptionHelper.encrypt(order.customerPhone!) : '',
-      'message': DbEncryptionHelper.encrypt(message),
-      'status': 'pending',
-      'created_at': DateTime.now().toIso8601String(),
-    });
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (_, setModalState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.mark_chat_read_rounded, color: Color(0xFF10B981), size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Kirim Notifikasi Nota #${order.id}',
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Penerima: ${order.customerName} • ${order.customerPhone}',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 540,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Order Items Mini Summary
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.receipt_long_rounded, size: 18, color: Color(0xFF64748B)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Item: ${order.items.map((it) => "${it.quantity}x ${it.itemName}").join(", ")}',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Notifikasi masuk antrean WhatsApp Outbox.'), backgroundColor: Colors.green),
+                  const Text(
+                    'Isi Pesan WhatsApp',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF334155)),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: msgCtrl,
+                    maxLines: 4,
+                    style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF1E293B)),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isProcessing ? null : () => Navigator.pop(dialogCtx),
+              child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+            ),
+            // Action 1: Kirim WA Saja
+            OutlinedButton.icon(
+              onPressed: isProcessing
+                  ? null
+                  : () async {
+                      setModalState(() => isProcessing = true);
+                      final sent = await _sendWhatsAppMessageOnline(
+                        phone: order.customerPhone!,
+                        message: msgCtrl.text.trim(),
+                      );
+                      if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(sent
+                                ? 'Pesan WhatsApp berhasil dikirim ke ${order.customerName}!'
+                                : 'Pesan tersimpan di antrean WhatsApp Outbox.'),
+                            backgroundColor: sent ? const Color(0xFF10B981) : const Color(0xFF0284C7),
+                          ),
+                        );
+                      }
+                    },
+              icon: const Icon(Icons.send_rounded, size: 16),
+              label: const Text('Kirim WA Saja', style: TextStyle(fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: primaryColor,
+                side: BorderSide(color: primaryColor, width: 1.5),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            // Action 2: Kirim WA & Selesai Sekaligus
+            ElevatedButton.icon(
+              onPressed: isProcessing
+                  ? null
+                  : () async {
+                      setModalState(() => isProcessing = true);
+                      await _sendWhatsAppMessageOnline(
+                        phone: order.customerPhone!,
+                        message: msgCtrl.text.trim(),
+                      );
+                      await _orderRepo.updateOrderStatus(order.id!, 'completed');
+                      if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+                      _loadReadyOrders();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Pesan WA terkirim & Nota #${order.id} (${order.customerName}) selesai!'),
+                            backgroundColor: const Color(0xFF10B981),
+                          ),
+                        );
+                      }
+                    },
+              icon: const Icon(Icons.done_all_rounded, size: 18, color: Colors.white),
+              label: const Text('Kirim WA & Selesai', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Future<void> _markOrderCompleted(Order order) async {
-    final success = await _orderRepo.updateOrderStatus(order.id!, 'completed');
-    if (success) {
-      _loadReadyOrders();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pesanan berhasil diselesaikan.'), backgroundColor: Colors.green),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal memperbarui status pesanan.')),
-      );
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF2563EB), size: 24),
+            const SizedBox(width: 10),
+            Text('Selesaikan Nota #${order.id}?', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          ],
+        ),
+        content: Text('Tandai pesanan ${order.customerName} sebagai Selesai? Nota ini akan diarsipkan dari daftar antrean siap ambil.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.done_rounded, size: 16, color: Colors.white),
+            label: const Text('Ya, Selesaikan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final success = await _orderRepo.updateOrderStatus(order.id!, 'completed');
+      if (success) {
+        _loadReadyOrders();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Nota #${order.id} (${order.customerName}) berhasil diselesaikan!'), backgroundColor: Colors.green),
+          );
+        }
+      }
     }
   }
 
