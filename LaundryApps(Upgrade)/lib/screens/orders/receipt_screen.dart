@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/models/order_model.dart';
+import '../../database/models/database_helper.dart';
 import '../../transactions/transaction_repository.dart';
 import '../../services/printer_service.dart';
 import '../../services/machine_status_service.dart';
@@ -38,6 +39,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   String _bizAddress = 'Layanan Cuci & Setrika Profesional';
   String _bizPhone = '';
   TextEditingController _phoneCtrl = TextEditingController();
+  List<Map<String, dynamic>> _orderUsages = [];
 
   @override
   void initState() {
@@ -47,6 +49,24 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     );
     _loadBizProfile();
     _calculateDuration();
+    _loadOrderUsages();
+  }
+
+  Future<void> _loadOrderUsages() async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final usages = await db.query(
+        'machine_usage_history',
+        where: 'order_id = ?',
+        whereArgs: [widget.order.id],
+        orderBy: 'started_at ASC',
+      );
+      if (mounted) {
+        setState(() {
+          _orderUsages = usages;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -452,6 +472,34 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                 _buildReceiptRow('Metode Pembayaran', widget.paymentMethod.toUpperCase()),
                 if (_maxDuration > 0)
                   _buildReceiptRow('Estimasi Selesai', '$_maxDuration Hari Kerja'),
+                if (_orderUsages.isNotEmpty) ...[
+                  if (_orderUsages.length == 1) ...[
+                    _buildReceiptRow(
+                      'Mesin Digunakan',
+                      '${_orderUsages.first['machine_name']} (${DateFormat('HH:mm').format(DateTime.parse(_orderUsages.first['started_at'] as String).toLocal())})',
+                      isBold: true,
+                    ),
+                  ] else ...[
+                    _buildReceiptRow('Alokasi Mesin', '${_orderUsages.length} Siklus Terdata', isBold: true),
+                    for (int i = 0; i < _orderUsages.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6, bottom: 2),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '• Siklus #${i + 1}: ${_orderUsages[i]['machine_name']}',
+                              style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
+                            ),
+                            Text(
+                              DateFormat('HH:mm').format(DateTime.parse(_orderUsages[i]['started_at'] as String).toLocal()),
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ],
 
                 const SizedBox(height: 12),
                 const Divider(height: 1, color: Color(0xFFE2E8F0), thickness: 1.2),

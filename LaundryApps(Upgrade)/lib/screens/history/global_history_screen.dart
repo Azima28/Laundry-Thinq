@@ -14,7 +14,12 @@ import '../../utils/globals.dart';
 
 class GlobalHistoryScreen extends StatefulWidget {
   final String initialCategoryTab; // 'buku_besar', 'order', 'cuci', 'pengering', 'gosok'
-  const GlobalHistoryScreen({super.key, this.initialCategoryTab = 'buku_besar'});
+  final bool showAppBar;
+  const GlobalHistoryScreen({
+    super.key,
+    this.initialCategoryTab = 'buku_besar',
+    this.showAppBar = false,
+  });
 
   @override
   State<GlobalHistoryScreen> createState() => _GlobalHistoryScreenState();
@@ -909,86 +914,393 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   // ==========================================
   // ORDER DETAILS DIALOG
   // ==========================================
-  void _showOrderDetailsDialog(Order order) {
+  Future<void> _showOrderDetailsDialog(Order order) async {
+    final db = await _db.database;
+    final List<Map<String, dynamic>> usages = await db.query(
+      'machine_usage_history',
+      where: 'order_id = ?',
+      whereArgs: [order.id],
+      orderBy: 'started_at ASC',
+    );
+
+    final isDone = order.status.toLowerCase() == 'completed' ||
+        order.status.toLowerCase() == 'selesai' ||
+        order.status.toLowerCase() == 'siap diambil';
+    final isProcessing =
+        order.status.toLowerCase() == 'proses' || order.status.toLowerCase() == 'processing';
+
+    if (!mounted) return;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Rincian Nota #${order.id}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: StyleConstants.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.receipt_long_rounded, color: StyleConstants.primaryColor, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Rincian Lengkap Nota #${order.id}',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+            ),
             IconButton(icon: const Icon(Icons.close_rounded, size: 20), onPressed: () => Navigator.pop(ctx)),
           ],
         ),
         content: SizedBox(
-          width: 460,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Pelanggan: ${order.customerName}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                  Text(order.customerPhone ?? 'Tanpa Nomor', style: const TextStyle(color: StyleConstants.textMuted, fontSize: 12.5)),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Waktu Masuk: ${DateFormat('dd MMM yyyy, HH:mm').format(order.orderDate)}',
-                style: const TextStyle(color: StyleConstants.textMuted, fontSize: 12),
-              ),
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              const SizedBox(height: 10),
-              const Text('Daftar Layanan & Item:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
-              const SizedBox(height: 6),
-              ...order.items.map((item) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Row(
-                      children: [
-                        Text('${item.quantity}x ', style: const TextStyle(fontWeight: FontWeight.bold, color: StyleConstants.primaryColor)),
-                        Expanded(child: Text(item.itemName, style: const TextStyle(fontSize: 13))),
-                        Text(formatRp(item.price * item.quantity), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                      ],
-                    ),
-                  )),
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Total Tagihan:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
-                  Text(formatRp(order.totalAmount), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: StyleConstants.primaryColor)),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Sudah Dibayar:', style: TextStyle(fontSize: 12.5, color: StyleConstants.textMuted)),
-                  Text(formatRp(order.paidAmount), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: StyleConstants.successColor)),
-                ],
-              ),
-              if (order.totalAmount > order.paidAmount)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Sisa Tagihan (Piutang):', style: TextStyle(fontSize: 12.5, color: StyleConstants.dangerColor, fontWeight: FontWeight.bold)),
-                    Text(formatRp(order.totalAmount - order.paidAmount), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.dangerColor)),
-                  ],
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. Customer & Order Identity Card
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: StyleConstants.borderLight),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: StyleConstants.primaryColor.withValues(alpha: 0.12),
+                        child: Text(
+                          order.customerName.isNotEmpty ? order.customerName[0].toUpperCase() : '?',
+                          style: const TextStyle(fontWeight: FontWeight.w900, color: StyleConstants.primaryColor, fontSize: 15),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              order.customerName,
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: StyleConstants.textHeading),
+                            ),
+                            Text(
+                              order.customerPhone?.isNotEmpty == true ? order.customerPhone! : 'Belum Ada No. WA',
+                              style: const TextStyle(fontSize: 12, color: StyleConstants.textMuted, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isDone ? StyleConstants.statusSuccessBg : (isProcessing ? StyleConstants.statusInfoBg : StyleConstants.statusWarningBg),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              isDone ? 'SELESAI' : (isProcessing ? 'SEDANG PROSES' : 'PENDING'),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: isDone ? StyleConstants.statusSuccessText : (isProcessing ? StyleConstants.statusInfoText : StyleConstants.statusWarningText),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            order.isPaid ? 'LUNAS' : (order.paidAmount > 0 ? 'CICILAN' : 'BELUM BAYAR'),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                              color: order.isPaid ? StyleConstants.statusSuccessText : StyleConstants.statusDangerText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-            ],
+                const SizedBox(height: 14),
+
+                // 2. Comprehensive Timestamps & Machine Tracking Card
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: StyleConstants.borderLight),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.schedule_rounded, size: 16, color: StyleConstants.primaryColor),
+                          SizedBox(width: 6),
+                          Text(
+                            'PELACAKAN WAKTU & SIKLUS MESIN',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted, letterSpacing: 0.5),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      _detailTimelineRow(
+                        icon: Icons.add_shopping_cart_rounded,
+                        label: 'Waktu Order Dibuat',
+                        value: DateFormat('dd MMM yyyy, HH:mm:ss').format(order.orderDate),
+                        color: StyleConstants.primaryColor,
+                      ),
+                      const SizedBox(height: 6),
+                      _detailTimelineRow(
+                        icon: Icons.hourglass_top_rounded,
+                        label: 'Waktu Masuk Antrian',
+                        value: DateFormat('dd MMM yyyy, HH:mm:ss').format(order.orderDate),
+                        color: StyleConstants.warningColor,
+                      ),
+                      const SizedBox(height: 6),
+
+                      // Machine Execution Time & Cycle Allocation
+                      if (usages.isNotEmpty) ...[
+                        if (usages.length == 1) ...[
+                          _detailTimelineRow(
+                            icon: Icons.power_rounded,
+                            label: 'Waktu Mesin Dihidupkan',
+                            value: DateFormat('dd MMM yyyy, HH:mm:ss').format(
+                              DateTime.parse(usages.first['started_at'] as String).toLocal(),
+                            ),
+                            color: StyleConstants.successColor,
+                          ),
+                          const SizedBox(height: 6),
+                          _detailTimelineRow(
+                            icon: Icons.local_laundry_service_rounded,
+                            label: 'Mesin Fisik Digunakan',
+                            value: '${usages.first['machine_name']} (${usages.first['status']})',
+                            color: StyleConstants.secondaryColor,
+                            isBold: true,
+                          ),
+                        ] else ...[
+                          _detailTimelineRow(
+                            icon: Icons.repeat_rounded,
+                            label: 'Total Siklus Mesin',
+                            value: '${usages.length} Siklus / Unit Mesin',
+                            color: StyleConstants.secondaryColor,
+                            isBold: true,
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                for (int i = 0; i < usages.length; i++)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 3),
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          '• Siklus #${i + 1}: ',
+                                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: StyleConstants.primaryColor),
+                                        ),
+                                        Text(
+                                          '${usages[i]['machine_name']} ',
+                                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                                        ),
+                                        Text(
+                                          '(Dihidupkan: ${DateFormat('HH:mm:ss').format(DateTime.parse(usages[i]['started_at'] as String).toLocal())})',
+                                          style: const TextStyle(fontSize: 11.5, color: StyleConstants.textMuted),
+                                        ),
+                                        const Spacer(),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: usages[i]['status'] == 'Success' ? StyleConstants.statusSuccessBg : StyleConstants.statusDangerBg,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            usages[i]['status'] ?? 'Success',
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: usages[i]['status'] == 'Success' ? StyleConstants.statusSuccessText : StyleConstants.statusDangerText,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ] else if (order.assignedMachineId != null && _machineNameMap.containsKey(order.assignedMachineId)) ...[
+                        _detailTimelineRow(
+                          icon: Icons.power_rounded,
+                          label: 'Waktu Mesin Dihidupkan',
+                          value: order.machineStartedAt != null
+                              ? DateFormat('dd MMM yyyy, HH:mm:ss').format(order.machineStartedAt!)
+                              : '-',
+                          color: StyleConstants.successColor,
+                        ),
+                        const SizedBox(height: 6),
+                        _detailTimelineRow(
+                          icon: Icons.local_laundry_service_rounded,
+                          label: 'Mesin Fisik Digunakan',
+                          value: _machineNameMap[order.assignedMachineId]!,
+                          color: StyleConstants.secondaryColor,
+                          isBold: true,
+                        ),
+                      ] else ...[
+                        _detailTimelineRow(
+                          icon: Icons.power_off_rounded,
+                          label: 'Status Mesin Fisik',
+                          value: 'Belum Dinyalakan (Menunggu di Antrian)',
+                          color: StyleConstants.warningColor,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // 3. Itemized Order Details Card
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: StyleConstants.borderLight),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'RINCIAN LAYANAN & ITEM:',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted, letterSpacing: 0.5),
+                      ),
+                      const SizedBox(height: 8),
+                      ...order.items.map((item) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: StyleConstants.primaryColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '${item.quantity}x',
+                                    style: const TextStyle(fontWeight: FontWeight.w900, color: StyleConstants.primaryColor, fontSize: 12),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.itemName,
+                                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading),
+                                      ),
+                                      Text(
+                                        '@ ${formatRp(item.price)}',
+                                        style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  formatRp(item.price * item.quantity),
+                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: StyleConstants.textHeading),
+                                ),
+                              ],
+                            ),
+                          )),
+                      const SizedBox(height: 10),
+                      const Divider(height: 1, color: StyleConstants.borderLight),
+                      const SizedBox(height: 10),
+
+                      // 4. Financial Summary Rows
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Total Tagihan:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
+                          Text(formatRp(order.totalAmount), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: StyleConstants.primaryColor)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Telah Dibayar (Kasir):', style: TextStyle(fontSize: 12.5, color: StyleConstants.textMuted)),
+                          Text(formatRp(order.paidAmount), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.successColor)),
+                        ],
+                      ),
+                      if (order.totalAmount > order.paidAmount) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Sisa Tagihan (Piutang):', style: TextStyle(fontSize: 12.5, color: StyleConstants.dangerColor, fontWeight: FontWeight.bold)),
+                            Text(formatRp(order.totalAmount - order.paidAmount), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: StyleConstants.dangerColor)),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Tutup', style: TextStyle(color: StyleConstants.textMuted)),
+            child: const Text('Tutup', style: TextStyle(color: StyleConstants.textMuted, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _detailTimelineRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    bool isBold = false,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 160,
+          child: Text(label, style: const TextStyle(fontSize: 12, color: StyleConstants.textMuted, fontWeight: FontWeight.w500)),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: isBold ? FontWeight.w900 : FontWeight.w700,
+              color: isBold ? color : StyleConstants.textHeading,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1013,7 +1325,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       ],
     );
 
-    if (Navigator.canPop(context)) {
+    if (widget.showAppBar) {
       return Scaffold(
         backgroundColor: StyleConstants.backgroundColor,
         appBar: AppBar(

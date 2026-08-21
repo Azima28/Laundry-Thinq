@@ -288,6 +288,14 @@ class PrinterService {
       pickupDateStr = DateFormat('dd/MM/yyyy HH:mm').format(pickup);
     }
 
+    final sqlDb = await db.database;
+    final List<Map<String, dynamic>> usageRows = await sqlDb.query(
+      'machine_usage_history',
+      where: 'order_id = ?',
+      whereArgs: [order.id],
+      orderBy: 'started_at ASC',
+    );
+
     final bool isLunas = order.isPaid || order.paidAmount >= order.totalAmount;
     final int sisaTagihan = order.totalAmount - order.paidAmount;
 
@@ -343,6 +351,30 @@ class PrinterService {
               if (pickupDateStr.isNotEmpty) ...[
                 pw.SizedBox(height: 2),
                 pw.Text('Estimasi Selesai: $pickupDateStr', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: config.smallTextSize)),
+              ],
+              if (usageRows.isNotEmpty) ...[
+                pw.SizedBox(height: 2),
+                if (usageRows.length == 1) ...[
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Mesin:', style: pw.TextStyle(fontSize: config.smallTextSize, fontWeight: pw.FontWeight.bold)),
+                      pw.Text(
+                        '${usageRows.first['machine_name']} (${DateFormat('HH:mm').format(DateTime.parse(usageRows.first['started_at'] as String).toLocal())})',
+                        style: pw.TextStyle(fontSize: config.smallTextSize, fontWeight: pw.FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  pw.Text('Alokasi Mesin (${usageRows.length} Siklus):', style: pw.TextStyle(fontSize: config.smallTextSize, fontWeight: pw.FontWeight.bold)),
+                  ...usageRows.map((u) {
+                    final startedAt = DateTime.parse(u['started_at'] as String).toLocal();
+                    return pw.Padding(
+                      padding: const pw.EdgeInsets.only(left: 4, top: 1),
+                      child: pw.Text('• ${u['machine_name']} - ${DateFormat('HH:mm').format(startedAt)}', style: pw.TextStyle(fontSize: config.smallTextSize - 0.5)),
+                    );
+                  }),
+                ],
               ],
               pw.SizedBox(height: config.spacing),
               pw.Divider(thickness: config.dividerThickness, height: 6),

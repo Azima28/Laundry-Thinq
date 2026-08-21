@@ -169,11 +169,11 @@ class MyApp extends StatelessWidget {
             return Container();
           },
         ),
-        '/history': (context) => const GlobalHistoryScreen(initialCategoryTab: 'order'),
-        '/history_gosok': (context) => const GlobalHistoryScreen(initialCategoryTab: 'gosok'),
-        '/history_mesin_cuci': (context) => const GlobalHistoryScreen(initialCategoryTab: 'cuci'),
-        '/history_pengering': (context) => const GlobalHistoryScreen(initialCategoryTab: 'pengering'),
-        '/global_history': (context) => const GlobalHistoryScreen(initialCategoryTab: 'buku_besar'),
+        '/history': (context) => const GlobalHistoryScreen(initialCategoryTab: 'order', showAppBar: true),
+        '/history_gosok': (context) => const GlobalHistoryScreen(initialCategoryTab: 'gosok', showAppBar: true),
+        '/history_mesin_cuci': (context) => const GlobalHistoryScreen(initialCategoryTab: 'cuci', showAppBar: true),
+        '/history_pengering': (context) => const GlobalHistoryScreen(initialCategoryTab: 'pengering', showAppBar: true),
+        '/global_history': (context) => const GlobalHistoryScreen(initialCategoryTab: 'buku_besar', showAppBar: true),
         '/mesin': (context) => FutureBuilder(
           future: _checkAdminAccess(),
           builder: (context, snapshot) {
