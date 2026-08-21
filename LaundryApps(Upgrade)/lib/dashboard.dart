@@ -177,7 +177,7 @@ class _DashboardPageState extends State<DashboardPage> {
       case 4:
         return 'Hubungi Pelanggan & Broadcast WhatsApp';
       case 5:
-        return 'Buku Besar, Kas & Riwayat Global';
+        return 'Pusat Riwayat & Buku Besar Global';
       case 6:
         return 'Catatan Pengeluaran & Kas Kecil';
       case 7:
@@ -354,7 +354,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(height: 4),
                 _sidebarMenuItem(4, Icons.chat_rounded, 'Hubungi (WA)', null),
                 const SizedBox(height: 4),
-                _sidebarMenuItem(5, Icons.account_balance_wallet_rounded, 'Buku Besar', null),
+                _sidebarMenuItem(5, Icons.receipt_long_rounded, 'Riwayat', null),
                 const SizedBox(height: 4),
                 _sidebarMenuItem(6, Icons.receipt_long_rounded, 'Pengeluaran', null),
                 const SizedBox(height: 4),
@@ -823,11 +823,11 @@ class _DashboardPageState extends State<DashboardPage> {
                         childAspectRatio: 2.8,
                         children: [
                           _buildQuickNavTile(
-                            title: 'Riwayat Transaksi',
-                            desc: 'Lihat nota & status proses',
+                            title: 'Pusat Riwayat',
+                            desc: 'Nota, log mesin cuci, pengering & kas',
                             icon: Icons.receipt_long_rounded,
                             color: const Color(0xFF0D9488),
-                            onTap: () => _navigate(context, '/history'),
+                            onTap: () => _selectTab(5),
                           ),
                           _buildQuickNavTile(
                             title: 'Database Pelanggan',

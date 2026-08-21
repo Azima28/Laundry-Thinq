@@ -8,10 +8,6 @@ import 'screens/orders/tambah_item.dart';
 import 'screens/orders/tambah_item_gosok.dart';
 import 'screens/orders/pesan_gosok.dart';
 import 'screens/orders/restock_screen.dart';
-import 'screens/history/history.dart';
-import 'screens/history/history_gosok.dart';
-import 'screens/history/history_mesin_cuci.dart';
-import 'screens/history/history_pengering.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/customers/customer_screen.dart';
 import 'screens/admin/admin_dashboard.dart';
@@ -173,10 +169,11 @@ class MyApp extends StatelessWidget {
             return Container();
           },
         ),
-        '/history': (context) => HistoryPage(),
-        '/history_gosok': (context) => HistoryGosokPage(),
-        '/history_mesin_cuci': (context) => const HistoryMesinCuciPage(),
-        '/history_pengering': (context) => const HistoryPengeringPage(),
+        '/history': (context) => const GlobalHistoryScreen(initialCategoryTab: 'order'),
+        '/history_gosok': (context) => const GlobalHistoryScreen(initialCategoryTab: 'gosok'),
+        '/history_mesin_cuci': (context) => const GlobalHistoryScreen(initialCategoryTab: 'cuci'),
+        '/history_pengering': (context) => const GlobalHistoryScreen(initialCategoryTab: 'pengering'),
+        '/global_history': (context) => const GlobalHistoryScreen(initialCategoryTab: 'buku_besar'),
         '/mesin': (context) => FutureBuilder(
           future: _checkAdminAccess(),
           builder: (context, snapshot) {
@@ -262,7 +259,6 @@ class MyApp extends StatelessWidget {
         '/customers': (context) => const CustomerScreen(),
         '/hubungi_pelanggan': (context) => const HubungiPelangganScreen(),
         '/pengeluaran': (context) => const PengeluaranScreen(),
-        '/global_history': (context) => const GlobalHistoryScreen(),
         '/restock': (context) => const RestockScreen(),
       },
     );
