@@ -4,11 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../database/models/database_helper.dart';
-import '../database/models/order_model.dart';
 import '../database/models/transaction_model.dart';
 import '../transactions/transaction_repository.dart';
 
@@ -52,7 +50,6 @@ class PdfExportHelper {
         .toSet();
 
     // Prepare lists
-    int totalPendapatan = 0;
     int totalDiterima = 0;
     int totalPiutang = 0;
     int totalPengeluaran = 0;
@@ -64,8 +61,7 @@ class PdfExportHelper {
           order.items.every((item) => ironItemIds.contains(item.itemId));
 
       final unpaid = (order.totalAmount - order.paidAmount).clamp(0, order.totalAmount);
-      
-      totalPendapatan += order.totalAmount;
+
       totalDiterima += order.paidAmount;
       if (unpaid > 0) {
         totalPiutang += unpaid;
@@ -115,7 +111,6 @@ class PdfExportHelper {
     final primaryColor = PdfColor.fromHex('#1E3A8A'); // Deep Navy Blue
     final secondaryColor = PdfColor.fromHex('#EFF6FF'); // Light Blue Accent
     final borderGrey = PdfColor.fromHex('#E2E8F0');
-    final textDark = PdfColor.fromHex('#1E293B');
 
     pdf.addPage(
       pw.MultiPage(
@@ -389,53 +384,74 @@ class PdfExportHelper {
       ),
     );
 
-    // 3. Save PDF to Downloads/Laporan_Laundry and open it
+    // 3. Save PDF - Let user freely choose destination location & file name (Windows Save As)
     try {
       final bytes = await pdf.save();
-      
-      // Get Downloads directory (falls back to Documents if not available)
-      Directory? downloadsDir = await getDownloadsDirectory();
-      downloadsDir ??= await getApplicationDocumentsDirectory();
+      final defaultFileName = startStr == endStr
+          ? 'Laporan_Keuangan_$startStr.pdf'
+          : 'Laporan_Keuangan_${startStr}_sd_$endStr.pdf';
 
-      final targetDir = Directory('${downloadsDir.path}/Laporan_Laundry');
-      if (!await targetDir.exists()) {
-        await targetDir.create(recursive: true);
+      String? chosenPath;
+      if (Platform.isWindows) {
+        chosenPath = await _pickSaveLocationNative(defaultFileName: defaultFileName);
+        if (chosenPath == null) {
+          // User clicked Cancel in Windows Save As dialog
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Ekspor PDF dibatalkan oleh pengguna.'),
+                backgroundColor: Color(0xFF64748B),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+          return;
+        }
       }
 
-      final fileName = 'Laporan_Keuangan_${startStr}_s_d_${endStr}.pdf';
-      final file = File('${targetDir.path}/$fileName');
+      File file;
+      Directory targetDir;
+      if (chosenPath != null) {
+        file = File(chosenPath);
+        targetDir = file.parent;
+      } else {
+        // Fallback for non-windows / mobile
+        Directory? downloadsDir = await getDownloadsDirectory();
+        downloadsDir ??= await getApplicationDocumentsDirectory();
+        targetDir = Directory('${downloadsDir.path}/Laporan_Laundry');
+        if (!await targetDir.exists()) {
+          await targetDir.create(recursive: true);
+        }
+        file = File('${targetDir.path}/$defaultFileName');
+      }
+
       await file.writeAsBytes(bytes);
 
-      // Open PDF natively using default viewer (using url_launcher for file:// scheme)
+      // Open PDF natively using default viewer
       final fileUri = Uri.file(file.path);
       final dirUri = Uri.file(targetDir.path);
 
       try {
         await launchUrl(fileUri, mode: LaunchMode.externalApplication);
       } catch (e) {
-        // Fallback: run explorer on the file directly
         await Process.run('explorer.exe', [file.path]);
-      }
-
-      // Open the folder containing the file
-      try {
-        await launchUrl(dirUri, mode: LaunchMode.externalApplication);
-      } catch (e) {
-        // Fallback: run explorer on the directory directly
-        await Process.run('explorer.exe', [targetDir.path]);
       }
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Laporan berhasil disimpan di:\n${file.path}'),
+            content: Text('Laporan berhasil diekspor ke:\n${file.path}'),
             backgroundColor: const Color(0xFF10B981), // Emerald Green
             duration: const Duration(seconds: 7),
             action: SnackBarAction(
               label: 'Buka Folder',
               textColor: Colors.white,
               onPressed: () {
-                launchUrl(dirUri, mode: LaunchMode.externalApplication);
+                try {
+                  launchUrl(dirUri, mode: LaunchMode.externalApplication);
+                } catch (_) {
+                  Process.run('explorer.exe', [targetDir.path]);
+                }
               },
             ),
           ),
@@ -451,5 +467,46 @@ class PdfExportHelper {
         );
       }
     }
+  }
+
+  /// Opens Native Windows Save File Dialog to choose location and file name for saving PDF (like Excel Save As)
+  static Future<String?> _pickSaveLocationNative({
+    required String defaultFileName,
+  }) async {
+    if (Platform.isWindows) {
+      try {
+        final script = '''
+        Add-Type -AssemblyName System.Windows.Forms
+        \$dialog = New-Object System.Windows.Forms.SaveFileDialog
+        \$dialog.Filter = "Dokumen PDF (*.pdf)|*.pdf|Semua File (*.*)|*.*"
+        \$dialog.DefaultExt = "pdf"
+        \$dialog.FileName = "$defaultFileName"
+        \$dialog.Title = "Simpan Laporan Keuangan PDF (Pilih Lokasi Simpan)"
+        \$dialog.InitialDirectory = [Environment]::GetFolderPath("Desktop")
+        if (\$dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+            Write-Output \$dialog.FileName
+        }
+        ''';
+
+        final result = await Process.run('powershell', [
+          '-NoProfile',
+          '-Command',
+          script,
+        ]);
+
+        if (result.exitCode == 0) {
+          final out = (result.stdout as String).trim();
+          if (out.isNotEmpty && out.toLowerCase().endsWith('.pdf')) {
+            return out;
+          } else if (out.isNotEmpty) {
+            return '$out.pdf';
+          }
+        }
+      } catch (e) {
+        debugPrint('[PdfExportHelper] SaveFileDialog error: $e');
+      }
+    }
+    return null;
   }
 }
