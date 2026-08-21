@@ -614,6 +614,8 @@ async function executeMenuItem(chatId, sender, selectedItem, choiceIndex, config
 
 // Helper to process vote selection (shared by event listener and manual polling)
 async function handleVoteSelection(chatId, sender, choice, choiceIndex, config, pollId) {
+    const choiceStr = typeof choice === 'string' ? choice : (choice?.name || choice?.title || (typeof choice === 'object' ? JSON.stringify(choice) : String(choice || '')));
+
     // Check if staff is chatting with this user (cooldown from config, default 30 min)
     const lastStaffChat = staffChatCooldown.get(sender) || 0;
     const staffCooldownMs = (config.chatbot_staff_cooldown !== undefined ? config.chatbot_staff_cooldown : 30) * 60 * 1000;
@@ -635,11 +637,11 @@ async function handleVoteSelection(chatId, sender, choice, choiceIndex, config, 
     let selectedItem = null;
 
     // If the user selects any back option, always return to main menu
-    if (choice.includes('Kembali') || choice.includes('kembali')) {
+    if (choiceStr.includes('Kembali') || choiceStr.includes('kembali')) {
         selectedItem = { type: 'back' };
-    } else if (choice.includes('tidak menemukan') || choice.includes('cucian saya')) {
+    } else if (choiceStr.includes('tidak menemukan') || choiceStr.includes('cucian saya')) {
         selectedItem = { type: 'api', action: 'status_by_nota' };
-    } else if (choice.includes('Hubungi Staff') || choice.includes('Kasir') || choice.includes('staff')) {
+    } else if (choiceStr.includes('Hubungi Staff') || choiceStr.includes('Kasir') || choiceStr.includes('staff')) {
         selectedItem = menu.find(item => item.type === 'staff') || {
             type: 'staff',
             response: 'Baik Kak, pesan Anda telah kami teruskan ke staf kasir kami. Staf kami akan segera membalas chat Anda secara manual. Terima kasih! 😊'
@@ -652,7 +654,7 @@ async function handleVoteSelection(chatId, sender, choice, choiceIndex, config, 
         const parentIdx = state.menuPath[0];
         const parentItem = menu[parentIdx];
         if (parentItem && parentItem.children) {
-            if (choiceIndex === parentItem.children.length || choice.includes('Kembali')) {
+            if (choiceIndex === parentItem.children.length || choiceStr.includes('Kembali')) {
                 selectedItem = { type: 'back' };
             } else {
                 selectedItem = parentItem.children[choiceIndex];
@@ -892,8 +894,9 @@ client.on('vote_update', async (vote) => {
         console.log(`[vote_update] Could not resolve contact for voter ${vote.voter}, using as-is`);
     }
 
-    const choice = vote.selectedOptions[0].name;
-    const choiceIndex = vote.selectedOptions[0].localId;
+    const selectedOpt = vote.selectedOptions && vote.selectedOptions.length > 0 ? vote.selectedOptions[0] : null;
+    const choice = selectedOpt ? (selectedOpt.name || selectedOpt.title || String(selectedOpt)) : '';
+    const choiceIndex = selectedOpt ? (selectedOpt.localId !== undefined ? selectedOpt.localId : 0) : 0;
 
     // FIX Bug #3: unmark from processedPollIds on failure so the timer can retry
     try {
