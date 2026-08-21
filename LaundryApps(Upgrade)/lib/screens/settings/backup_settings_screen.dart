@@ -640,59 +640,108 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     }
   }
 
-  Future<void> _restoreCustomFilePath() async {
-    final pathController = TextEditingController();
-    final customFile = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Pulihkan dari Lokasi File Luar (.db)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-        content: SizedBox(
-          width: 500,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+  /// Opens Native Windows File Dialog to pick a .db backup file from any folder or USB Flashdisk
+  Future<String?> _pickFileNative() async {
+    if (Platform.isWindows) {
+      try {
+        final result = await Process.run('powershell', [
+          '-NoProfile',
+          '-Command',
+          r'''
+          Add-Type -AssemblyName System.Windows.Forms
+          $dialog = New-Object System.Windows.Forms.OpenFileDialog
+          $dialog.Filter = "Database SQLite (*.db;*.sqlite;*.db3)|*.db;*.sqlite;*.db3|Semua File (*.*)|*.*"
+          $dialog.Title = "Pilih File Database Cadangan (.db) untuk Diimpor"
+          $dialog.InitialDirectory = [Environment]::GetFolderPath("MyDocuments")
+          if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+              [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+              Write-Output $dialog.FileName
+          }
+          '''
+        ]);
+        final output = (result.stdout as String).trim();
+        if (output.isNotEmpty && File(output).existsSync()) {
+          return output;
+        }
+      } catch (e) {
+        debugPrint('[BackupSettings] Gagal memanggil native file picker: $e');
+      }
+    }
+    return null;
+  }
+
+  /// Import and restore a database file directly from any folder or USB Flashdisk
+  Future<void> _importAndRestoreFromFile() async {
+    // 1. Try opening native Windows file dialog
+    String? selectedPath = await _pickFileNative();
+
+    // 2. If native picker was not triggered or returned empty, fallback to manual path prompt
+    if (selectedPath == null || selectedPath.isEmpty) {
+      if (!mounted) return;
+      final pathController = TextEditingController();
+      final customFile = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
             children: [
-              const Text(
-                'Masukkan path lengkap file database cadangan (misal dari Flashdisk / Harddisk):',
-                style: TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: pathController,
-                decoration: InputDecoration(
-                  hintText: 'D:\\backup\\laundry_backup.db',
-                  filled: true,
-                  fillColor: const Color(0xFFF8FAFC),
-                  prefixIcon: const Icon(Icons.usb_rounded, size: 20),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
+              Icon(Icons.file_open_rounded, color: Color(0xFF6366F1), size: 24),
+              SizedBox(width: 10),
+              Text('Impor File Database Luar (.db)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
             ],
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          ElevatedButton(
-            onPressed: () {
-              final p = pathController.text.trim();
-              if (p.isNotEmpty) Navigator.pop(ctx, p);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white),
-            child: const Text('Lanjutkan', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: SizedBox(
+            width: 520,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Masukkan path lengkap file database cadangan yang ingin diimpor (misal dari Flashdisk D: atau folder download):',
+                  style: TextStyle(fontSize: 12.5, color: Color(0xFF475569), height: 1.4),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: pathController,
+                  decoration: InputDecoration(
+                    hintText: 'D:\\backup\\laundry_backup.db',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    prefixIcon: const Icon(Icons.folder_open_rounded, size: 20),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-    );
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+            ElevatedButton(
+              onPressed: () {
+                final p = pathController.text.trim();
+                if (p.isNotEmpty) Navigator.pop(ctx, p);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white),
+              child: const Text('Lanjutkan Pemulihan', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
 
-    if (customFile != null && customFile.isNotEmpty) {
-      final f = File(customFile);
+      if (customFile != null && customFile.isNotEmpty) {
+        selectedPath = customFile;
+      }
+    }
+
+    // 3. Process the chosen file with safety snapshot & admin verification
+    if (selectedPath != null && selectedPath.isNotEmpty) {
+      final f = File(selectedPath);
       if (await f.exists()) {
         await _restoreBackupFlow(f);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('File tidak ditemukan di lokasi tersebut.'), backgroundColor: Colors.red),
+            const SnackBar(content: Text('File database tidak ditemukan di lokasi tersebut.'), backgroundColor: Colors.red),
           );
         }
       }
@@ -921,14 +970,14 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
           ),
         ),
         const SizedBox(width: 14),
-        // Custom File Restore Button
+        // Import & Restore from External File / USB Button
         Expanded(
           child: OutlinedButton.icon(
-            onPressed: _restoreCustomFilePath,
-            icon: const Icon(Icons.usb_rounded, size: 20, color: Color(0xFF475569)),
-            label: const Text('Pulihkan dari USB', style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold)),
+            onPressed: _importAndRestoreFromFile,
+            icon: const Icon(Icons.file_open_rounded, size: 20, color: Color(0xFF6366F1)),
+            label: const Text('Pilih & Impor File (.db)', style: TextStyle(color: Color(0xFF6366F1), fontWeight: FontWeight.bold)),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
+              side: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
               backgroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 18),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
