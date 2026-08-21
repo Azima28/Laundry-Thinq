@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
+import 'package:printing/printing.dart';
 import '../../services/printer_service.dart';
+import '../../utils/style_constants.dart';
 
 class PrinterSettingsScreen extends StatefulWidget {
   const PrinterSettingsScreen({Key? key}) : super(key: key);
@@ -14,23 +17,35 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   final TextEditingController _businessNameController = TextEditingController();
   final TextEditingController _businessAddressController = TextEditingController();
   final TextEditingController _businessPhoneController = TextEditingController();
-  int _receiptWidth = 58;
+  final TextEditingController _footerNoteController = TextEditingController();
 
-  String _selectedName = '';
-  String _selectedAddress = '';
-  List<BluetoothInfo> _devices = [];
-  bool _isLoading = false;
-  bool _isConnecting = false;
-  bool _isConnected = false;
+  String _connectionType = 'usb'; // 'usb' or 'bluetooth'
+  int _receiptWidth = 58; // 58, 76 (Epson TM-U220D), 80
+
+  // USB Printers State
+  List<Printer> _usbPrinters = [];
+  String _selectedUsbPrinter = '';
+  bool _isLoadingUsb = false;
+
+  // Bluetooth Printers State
+  List<BluetoothInfo> _btDevices = [];
+  String _selectedBtName = '';
+  String _selectedBtAddress = '';
+  bool _isLoadingBt = false;
+  bool _isConnectingBt = false;
+  bool _isBtConnected = false;
   bool _btEnabled = false;
 
-  final Color primaryColor = const Color(0xFF4E80EE);
-  final Color backgroundColor = const Color(0xFFF8FAFC);
+  bool _isTestingPrint = false;
+
+  final Color primaryColor = StyleConstants.primaryColor;
+  final Color backgroundColor = StyleConstants.backgroundColor;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _loadUsbPrinters();
     _checkBluetooth();
   }
 
@@ -39,139 +54,208 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     _businessNameController.dispose();
     _businessAddressController.dispose();
     _businessPhoneController.dispose();
+    _footerNoteController.dispose();
     super.dispose();
   }
 
-  Future<void> _checkBluetooth() async {
-    final hasPermission = await PrinterService.requestPermissions();
-    if (!hasPermission) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Izin Bluetooth diperlukan untuk mendeteksi printer')),
-        );
-      }
-    }
-
-    final enabled = await PrintBluetoothThermal.bluetoothEnabled;
-    if (mounted) setState(() => _btEnabled = enabled);
-    if (enabled && hasPermission) _loadDevices();
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _businessNameController.text = prefs.getString('biz_name') ?? 'Azima Laundry';
+      _businessAddressController.text = prefs.getString('biz_address') ?? 'Jl. Raya Utama No. 8';
+      _businessPhoneController.text = prefs.getString('biz_phone') ?? '08123456789';
+      _footerNoteController.text = prefs.getString('biz_footer') ?? 'Terima kasih telah mencuci di Azima Laundry!';
+      _connectionType = prefs.getString('printer_connection_type') ?? 'usb';
+      _receiptWidth = prefs.getInt('receipt_width') ?? 58;
+      _selectedUsbPrinter = prefs.getString('printer_usb_name') ?? '';
+      _selectedBtAddress = prefs.getString('printer_mac') ?? '';
+      _selectedBtName = prefs.getString('printer_name') ?? '';
+    });
   }
 
-  Future<void> _loadDevices() async {
-    final hasPermission = await PrinterService.requestPermissions();
-    if (!hasPermission) return;
+  Future<void> _loadUsbPrinters() async {
+    setState(() => _isLoadingUsb = true);
+    try {
+      final list = await PrinterService.getAvailableUsbPrinters();
+      if (mounted) {
+        setState(() {
+          _usbPrinters = list;
+          _isLoadingUsb = false;
+          // Auto select default printer if none is selected yet
+          if (_selectedUsbPrinter.isEmpty && list.isNotEmpty) {
+            final defaultPrinter = list.firstWhere((p) => p.isDefault, orElse: () => list.first);
+            _selectedUsbPrinter = defaultPrinter.name;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('[PrinterSettings] Gagal memuat USB printers: $e');
+      if (mounted) setState(() => _isLoadingUsb = false);
+    }
+  }
 
-    setState(() => _isLoading = true);
+  Future<void> _checkBluetooth() async {
+    if (!Platform.isAndroid) return;
+    final hasPermission = await PrinterService.requestPermissions();
+    final enabled = await PrintBluetoothThermal.bluetoothEnabled;
+    if (mounted) setState(() => _btEnabled = enabled);
+    if (enabled && hasPermission) _loadBtDevices();
+  }
+
+  Future<void> _loadBtDevices() async {
+    setState(() => _isLoadingBt = true);
     try {
       final List<BluetoothInfo> devices = await PrintBluetoothThermal.pairedBluetooths;
       final connected = await PrintBluetoothThermal.connectionStatus;
       if (mounted) {
         setState(() {
-          _devices = devices;
-          _isLoading = false;
-          _isConnected = connected;
+          _btDevices = devices;
+          _isLoadingBt = false;
+          _isBtConnected = connected;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoadingBt = false);
     }
   }
 
-  Future<void> _connectDevice(String mac, String name) async {
-    setState(() => _isConnecting = true);
+  Future<void> _selectUsbPrinter(Printer printer) async {
+    setState(() => _selectedUsbPrinter = printer.name);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('printer_usb_name', printer.name);
+    await prefs.setString('printer_connection_type', 'usb');
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Printer kabel aktif diset ke: ${printer.name}'),
+          backgroundColor: const Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
+  }
+
+  Future<void> _connectBtDevice(String mac, String name) async {
+    setState(() => _isConnectingBt = true);
     try {
       final bool result = await PrintBluetoothThermal.connect(macPrinterAddress: mac);
       if (mounted) {
         setState(() {
-          _isConnecting = false;
-          _isConnected = result;
+          _isConnectingBt = false;
+          _isBtConnected = result;
           if (result) {
-            _selectedName = name;
-            _selectedAddress = mac;
+            _selectedBtName = name;
+            _selectedBtAddress = mac;
           }
         });
-        _savePrinterConnection(mac, name);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result ? 'Terhubung ke $name' : 'Gagal terhubung ke $name'),
-            backgroundColor: result ? Colors.green : Colors.red,
-          ),
-        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('printer_mac', mac);
+        await prefs.setString('printer_name', name);
+        await prefs.setString('printer_connection_type', 'bluetooth');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result ? 'Terhubung ke $name' : 'Gagal terhubung ke $name'),
+              backgroundColor: result ? Colors.green : Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
-      if (mounted) setState(() => _isConnecting = false);
+      if (mounted) setState(() => _isConnectingBt = false);
     }
   }
 
-  Future<void> _disconnect() async {
+  Future<void> _disconnectBt() async {
     try {
       await PrintBluetoothThermal.disconnect;
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('printer_mac');
       await prefs.remove('printer_name');
       setState(() {
-        _isConnected = false;
-        _selectedAddress = '';
-        _selectedName = '';
+        _isBtConnected = false;
+        _selectedBtAddress = '';
+        _selectedBtName = '';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sambungan printer diputus'), backgroundColor: Colors.blueGrey),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sambungan bluetooth diputus'), backgroundColor: Colors.blueGrey),
+        );
+      }
     } catch (e) {
       debugPrint('Error disconnecting printer: $e');
     }
   }
 
-  Future<void> _loadSettings() async {
+  Future<void> _saveAllSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _businessNameController.text = prefs.getString('biz_name') ?? 'Smart Laundry';
-      _businessAddressController.text = prefs.getString('biz_address') ?? 'Jl. Raya Utama No. 8';
-      _businessPhoneController.text = prefs.getString('biz_phone') ?? '08123456789';
-      _receiptWidth = prefs.getInt('receipt_width') ?? 58;
-      _selectedAddress = prefs.getString('printer_mac') ?? '';
-      _selectedName = prefs.getString('printer_name') ?? '';
-    });
-  }
-
-  Future<void> _savePrinterConnection(String mac, String name) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('printer_mac', mac);
-    await prefs.setString('printer_name', name);
-  }
-
-  Future<void> _saveReceiptSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('printer_connection_type', _connectionType);
+    await prefs.setString('printer_usb_name', _selectedUsbPrinter);
+    await prefs.setInt('receipt_width', _receiptWidth);
     await prefs.setString('biz_name', _businessNameController.text.trim());
     await prefs.setString('biz_address', _businessAddressController.text.trim());
     await prefs.setString('biz_phone', _businessPhoneController.text.trim());
-    await prefs.setInt('receipt_width', _receiptWidth);
+    await prefs.setString('biz_footer', _footerNoteController.text.trim());
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pengaturan struk belanja berhasil disimpan.'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              const Text('Pengaturan printer dan struk berhasil disimpan!'),
+            ],
+          ),
+          backgroundColor: const Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
       );
     }
   }
 
   Future<void> _testPrint() async {
-    if (!_isConnected) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Hubungkan printer bluetooth terlebih dahulu.'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
+    setState(() => _isTestingPrint = true);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Mencetak halaman pengujian...'), duration: Duration(seconds: 1)),
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+            SizedBox(width: 10),
+            Text('Mengirim halaman pengujian ke printer...'),
+          ],
+        ),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
 
     try {
-      await PrinterService.printTestPage();
+      final result = await PrinterService.printTestPage();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result ? 'Halaman tes cetak berhasil dikirim!' : 'Gagal mengirim cetak ke printer.'),
+            backgroundColor: result ? const Color(0xFF10B981) : Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal cetak: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error cetak: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isTestingPrint = false);
+      }
     }
   }
 
@@ -179,21 +263,12 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      labelStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+      labelStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12.5, fontWeight: FontWeight.bold),
       hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-      floatingLabelStyle: const TextStyle(color: Color(0xFF4E80EE), fontWeight: FontWeight.bold),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF4E80EE), width: 2),
-      ),
+      floatingLabelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w800),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primaryColor, width: 2)),
       prefixIcon: Icon(icon, color: const Color(0xFF64748B), size: 20),
       filled: true,
       fillColor: const Color(0xFFF8FAFC),
@@ -203,333 +278,498 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        title: const Text('Pengaturan Printer Thermal', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
-        elevation: 0,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFE2E8F0), height: 1),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // 1. Left Panel: Bluetooth Scan and Pairing (360px)
-          Container(
-            width: 360,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(right: BorderSide(color: Color(0xFFE2E8F0))),
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // BT disabled notice
-                  if (!_btEnabled)
+    final canPop = Navigator.canPop(context);
+
+    Widget content = Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 1. Left Panel: Connection Manager (USB / Bluetooth Selector & Device List)
+        Container(
+          width: 440,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(right: BorderSide(color: Color(0xFFE2E8F0))),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.print_rounded, size: 22, color: Color(0xFF0F172A)),
+                        SizedBox(width: 10),
+                        Text(
+                          'Pilih Tipe Koneksi Printer',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Connection Type Segmented Switcher
                     Container(
-                      padding: const EdgeInsets.all(16),
-                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF2F2),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFFCA5A5)),
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.bluetooth_disabled_rounded, color: Color(0xFFEF4444), size: 22),
-                          const SizedBox(width: 12),
                           Expanded(
-                            child: Text(
-                              'Bluetooth tidak aktif! Silakan aktifkan Bluetooth komputer.',
-                              style: TextStyle(color: const Color(0xFFB91C1C), fontSize: 11.5, height: 1.5, fontWeight: FontWeight.w600),
+                            child: _buildTypeSegment(
+                              label: 'Kabel USB / Windows',
+                              icon: Icons.usb_rounded,
+                              type: 'usb',
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: _buildTypeSegment(
+                              label: 'Bluetooth Nirkabel',
+                              icon: Icons.bluetooth_rounded,
+                              type: 'bluetooth',
                             ),
                           ),
                         ],
                       ),
                     ),
-
-                  // Connection Status
-                  const Text('Printer Terkoneksi', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF475569), letterSpacing: 0.5)),
-                  const SizedBox(height: 12),
-                  _buildPrinterStatusCard(),
-                  const SizedBox(height: 24),
-                  
-                  // Device List Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Daftar Perangkat', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
-                      IconButton(
-                        icon: const Icon(Icons.refresh_rounded, size: 20, color: Color(0xFF64748B)),
-                        onPressed: _loadDevices,
-                        tooltip: 'Scan ulang bluetooth',
-                        style: IconButton.styleFrom(hoverColor: const Color(0xFFF1F5F9)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Device list builder
-                  _isLoading
-                      ? const Center(child: Padding(padding: EdgeInsets.all(24.0), child: CircularProgressIndicator()))
-                      : _devices.isEmpty
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 24.0),
-                                child: Text('Tidak ada perangkat bluetooth paired.', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
-                              ),
-                            )
-                          : Column(
-                              children: _devices.map((dev) {
-                                final isSelected = _selectedAddress == dev.macAdress;
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? primaryColor.withOpacity(0.04) : Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: isSelected ? primaryColor : const Color(0xFFE2E8F0),
-                                      width: isSelected ? 1.5 : 1,
-                                    ),
-                                  ),
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  child: ListTile(
-                                    dense: true,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                    title: Text(dev.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
-                                    subtitle: Text(dev.macAdress, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                                    trailing: _isConnecting && isSelected
-                                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                                        : (isSelected && _isConnected)
-                                            ? const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20)
-                                            : ElevatedButton(
-                                                onPressed: () => _connectDevice(dev.macAdress, dev.name),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: primaryColor,
-                                                  foregroundColor: Colors.white,
-                                                  elevation: 0,
-                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                                ),
-                                                child: const Text('Hubungkan', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                                              ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                ],
-              ),
-            ),
-          ),
-
-          // 2. Right Panel: Header Settings Form (Expanded)
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Container(
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    )
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Column(
+              ),
+              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+              // Device List Area
+              Expanded(
+                child: _connectionType == 'usb' ? _buildUsbPrinterList() : _buildBluetoothDeviceList(),
+              ),
+            ],
+          ),
+        ),
+
+        // 2. Right Panel: Receipt Header & Design Configuration
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(28.0),
+            child: Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF6366F1), size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Desain & Informasi Kepala Struk (Header)',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                             ),
-                            SizedBox(height: 4),
+                            SizedBox(height: 2),
                             Text(
-                              'Konfigurasi data cetak identitas toko pada nota belanja',
-                              style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: _testPrint,
-                              icon: const Icon(Icons.print_rounded, color: Color(0xFF4F46E5), size: 18),
-                              label: const Text('Cetak Test Page', style: TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFEEF2F6),
-                                shadowColor: Colors.transparent,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            ElevatedButton.icon(
-                              onPressed: _saveReceiptSettings,
-                              icon: const Icon(Icons.save_rounded, color: Colors.white, size: 18),
-                              label: const Text('Simpan Struk', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryColor,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shadowColor: Colors.transparent,
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    const Divider(color: Color(0xFFF1F5F9)),
-                    const SizedBox(height: 24),
-
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            TextField(
-                              controller: _businessNameController,
-                              decoration: _inputDecoration(
-                                'Nama Bisnis / Toko Laundry',
-                                'Smart Laundry',
-                                Icons.store_rounded,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: _businessAddressController,
-                              decoration: _inputDecoration(
-                                'Alamat Toko',
-                                'Jl. Raya Utama No. 8',
-                                Icons.location_on_rounded,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: _businessPhoneController,
-                              decoration: _inputDecoration(
-                                'Nomor Telepon Toko',
-                                '08123456789',
-                                Icons.phone_rounded,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            // Width Dropdown
-                            DropdownButtonFormField<int>(
-                              value: _receiptWidth,
-                              dropdownColor: Colors.white,
-                              style: const TextStyle(color: Color(0xFF0F172A), fontSize: 14),
-                              decoration: _inputDecoration(
-                                'Lebar Kertas Cetak (Printer Thermal)',
-                                '',
-                                Icons.straighten_rounded,
-                              ),
-                              items: const [
-                                DropdownMenuItem(value: 48, child: Text('48 mm (Mini Thermal)')),
-                                DropdownMenuItem(value: 58, child: Text('58 mm (Standar POS Kasir)')),
-                                DropdownMenuItem(value: 72, child: Text('72 mm (Medium)')),
-                                DropdownMenuItem(value: 80, child: Text('80 mm (Kasir Besar/Lebar)')),
-                              ],
-                              onChanged: (val) {
-                                if (val != null) setState(() => _receiptWidth = val);
-                              },
+                              'Konfigurasi identitas toko, ukuran kertas, dan format cetak nota kasir',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                      ElevatedButton.icon(
+                        onPressed: _isTestingPrint ? null : _testPrint,
+                        icon: const Icon(Icons.print_rounded, size: 18, color: Colors.white),
+                        label: const Text('Cetak Test Page', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366F1),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: _saveAllSettings,
+                        icon: const Icon(Icons.save_rounded, size: 18, color: Colors.white),
+                        label: const Text('Simpan Struk', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  const SizedBox(height: 24),
+
+                  // Form Fields
+                  TextField(
+                    controller: _businessNameController,
+                    decoration: _inputDecoration('Nama Bisnis / Toko Laundry', 'Misal: Azima Laundry', Icons.store_rounded),
+                  ),
+                  const SizedBox(height: 18),
+
+                  TextField(
+                    controller: _businessAddressController,
+                    decoration: _inputDecoration('Alamat Toko', 'Misal: Jl. Raya Utama No. 8', Icons.location_on_rounded),
+                  ),
+                  const SizedBox(height: 18),
+
+                  TextField(
+                    controller: _businessPhoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: _inputDecoration('Nomor Telepon / WhatsApp Toko', 'Misal: 08123456789', Icons.phone_rounded),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Receipt Paper Width Selector (with Epson TM-U220D 76mm Support!)
+                  DropdownButtonFormField<int>(
+                    value: _receiptWidth,
+                    decoration: _inputDecoration('Lebar Kertas Cetak (Printer POS)', 'Pilih ukuran kertas', Icons.straighten_rounded),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 58,
+                        child: Row(
+                          children: [
+                            Icon(Icons.receipt_rounded, size: 18, color: Color(0xFF64748B)),
+                            SizedBox(width: 10),
+                            Text('58 mm (Printer Thermal Standar Kasir)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+                          ],
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 76,
+                        child: Row(
+                          children: [
+                            Icon(Icons.precision_manufacturing_rounded, size: 18, color: Color(0xFF6366F1)),
+                            SizedBox(width: 10),
+                            Text('76 mm (Dot Matrix Epson TM-U220D / Star SP700)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF4338CA))),
+                          ],
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 80,
+                        child: Row(
+                          children: [
+                            Icon(Icons.receipt_long_rounded, size: 18, color: Color(0xFF64748B)),
+                            SizedBox(width: 10),
+                            Text('80 mm (Printer Thermal Lebar / POS-80)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _receiptWidth = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 18),
+
+                  TextField(
+                    controller: _footerNoteController,
+                    maxLines: 2,
+                    decoration: _inputDecoration('Catatan Kaki Struk (Footer Message)', 'Misal: Terima kasih telah mencuci di tempat kami!', Icons.notes_rounded),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
+        ),
+      ],
+    );
+
+    if (canPop) {
+      return Scaffold(
+        backgroundColor: backgroundColor,
+        appBar: AppBar(
+          title: const Text('Pengaturan Printer Kasir', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF0F172A),
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, size: 22),
+            tooltip: 'Kembali',
+            onPressed: () => Navigator.pop(context),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(color: const Color(0xFFE2E8F0), height: 1),
+          ),
+        ),
+        body: content,
+      );
+    } else {
+      return content;
+    }
+  }
+
+  Widget _buildTypeSegment({
+    required String label,
+    required IconData icon,
+    required String type,
+  }) {
+    final isSelected = _connectionType == type;
+    return InkWell(
+      onTap: () {
+        setState(() => _connectionType = type);
+        final prefs = SharedPreferences.getInstance();
+        prefs.then((p) => p.setString('printer_connection_type', type));
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isSelected
+              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: isSelected ? primaryColor : const Color(0xFF64748B)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? primaryColor : const Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildPrinterStatusCard() {
-    if (_selectedAddress.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+  Widget _buildUsbPrinterList() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            children: [
+              const Text(
+                'Printer Kabel Terdeteksi (Windows)',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                onPressed: _loadUsbPrinters,
+                tooltip: 'Refresh Printer',
+                style: IconButton.styleFrom(backgroundColor: const Color(0xFFF1F5F9), padding: const EdgeInsets.all(6)),
+              ),
+            ],
+          ),
         ),
-        child: const Row(
-          children: [
-            Icon(Icons.print_disabled_rounded, color: Color(0xFF94A3B8), size: 22),
-            const SizedBox(width: 12),
-            Expanded(child: Text('Belum ada printer terhubung.', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)))),
-          ],
-        ),
-      );
-    }
+        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        Expanded(
+          child: _isLoadingUsb
+              ? const Center(child: CircularProgressIndicator())
+              : _usbPrinters.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.print_disabled_rounded, size: 42, color: Colors.grey[300]),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Tidak ada printer driver terpasang di Windows.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _usbPrinters.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final printer = _usbPrinters[index];
+                        final isSelected = _selectedUsbPrinter == printer.name;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _isConnected ? const Color(0xFFECFDF5) : const Color(0xFFFFF7ED),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _isConnected ? const Color(0xFF10B981) : const Color(0xFFF97316)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.print_rounded, color: _isConnected ? const Color(0xFF10B981) : const Color(0xFFF97316), size: 24),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_selectedName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0F172A))),
-                const SizedBox(height: 4),
-                Text(
-                  _isConnected ? 'TERHUBUNG' : 'DISCONNECTED (Tersimpan)',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: _isConnected ? const Color(0xFF047857) : const Color(0xFFC2410C),
-                  ),
-                ),
-              ],
-            ),
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected ? primaryColor : const Color(0xFFE2E8F0),
+                              width: isSelected ? 2 : 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isSelected ? primaryColor.withValues(alpha: 0.1) : const Color(0xFF0F172A).withValues(alpha: 0.02),
+                                blurRadius: isSelected ? 6 : 2,
+                              ),
+                            ],
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: isSelected ? primaryColor : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.usb_rounded,
+                                color: isSelected ? Colors.white : const Color(0xFF64748B),
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              printer.name,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13.5,
+                                color: isSelected ? primaryColor : const Color(0xFF0F172A),
+                              ),
+                            ),
+                            subtitle: Text(
+                              printer.isDefault ? 'Default Windows Printer' : 'Kabel USB / Spooler Siap',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle_rounded, color: Color(0xFF2563EB), size: 20)
+                                : ElevatedButton(
+                                    onPressed: () => _selectUsbPrinter(printer),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFF1F5F9),
+                                      foregroundColor: const Color(0xFF0F172A),
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    child: const Text('Pilih', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ),
+                            onTap: () => _selectUsbPrinter(printer),
+                          ),
+                        );
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBluetoothDeviceList() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            children: [
+              const Text(
+                'Perangkat Bluetooth Paired',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                onPressed: _loadBtDevices,
+                tooltip: 'Scan Bluetooth',
+                style: IconButton.styleFrom(backgroundColor: const Color(0xFFF1F5F9), padding: const EdgeInsets.all(6)),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.link_off_rounded, color: Colors.redAccent, size: 20),
-            onPressed: _disconnect,
-            tooltip: 'Putuskan printer',
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.white,
-              hoverColor: Colors.red.withOpacity(0.05),
-            ),
-          ),
-        ],
-      ),
+        ),
+        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        Expanded(
+          child: _isLoadingBt
+              ? const Center(child: CircularProgressIndicator())
+              : _btDevices.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.bluetooth_disabled_rounded, size: 42, color: Colors.grey[300]),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Tidak ada printer bluetooth yang paired.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _btDevices.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final dev = _btDevices[index];
+                        final isConnected = _isBtConnected && _selectedBtAddress == dev.macAdress;
+
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: isConnected ? const Color(0xFFF0FDF4) : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isConnected ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+                              width: isConnected ? 2 : 1,
+                            ),
+                          ),
+                          child: ListTile(
+                            leading: Icon(Icons.bluetooth_connected_rounded, color: isConnected ? const Color(0xFF10B981) : const Color(0xFF64748B)),
+                            title: Text(dev.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                            subtitle: Text(dev.macAdress, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            trailing: isConnected
+                                ? ElevatedButton(
+                                    onPressed: _disconnectBt,
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red[50], foregroundColor: Colors.red, elevation: 0),
+                                    child: const Text('Putus', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  )
+                                : ElevatedButton(
+                                    onPressed: _isConnectingBt ? null : () => _connectBtDevice(dev.macAdress, dev.name),
+                                    style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white, elevation: 0),
+                                    child: const Text('Hubungkan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  ),
+                          ),
+                        );
+                      },
+                    ),
+        ),
+      ],
     );
   }
 }
