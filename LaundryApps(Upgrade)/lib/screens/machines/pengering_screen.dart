@@ -1619,15 +1619,16 @@ class _PengeringContentState extends State<PengeringContent> {
                               service.setActivating(machineId, true);
 
                               try {
-                                String? customMsg =
-                                    isCustomMessage && msgCtrl.text.isNotEmpty
-                                    ? msgCtrl.text
-                                    : null;
-
-                                // If active customer phone was typed manually in dialog, save/use it
-                                if (sendWa && customerPhone.isEmpty && activePhoneCtrl.text.trim().isNotEmpty) {
-                                  customerPhone = '+62${activePhoneCtrl.text.trim()}';
+                                String activePhone = customerPhone;
+                                if (activePhoneCtrl.text.trim().isNotEmpty) {
+                                  final input = activePhoneCtrl.text.trim();
+                                  activePhone = input.startsWith('+62')
+                                      ? input
+                                      : (input.startsWith('0') ? '+62${input.substring(1)}' : '+62$input');
                                 }
+
+                                final String messageToSend = msgCtrl.text.trim();
+                                final String? customMsg = messageToSend.isNotEmpty ? messageToSend : null;
 
                                 if (isReplacing) {
                                   String finalPhone = newOrder.customerPhone ?? '';
@@ -1666,6 +1667,7 @@ class _PengeringContentState extends State<PengeringContent> {
                                     newCustomerPhone: finalPhone,
                                     sendWaToPrevious: sendWa,
                                     waMessage: customMsg,
+                                    previousCustomerPhone: activePhone,
                                   ).then((res) {
                                     if (res['success'] != true) {
                                       Globals.showErrorSnackBar('Info IoT: ${res['error']}');
@@ -1686,6 +1688,7 @@ class _PengeringContentState extends State<PengeringContent> {
                                     entityId: machine.name,
                                     sendWa: sendWa,
                                     waMessage: customMsg,
+                                    customerPhone: activePhone,
                                   ).then((res) {
                                     if (res['success'] != true) {
                                       Globals.showErrorSnackBar('Info IoT: ${res['error']}');

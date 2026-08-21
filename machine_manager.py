@@ -890,7 +890,7 @@ def stop_machine_monitoring(entity_id, source='admin'):
     return "monitoring_stopped", 200
 
 
-def finish_and_notify(entity_id, send_wa=True, wa_message=None):
+def finish_and_notify(entity_id, send_wa=True, wa_message=None, customer_phone=None):
     """Manually stop monitoring and release a machine (Selesaikan).
 
     Sends completion WA to customer if send_wa is True and phone number is available.
@@ -900,21 +900,21 @@ def finish_and_notify(entity_id, send_wa=True, wa_message=None):
     """
     info = get_customer_info(entity_id)
     customer_name = info.get("name", "Pelanggan")
-    customer_phone = info.get("phone")
+    target_phone = customer_phone or info.get("phone")
 
-    print(f"[Monitor] Finishing machine {entity_id} for {customer_name} (send_wa={send_wa}, phone={customer_phone})")
+    print(f"[Monitor] Finishing machine {entity_id} for {customer_name} (send_wa={send_wa}, phone={target_phone}, custom_msg={bool(wa_message)})")
 
-    if send_wa and customer_phone:
+    if send_wa and target_phone:
         if wa_message:
             threading.Thread(
                 target=wa_bridge.send_wa_message,
-                args=(customer_phone, wa_message),
+                args=(target_phone, wa_message),
                 daemon=True
             ).start()
         else:
             threading.Thread(
                 target=wa_bridge.send_wa_cucian_selesai,
-                args=(customer_phone, customer_name, entity_id),
+                args=(target_phone, customer_name, entity_id),
                 daemon=True
             ).start()
 
@@ -927,7 +927,8 @@ def finish_and_notify(entity_id, send_wa=True, wa_message=None):
 
 
 def replace_customer(entity_id, new_customer_name, new_customer_phone=None,
-                     send_wa_to_previous=False, wa_message=None):
+                     send_wa_to_previous=False, wa_message=None,
+                     previous_customer_phone=None):
     """Replace the customer on an occupied/active machine.
 
     Used when kasir wants to assign a new customer to a machine that still
@@ -939,15 +940,16 @@ def replace_customer(entity_id, new_customer_name, new_customer_phone=None,
         new_customer_phone: New customer's phone (optional)
         send_wa_to_previous: Whether to send WA to previous customer
         wa_message: Custom WA message (None = use template)
+        previous_customer_phone: Previous customer's phone if known by frontend
 
     Returns:
         tuple (message, status_code)
     """
     prev_info = get_customer_info(entity_id)
     prev_name = prev_info.get("name", "")
-    prev_phone = prev_info.get("phone", "")
+    prev_phone = previous_customer_phone or prev_info.get("phone", "")
 
-    print(f"[Monitor] Replacing customer on {entity_id}: {prev_name} -> {new_customer_name} (send_wa_prev={send_wa_to_previous}, prev_phone={prev_phone})")
+    print(f"[Monitor] Replacing customer on {entity_id}: {prev_name} -> {new_customer_name} (send_wa_prev={send_wa_to_previous}, prev_phone={prev_phone}, custom_msg={bool(wa_message)})")
 
     # Send WA to previous customer if requested
     if send_wa_to_previous and prev_phone:

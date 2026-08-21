@@ -365,6 +365,7 @@ class MachineStatusService {
     required String entityId,
     required bool sendWa,
     String? waMessage,
+    String? customerPhone,
   }) async {
     // Optimistic Update!
     updateMachineStatusOptimistic(
@@ -385,6 +386,7 @@ class MachineStatusService {
               'entity_id': entityId,
               'send_wa': sendWa,
               'wa_message': waMessage,
+              'customer_phone': customerPhone,
             }),
           )
           .timeout(const Duration(seconds: 10));
@@ -407,6 +409,7 @@ class MachineStatusService {
     String? newCustomerPhone,
     required bool sendWaToPrevious,
     String? waMessage,
+    String? previousCustomerPhone,
   }) async {
     // Optimistic Update!
     updateMachineStatusOptimistic(
@@ -427,6 +430,7 @@ class MachineStatusService {
               'entity_id': entityId,
               'new_customer_name': newCustomerName,
               'new_customer_phone': newCustomerPhone,
+              'previous_customer_phone': previousCustomerPhone,
               'send_wa_to_previous': sendWaToPrevious,
               'wa_message': waMessage,
             }),

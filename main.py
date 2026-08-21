@@ -387,12 +387,13 @@ def api_machine_stop():
 @app.route('/api/machine/replace', methods=['POST'])
 def api_machine_replace():
     """Replace customer on an occupied/active machine.
-    
+
     Expects JSON body:
     {
         "entity_id": "Mesin_Cuci_2",
         "new_customer_name": "Yanti",
         "new_customer_phone": "08123456789",
+        "previous_customer_phone": "08987654321",
         "send_wa_to_previous": true,
         "wa_message": null
     }
@@ -400,22 +401,24 @@ def api_machine_replace():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON body"}), 400
-    
+
     entity = machine_manager.resolve_entity(data.get('entity_id', ''))
     if not entity:
         return jsonify({"error": "Invalid machine"}), 400
-    
+
     new_name = data.get('new_customer_name', 'Pelanggan')
     new_phone = data.get('new_customer_phone')
+    prev_phone = data.get('previous_customer_phone')
     send_wa = data.get('send_wa_to_previous', False)
     wa_msg = data.get('wa_message')
-    
+
     res, code = machine_manager.replace_customer(
         entity,
         new_customer_name=new_name,
         new_customer_phone=new_phone,
         send_wa_to_previous=send_wa,
-        wa_message=wa_msg
+        wa_message=wa_msg,
+        previous_customer_phone=prev_phone
     )
     return jsonify({"message": res}), code
 
@@ -423,29 +426,32 @@ def api_machine_replace():
 @app.route('/api/machine/finish', methods=['POST'])
 def api_machine_finish():
     """Manually stop monitoring and release a machine (Selesaikan).
-    
+
     Expects JSON body:
     {
         "entity_id": "Mesin_Cuci_2",
         "send_wa": true,
-        "wa_message": null
+        "wa_message": null,
+        "customer_phone": "08123456789"
     }
     """
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON body"}), 400
-    
+
     entity = machine_manager.resolve_entity(data.get('entity_id', ''))
     if not entity:
         return jsonify({"error": "Invalid machine"}), 400
-    
+
     send_wa = data.get('send_wa', True)
     wa_msg = data.get('wa_message')
-    
+    cust_phone = data.get('customer_phone')
+
     res, code = machine_manager.finish_and_notify(
         entity,
         send_wa=send_wa,
-        wa_message=wa_msg
+        wa_message=wa_msg,
+        customer_phone=cust_phone
     )
     return jsonify({"message": res}), code
 
