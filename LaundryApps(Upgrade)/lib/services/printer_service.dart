@@ -43,17 +43,18 @@ class ReceiptLayoutConfig {
   factory ReceiptLayoutConfig.forWidth(int widthMm) {
     if (widthMm == 76) {
       // Epson TM-U220D: Paper Roll is 76mm.
-      // Left and right margins balanced to center the 63.5mm printable area perfectly on the roll!
+      // Hardware left unprintable barrier is ~8.5mm to 9.5mm from the physical edge.
+      // Setting marginLeftMm to 10.0mm prevents left clipping, and marginRightMm to 8.5mm guarantees zero right clipping!
       return const ReceiptLayoutConfig(
         pageWidthMm: 76.0,
-        marginLeftMm: 6.0,
-        marginRightMm: 6.0,
-        headerTitleSize: 12.5,
-        headerSubSize: 9.0,
-        sectionTitleSize: 10.0,
-        bodyTextSize: 9.2,
-        smallTextSize: 8.2,
-        totalTextSize: 11.5,
+        marginLeftMm: 10.0,
+        marginRightMm: 8.5,
+        headerTitleSize: 12.0,
+        headerSubSize: 8.5,
+        sectionTitleSize: 9.2,
+        bodyTextSize: 8.8,
+        smallTextSize: 7.8,
+        totalTextSize: 10.8,
         dividerThickness: 0.8,
         spacing: 2.5,
       );
@@ -76,8 +77,8 @@ class ReceiptLayoutConfig {
       // 58mm Standard Thermal: Paper Roll 58mm
       return const ReceiptLayoutConfig(
         pageWidthMm: 58.0,
-        marginLeftMm: 4.5,
-        marginRightMm: 4.5,
+        marginLeftMm: 3.5,
+        marginRightMm: 3.5,
         headerTitleSize: 11.0,
         headerSubSize: 8.5,
         sectionTitleSize: 9.5,
