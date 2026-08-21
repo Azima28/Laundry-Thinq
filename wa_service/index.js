@@ -149,15 +149,18 @@ async function sendBotMessage(chatId, content) {
     activeSends.add(cleanChatId);
     try {
         const msg = await client.sendMessage(chatId, content);
-        if (msg && msg.id && msg.id.id) {
-            botSentMessageIds.add(msg.id.id);
-            // Limit Set size to prevent memory growth
-            if (botSentMessageIds.size > 1000) {
-                const firstKey = botSentMessageIds.values().next().value;
-                botSentMessageIds.delete(firstKey);
+        if (msg && msg.id) {
+            const rawId = typeof msg.id === 'object' ? (msg.id.id || msg.id._serialized) : String(msg.id);
+            if (rawId) {
+                botSentMessageIds.add(rawId);
+                // Limit Set size to prevent memory growth
+                if (botSentMessageIds.size > 1000) {
+                    const firstKey = botSentMessageIds.values().next().value;
+                    botSentMessageIds.delete(firstKey);
+                }
             }
         }
-        return msg;
+        return msg || { success: true };
     } catch (e) {
         console.error('[Chatbot] Error in sendBotMessage:', e.message);
         throw e;
@@ -165,7 +168,7 @@ async function sendBotMessage(chatId, content) {
         setTimeout(() => {
             activeSends.delete(chatId);
             activeSends.delete(cleanChatId);
-        }, 2000);
+        }, 3000);
     }
 }
 
@@ -1073,14 +1076,17 @@ client.on('message', async (msg) => {
 
 // Detect staff manual chat to pause chatbot (message_create)
 client.on('message_create', (msg) => {
-    if (msg.fromMe && msg.to && !msg.to.endsWith('@g.us')) {
+    if (!msg || !msg.to) return;
+    if (msg.fromMe && !msg.to.endsWith('@g.us')) {
         const to = msg.to.replace('@c.us', '').replace('@lid', '');
-        const msgId = msg.id.id;
-        
+        const msgId = msg.id ? (typeof msg.id === 'object' ? (msg.id.id || msg.id._serialized) : String(msg.id)) : null;
+
         // If this is currently being sent by the bot, skip the manual staff message check completely
         if (activeSends.has(msg.to) || activeSends.has(to)) {
             return;
         }
+
+        if (!msgId) return;
 
         // Delay processing to allow the client.sendMessage promise to resolve and register the ID
         setTimeout(() => {
@@ -1091,10 +1097,10 @@ client.on('message_create', (msg) => {
             if (activeSends.has(msg.to) || activeSends.has(to)) {
                 return;
             }
-            
+
             staffChatCooldown.set(to, Date.now());
             console.log(`[Chatbot] Staff manual message detected. Chatbot auto-reply paused for ${to} for 30 minutes.`);
-        }, 1000); // Increased timeout to 1s for safety
+        }, 1500);
     }
 });
 
@@ -1277,12 +1283,16 @@ app.post('/send', async (req, res) => {
 
         // Send the message
         const result = await sendBotMessage(chatId, message);
-        
+
         console.log(`[WA] Message sent to ${cleanPhone}: "${message.substring(0, 50)}..."`);
-        
+
+        const serializedId = result && result.id
+            ? (typeof result.id === 'object' ? (result.id._serialized || result.id.id) : String(result.id))
+            : 'msg_' + Date.now();
+
         res.json({
             success: true,
-            messageId: result.id?._serialized || null,
+            messageId: serializedId,
             timestamp: new Date().toISOString()
         });
     } catch (error) {

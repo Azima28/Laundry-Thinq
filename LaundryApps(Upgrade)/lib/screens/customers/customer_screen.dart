@@ -360,17 +360,19 @@ class _CustomerScreenState extends State<CustomerScreen> {
       statusNote = 'Layanan offline';
     }
 
-    // 2. Always persist into SQLite wa_outbox queue for tracking/reliability
-    try {
-      final db = await _db.database;
-      await db.insert('wa_outbox', {
-        'phone': DbEncryptionHelper.encrypt(cleanPhone),
-        'message': DbEncryptionHelper.encrypt(message),
-        'status': sentOnline ? 'sent' : 'pending',
-        'created_at': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      debugPrint('[CustomerScreen] Gagal mencatat wa_outbox: $e');
+    // 2. Only queue to SQLite wa_outbox if sending online failed (prevents double messages)
+    if (!sentOnline) {
+      try {
+        final db = await _db.database;
+        await db.insert('wa_outbox', {
+          'phone': DbEncryptionHelper.encrypt(cleanPhone),
+          'message': DbEncryptionHelper.encrypt(message),
+          'status': 'pending',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('[CustomerScreen] Gagal mencatat wa_outbox: $e');
+      }
     }
 
     if (mounted) {
