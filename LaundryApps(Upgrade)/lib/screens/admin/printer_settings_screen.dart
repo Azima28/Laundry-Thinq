@@ -37,6 +37,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   bool _btEnabled = false;
 
   bool _isTestingPrint = false;
+  bool _isClearingSpooler = false;
 
   final Color primaryColor = StyleConstants.primaryColor;
   final Color backgroundColor = StyleConstants.backgroundColor;
@@ -259,6 +260,54 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     }
   }
 
+  Future<void> _clearSpooler() async {
+    setState(() => _isClearingSpooler = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+            SizedBox(width: 10),
+            Text('Membersihkan antrean Print Spooler Windows...'),
+          ],
+        ),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    try {
+      final result = await PrinterService.clearPrintSpooler();
+      await _loadUsbPrinters();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.cleaning_services_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(child: Text(result['message'] ?? 'Spooler berhasil dibersihkan!')),
+              ],
+            ),
+            backgroundColor: result['success'] == true ? const Color(0xFF10B981) : Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal bersihkan spooler: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isClearingSpooler = false);
+      }
+    }
+  }
+
   InputDecoration _inputDecoration(String label, String hint, IconData icon) {
     return InputDecoration(
       labelText: label,
@@ -399,6 +448,23 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                           ],
                         ),
                       ),
+                      OutlinedButton.icon(
+                        onPressed: _isClearingSpooler ? null : _clearSpooler,
+                        icon: _isClearingSpooler
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFE11D48)))
+                            : const Icon(Icons.cleaning_services_rounded, size: 16, color: Color(0xFFE11D48)),
+                        label: Text(
+                          _isClearingSpooler ? 'Clearing...' : 'Clear Spooler',
+                          style: const TextStyle(color: Color(0xFFE11D48), fontWeight: FontWeight.bold),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFFDA4AF)),
+                          backgroundColor: const Color(0xFFFFF1F2),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       ElevatedButton.icon(
                         onPressed: _isTestingPrint ? null : _testPrint,
                         icon: const Icon(Icons.print_rounded, size: 18, color: Colors.white),
@@ -684,6 +750,26 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                         );
                       },
                     ),
+        ),
+        // Clear Spooler Footer Button
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: OutlinedButton.icon(
+            onPressed: _isClearingSpooler ? null : _clearSpooler,
+            icon: _isClearingSpooler
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFE11D48)))
+                : const Icon(Icons.cleaning_services_rounded, size: 18, color: Color(0xFFE11D48)),
+            label: Text(
+              _isClearingSpooler ? 'Sedang Bersihkan Spooler...' : 'Bersihkan Antrean Print Spooler (Clear Spooler)',
+              style: const TextStyle(color: Color(0xFFE11D48), fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFFFDA4AF), width: 1.5),
+              backgroundColor: const Color(0xFFFFF1F2),
+              minimumSize: const Size.fromHeight(44),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
         ),
       ],
     );

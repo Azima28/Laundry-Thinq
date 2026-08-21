@@ -46,6 +46,60 @@ class PrinterService {
     }
   }
 
+  /// Clears stuck print jobs and restarts Windows Print Spooler service
+  static Future<Map<String, dynamic>> clearPrintSpooler() async {
+    if (!Platform.isWindows) {
+      return {
+        'success': true,
+        'message': 'Fitur Clear Spooler khusus sistem operasi Windows.'
+      };
+    }
+
+    try {
+      // 1. Remove all active print jobs across printers
+      await Process.run('powershell', [
+        '-NoProfile',
+        '-Command',
+        r'''
+        try {
+            $printers = Get-Printer -ErrorAction SilentlyContinue
+            foreach ($p in $printers) {
+                Get-PrintJob -PrinterName $p.Name -ErrorAction SilentlyContinue | Remove-PrintJob -ErrorAction SilentlyContinue
+            }
+        } catch {}
+        '''
+      ]);
+
+      // 2. Restart Print Spooler service and purge stuck spool files
+      await Process.run('powershell', [
+        '-NoProfile',
+        '-Command',
+        r'''
+        try {
+            Stop-Service -Name Spooler -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 400
+            $spoolDir = "$env:SystemRoot\System32\spool\PRINTERS"
+            if (Test-Path $spoolDir) {
+                Get-ChildItem -Path "$spoolDir\*" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+            }
+            Start-Service -Name Spooler -ErrorAction SilentlyContinue
+        } catch {}
+        '''
+      ]);
+
+      return {
+        'success': true,
+        'message': 'Antrean Print Spooler Windows berhasil dibersihkan & di-restart.'
+      };
+    } catch (e) {
+      debugPrint('[PrinterService] Error clearing print spooler: $e');
+      return {
+        'success': false,
+        'message': 'Gagal membersihkan spooler: $e'
+      };
+    }
+  }
+
   /// Get the active connection type ('usb' or 'bluetooth')
   static Future<String> getConnectionType() async {
     final prefs = await SharedPreferences.getInstance();
