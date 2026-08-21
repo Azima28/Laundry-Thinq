@@ -7,13 +7,17 @@ subscribers_lock = threading.Lock()
 
 # Global state for initial snapshots
 latest_state = {}
+_last_logged_broadcast = {}
 
 def broadcast(data):
     """Send data to all connected SSE clients."""
-    # Debug log
+    # Debug log only when data changes to prevent console flood
     if not data.startswith("LOG|"):
-        print(f"[SSE] Broadcasting update: {data}")
-    
+        key = data.split("|")[0] if "|" in data else data
+        if _last_logged_broadcast.get(key) != data:
+            _last_logged_broadcast[key] = data
+            print(f"[SSE] Update: {data}")
+
     with subscribers_lock:
         for q in list(subscribers):
             try:

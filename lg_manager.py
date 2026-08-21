@@ -494,11 +494,27 @@ async def lg_polling_loop():
                             run_state = current_state_val.capitalize()
                             
                         timer_data = state_data.get("timer", {})
+                        washer_data = state_data.get("washer", {})
+                        dryer_data = state_data.get("dryer", {})
+
                         rem_h = 0
                         rem_m = 0
                         if isinstance(timer_data, dict):
-                            rem_h = int(timer_data.get("remainHour", 0) or 0)
-                            rem_m = int(timer_data.get("remainMinute", 0) or 0)
+                            rem_h = int(timer_data.get("remainHour", 0) or timer_data.get("remainTimeHour", 0) or 0)
+                            rem_m = int(timer_data.get("remainMinute", 0) or timer_data.get("remainTimeMinute", 0) or 0)
+
+                        if not (rem_h or rem_m):
+                            if isinstance(washer_data, dict):
+                                rem_h = int(washer_data.get("remainHour", 0) or washer_data.get("remainTimeHour", 0) or 0)
+                                rem_m = int(washer_data.get("remainMinute", 0) or washer_data.get("remainTimeMinute", 0) or 0)
+                            elif isinstance(dryer_data, dict):
+                                rem_h = int(dryer_data.get("remainHour", 0) or dryer_data.get("remainTimeHour", 0) or 0)
+                                rem_m = int(dryer_data.get("remainMinute", 0) or dryer_data.get("remainTimeMinute", 0) or 0)
+
+                        if not (rem_h or rem_m):
+                            rem_h = int(state_data.get("remainHour", 0) or 0)
+                            rem_m = int(state_data.get("remainMinute", 0) or state_data.get("remainTime", 0) or 0)
+
                         remain_time = f"{rem_h}:{rem_m:02d}" if (rem_h or rem_m) else "--:--"
                         
                         if (remain_time == "--:--" or not remain_time) and state == "Running":

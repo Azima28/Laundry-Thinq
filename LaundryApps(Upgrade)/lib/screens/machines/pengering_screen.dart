@@ -571,12 +571,6 @@ class _PengeringContentState extends State<PengeringContent> {
     final bool isError = state == 'ERROR' || state == 'OFFLINE';
     final bool isManual = entry != null && entry['is_manual'] == true;
 
-    Color color;
-    Color bg;
-    Color border;
-    String badgeText;
-    bool canClick = false;
-
     final bool isRunning = state == 'RUNNING' ||
                            state == 'RUN' ||
                            (runState.isNotEmpty &&
@@ -586,52 +580,115 @@ class _PengeringContentState extends State<PengeringContent> {
                             runState != '-' &&
                             runState != 'unknown');
 
+    Color iconColor;
+    Color iconBg;
+    Color border;
+    Gradient cardGradient;
+    String badgeText;
+    Color badgeBg;
+    Color badgeTextColor;
+    Color titleColor;
+    Color subColor;
+    bool canClick = false;
+
     if (isError) {
-      // 6. ERROR (Red)
-      color = StyleConstants.dangerColor;
-      bg = StyleConstants.statusDangerBg;
-      border = StyleConstants.dangerColor.withValues(alpha: 0.3);
+      // ERROR (Red Full Gradient)
+      cardGradient = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFFEF2F2), Color(0xFFFEE2E2)],
+      );
+      border = const Color(0xFFFCA5A5);
+      iconBg = const Color(0xFFEF4444);
+      iconColor = Colors.white;
+      badgeBg = const Color(0xFFDC2626);
+      badgeTextColor = Colors.white;
+      titleColor = const Color(0xFF7F1D1D);
+      subColor = const Color(0xFF991B1B);
       badgeText = "ERROR";
       canClick = true;
     } else if (isRunning) {
-      // 3. RUNNING (Blue)
-      color = StyleConstants.primaryColor;
-      bg = StyleConstants.statusInfoBg;
-      border = StyleConstants.primaryColor.withValues(alpha: 0.3);
+      // RUNNING (Blue/Amber Electric Full Gradient)
+      cardGradient = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFEFF6FF), Color(0xFFDBEAFE)],
+      );
+      border = const Color(0xFF93C5FD);
+      iconBg = const Color(0xFF2563EB);
+      iconColor = Colors.white;
+      badgeBg = const Color(0xFF1D4ED8);
+      badgeTextColor = Colors.white;
+      titleColor = const Color(0xFF1E3A8A);
+      subColor = const Color(0xFF1D4ED8);
       final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
       badgeText = "RUNNING$timeText";
       canClick = !service.thinqOk || isManual;
     } else if (customerName.isEmpty) {
-      // 1. READY (Green)
-      color = StyleConstants.successColor;
-      bg = StyleConstants.statusSuccessBg;
-      border = StyleConstants.successColor.withValues(alpha: 0.3);
+      // READY (Green Emerald Full Gradient)
+      cardGradient = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)],
+      );
+      border = const Color(0xFF86EFAC);
+      iconBg = const Color(0xFF10B981);
+      iconColor = Colors.white;
+      badgeBg = const Color(0xFF059669);
+      badgeTextColor = Colors.white;
+      titleColor = const Color(0xFF065F46);
+      subColor = const Color(0xFF047857);
       badgeText = "READY";
       canClick = _selectedOrderItem != null;
     } else {
-      // We have a customer name but not running
       if (machineStatus == 'unready') {
-        // 2. BOOKING (Orange)
-        color = const Color(0xFFF97316);
-        bg = const Color(0xFFFFF7ED);
-        border = const Color(0xFFF97316).withValues(alpha: 0.3);
+        // BOOKING (Orange/Amber Full Gradient)
+        cardGradient = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+        );
+        border = const Color(0xFFFDE68A);
+        iconBg = const Color(0xFFF59E0B);
+        iconColor = Colors.white;
+        badgeBg = const Color(0xFFD97706);
+        badgeTextColor = Colors.white;
+        titleColor = const Color(0xFF78350F);
+        subColor = const Color(0xFFB45309);
         final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
         badgeText = "BOOKING$timeText";
         canClick = !service.thinqOk || isManual;
       } else {
-        // Finished / Idle, waiting for cashier action
         if (waSent) {
-          // 5. SUDAH DI-WA (Purple / Teal)
-          color = StyleConstants.infoColor;
-          bg = StyleConstants.statusInfoBg;
-          border = StyleConstants.infoColor.withValues(alpha: 0.3);
+          // WA TERKIRIM (Teal/Cyan Full Gradient)
+          cardGradient = const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFF0FDFA), Color(0xFFCCFBF1)],
+          );
+          border = const Color(0xFF99F6E4);
+          iconBg = const Color(0xFF0D9488);
+          iconColor = Colors.white;
+          badgeBg = const Color(0xFF0F766E);
+          badgeTextColor = Colors.white;
+          titleColor = const Color(0xFF134E4A);
+          subColor = const Color(0xFF0F766E);
           badgeText = "WA TERKIRIM";
           canClick = true;
         } else {
-          // 4. MENUNGGU (Amber)
-          color = StyleConstants.warningColor;
-          bg = StyleConstants.statusWarningBg;
-          border = StyleConstants.warningColor.withValues(alpha: 0.3);
+          // SELESAI / MENUNGGU (Yellow/Amber Full Gradient)
+          cardGradient = const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFEFCE8), Color(0xFFFEF08A)],
+          );
+          border = const Color(0xFFFDE047);
+          iconBg = const Color(0xFFEAB308);
+          iconColor = Colors.white;
+          badgeBg = const Color(0xFFA16207);
+          badgeTextColor = Colors.white;
+          titleColor = const Color(0xFF713F12);
+          subColor = const Color(0xFF854D0E);
           badgeText = "SELESAI";
           canClick = true;
         }
@@ -646,7 +703,7 @@ class _PengeringContentState extends State<PengeringContent> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: cardGradient,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: border,
@@ -654,110 +711,125 @@ class _PengeringContentState extends State<PengeringContent> {
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.10),
-            blurRadius: 12,
+            color: iconBg.withValues(alpha: 0.12),
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(color: color, width: 4),
-            ),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(18),
-              onTap: (isActivating || !canClick)
-                  ? null
-                  : () => _handleMachineTap(
-                      machine,
-                      displayName,
-                      machineStatus,
-                      state,
-                      entry,
-                    ),
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: bg,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: isActivating
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: color,
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.wb_sunny_rounded,
-                                  color: color,
-                                  size: 22,
-                                ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: bg,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            badgeText,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: color,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: (isActivating || !canClick)
+                ? null
+                : () => _handleMachineTap(
+                    machine,
+                    displayName,
+                    machineStatus,
+                    state,
+                    entry,
+                  ),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: iconBg,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: iconBg.withValues(alpha: 0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
                             ),
+                          ],
+                        ),
+                        child: isActivating
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Icon(
+                                Icons.wb_sunny_rounded,
+                                color: iconColor,
+                                size: 22,
+                              ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: badgeBg,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: badgeBg.withValues(alpha: 0.25),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          badgeText,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
+                            color: badgeTextColor,
+                            letterSpacing: 0.4,
                           ),
                         ),
-                      ],
-                    ),
-                    const Spacer(),
-                    Text(
-                      displayName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Color(0xFF0F172A),
                       ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    displayName,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      color: titleColor,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      minutes > 0 ? '$remain ($runState)' : runState,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[500],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    minutes > 0 ? '$remain ($runState)' : (runState == 'Idle' ? 'Siap Digunakan (Idle)' : runState),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: subColor,
+                    ),
+                  ),
+                  if (customerName.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: border),
                       ),
-                    ),
-                    if (customerName.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      const Divider(height: 1),
-                      const SizedBox(height: 10),
-                      Row(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             Icons.person_rounded,
-                            size: 12,
-                            color: Colors.grey[400],
+                            size: 13,
+                            color: iconBg,
                           ),
                           const SizedBox(width: 6),
                           Expanded(
@@ -765,18 +837,18 @@ class _PengeringContentState extends State<PengeringContent> {
                               customerName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF334155),
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: titleColor,
                               ),
                             ),
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
           ),
