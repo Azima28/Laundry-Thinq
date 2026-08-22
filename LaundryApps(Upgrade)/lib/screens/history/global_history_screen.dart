@@ -390,6 +390,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
           title: const Row(
             children: [
               Icon(Icons.picture_as_pdf_rounded, color: StyleConstants.dangerColor, size: 22),
@@ -792,6 +793,8 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Konfirmasi Nyalakan Ulang', style: TextStyle(fontWeight: FontWeight.w800)),
         content: Text('Coba kirim sinyal aktivasi kembali ke ${machine.name} untuk pelanggan ${order.customerName}?'),
@@ -877,6 +880,8 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Pelunasan Pembayaran', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
           content: Column(
@@ -981,6 +986,8 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: Row(
           children: [
@@ -2262,6 +2269,8 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
               titlePadding: const EdgeInsets.fromLTRB(20, 18, 16, 12),
               contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
