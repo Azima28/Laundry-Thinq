@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import '../../database/models/database_helper.dart';
 import '../../database/models/order_model.dart';
+import '../../database/models/machine_model.dart';
 import '../../database/models/transaction_model.dart';
 import '../../transactions/transaction_repository.dart';
 import '../../transactions/order_repository.dart';
@@ -56,8 +57,12 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   List<Order> _pengeringOrders = [];
   List<Order> _ironOrders = [];
 
+  List<MachineModel> _washerMachines = [];
+  List<MachineModel> _dryerMachines = [];
   Map<int, String> _machineNameMap = {};
-  Map<int, Map<String, dynamic>> _latestUsageByOrderId = {};
+  Map<String, int> _washerUsageCountMap = {};
+  Map<String, int> _dryerUsageCountMap = {};
+  Map<int, List<Map<String, dynamic>>> _allUsagesByOrderId = {};
   List<Map<String, dynamic>> _washerUsageHistory = [];
   List<Map<String, dynamic>> _dryerUsageHistory = [];
 
@@ -113,12 +118,15 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
     try {
-      // 1. Load All Machines
+      // 1. Load All Registered Machines
       final machines = await _db.getAllMachines();
       final Map<int, String> machineNameMap = {
         for (var m in machines)
           if (m.id != null) m.id!: m.name
       };
+
+      final washerMachines = machines.where((m) => m.machineType.toLowerCase() == 'cuci').toList();
+      final dryerMachines = machines.where((m) => m.machineType.toLowerCase() == 'pengering').toList();
 
       // 2. Load Pengeluaran
       final expenses = await _db.getExpensesByDate(dateStr);
@@ -156,12 +164,33 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
             startedAt.day == _selectedDate.day;
       }).toList();
 
+      // Count activations per machine on selected date
+      final Map<String, int> washerUsageCountMap = {
+        for (var m in washerMachines) m.name: 0
+      };
+      for (var u in dayWasherUsages) {
+        final mName = u['machine_name']?.toString() ?? '';
+        washerUsageCountMap[mName] = (washerUsageCountMap[mName] ?? 0) + 1;
+      }
+
+      final Map<String, int> dryerUsageCountMap = {
+        for (var m in dryerMachines) m.name: 0
+      };
+      for (var u in dayDryerUsages) {
+        final mName = u['machine_name']?.toString() ?? '';
+        dryerUsageCountMap[mName] = (dryerUsageCountMap[mName] ?? 0) + 1;
+      }
+
       final allUsages = await _db.getMachineUsageHistory();
+      final Map<int, List<Map<String, dynamic>>> allUsagesByOrderId = {};
       final Map<int, Map<String, dynamic>> latestUsageByOrderId = {};
       for (var u in allUsages) {
         final orderId = u['order_id'] as int?;
-        if (orderId != null && !latestUsageByOrderId.containsKey(orderId)) {
-          latestUsageByOrderId[orderId] = u;
+        if (orderId != null) {
+          allUsagesByOrderId.putIfAbsent(orderId, () => []).add(u);
+          if (!latestUsageByOrderId.containsKey(orderId)) {
+            latestUsageByOrderId[orderId] = u;
+          }
         }
       }
 
@@ -273,8 +302,12 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           _pengeringOrders = pengeringOrders;
           _ironOrders = ironOrders;
 
+          _washerMachines = washerMachines;
+          _dryerMachines = dryerMachines;
           _machineNameMap = machineNameMap;
-          _latestUsageByOrderId = latestUsageByOrderId;
+          _washerUsageCountMap = washerUsageCountMap;
+          _dryerUsageCountMap = dryerUsageCountMap;
+          _allUsagesByOrderId = allUsagesByOrderId;
 
           _washerUsageHistory = dayWasherUsages;
           _dryerUsageHistory = dayDryerUsages;
@@ -290,26 +323,43 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   }
 
   String _getMachineInfoForOrder(Order order, {String defaultCategory = 'cuci'}) {
-    // 1. Check matching machine_usage_history record
-    final usage = _latestUsageByOrderId[order.id];
-    if (usage != null && usage['machine_name'] != null && usage['machine_name'].toString().isNotEmpty) {
-      final status = usage['status']?.toString() ?? 'Success';
-      return '${usage['machine_name']} ($status)';
+    final usages = _allUsagesByOrderId[order.id] ?? [];
+
+    // Count how many items of this category are in the order
+    int totalTargetQty = 0;
+    for (var it in order.items) {
+      if (defaultCategory == 'cuci' && _isCuciItem(it)) {
+        totalTargetQty += it.quantity;
+      } else if (defaultCategory == 'pengering' && _isPengeringItem(it)) {
+        totalTargetQty += it.quantity;
+      }
+    }
+    if (totalTargetQty == 0) totalTargetQty = 1;
+
+    if (usages.isNotEmpty) {
+      final machineNames = usages.map((u) => u['machine_name']?.toString() ?? 'Mesin').toSet().join(', ');
+      final int runsCount = usages.length;
+
+      if (runsCount >= totalTargetQty) {
+        return '$machineNames ($runsCount/$totalTargetQty Siklus)';
+      } else {
+        return '$machineNames ($runsCount/$totalTargetQty Dihidupkan)';
+      }
     }
 
-    // 2. Check assignedMachineId in order
+    // Check assignedMachineId in order
     if (order.assignedMachineId != null && _machineNameMap.containsKey(order.assignedMachineId)) {
-      return _machineNameMap[order.assignedMachineId]!;
+      return '${_machineNameMap[order.assignedMachineId]!} (1x Dihidupkan)';
     }
 
-    // 3. Fallback queue status
+    // Fallback queue status
     final s = order.status.toLowerCase();
-    if (s == 'completed' || s == 'selesai') {
+    if (s == 'completed' || s == 'selesai' || s == 'siap diambil') {
       return 'Selesai / Sukses';
     } else if (s == 'proses' || s == 'processing') {
       return 'Sedang Dikerjakan';
     } else {
-      return defaultCategory == 'pengering' ? 'Antrian Pengering' : 'Antrian Cuci';
+      return defaultCategory == 'pengering' ? 'Antrian Pengering (Belum Dihidupkan)' : 'Antrian Cuci (Belum Dihidupkan)';
     }
   }
 
@@ -1970,6 +2020,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     int countProses = 0;
     int countPending = 0;
     int totalNilai = 0;
+    int totalTargetQty = 0;
 
     for (var o in filtered) {
       totalNilai += o.totalAmount;
@@ -1981,12 +2032,28 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       } else {
         countPending++;
       }
+
+      for (var it in o.items) {
+        if (categoryKey == 'cuci' && _isCuciItem(it)) {
+          totalTargetQty += it.quantity;
+        } else if (categoryKey == 'pengering' && _isPengeringItem(it)) {
+          totalTargetQty += it.quantity;
+        } else if (categoryKey == 'gosok') {
+          totalTargetQty += it.quantity;
+        } else if (categoryKey == 'order') {
+          totalTargetQty += it.quantity;
+        }
+      }
     }
+
+    final int totalActivations = categoryKey == 'cuci'
+        ? _washerUsageHistory.length
+        : (categoryKey == 'pengering' ? _dryerUsageHistory.length : 0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 4-in-1 KPI Ribbon (Lifecycle Status)
+        // 1. 4-in-1 KPI Ribbon (Lifecycle Status)
         Row(
           children: [
             Expanded(
@@ -2000,35 +2067,50 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: _buildFinancialKpiCard(
-                title: 'SUKSES / SELESAI',
-                value: '$countSelesai Nota',
-                icon: Icons.check_circle_rounded,
+                title: categoryKey == 'cuci'
+                    ? 'TOTAL SIKLUS DIPESAN'
+                    : (categoryKey == 'pengering' ? 'TOTAL SIKLUS PENGERING' : 'TOTAL ITEM LAYANAN'),
+                value: '$totalTargetQty Siklus / Item',
+                icon: Icons.repeat_rounded,
+                color: StyleConstants.secondaryColor,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildFinancialKpiCard(
+                title: (categoryKey == 'cuci' || categoryKey == 'pengering')
+                    ? 'TOTAL MESIN DIHIDUPKAN'
+                    : 'STATUS LUNAS',
+                value: (categoryKey == 'cuci' || categoryKey == 'pengering')
+                    ? '$totalActivations Kali Dihidupkan'
+                    : '$countSelesai Lunas',
+                icon: (categoryKey == 'cuci' || categoryKey == 'pengering')
+                    ? Icons.power_rounded
+                    : Icons.check_circle_rounded,
                 color: StyleConstants.successColor,
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _buildFinancialKpiCard(
-                title: 'SEDANG PROSES / MESIN',
-                value: '$countProses Nota',
-                icon: Icons.sync_rounded,
-                color: StyleConstants.infoColor,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildFinancialKpiCard(
-                title: 'ANTRIAN / PENDING',
-                value: '$countPending Nota',
+                title: 'STATUS PENGERJAAN',
+                value: '$countSelesai Selesai • $countProses Proses',
                 icon: Icons.hourglass_top_rounded,
-                color: StyleConstants.warningColor,
+                color: countPending > 0 ? StyleConstants.warningColor : StyleConstants.infoColor,
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
 
-        // Search Bar & Filter Chips
+        // 2. Machine Usage Breakdown Chips Ribbon (Per-Machine Activations Summary)
+        if (categoryKey == 'cuci' || categoryKey == 'pengering')
+          _buildMachineActivationSummaryBar(categoryKey, accentColor),
+
+        if (categoryKey == 'cuci' || categoryKey == 'pengering')
+          const SizedBox(height: 12),
+
+        // 3. Search Bar & Filter Chips
         Row(
           children: [
             Expanded(
@@ -2071,13 +2153,142 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         ),
         const SizedBox(height: 10),
 
-        // Data Table
+        // 4. Data Table
         Expanded(
           child: filtered.isEmpty
               ? _buildEmptyState('Tidak ada pesanan $title yang sesuai dengan filter tanggal atau pencarian.')
               : _buildCategoryOrdersTable(filtered, categoryKey, accentColor),
         ),
       ],
+    );
+  }
+
+  // ==========================================
+  // MACHINE USAGE BREAKDOWN CHIPS RIBBON
+  // ==========================================
+  Widget _buildMachineActivationSummaryBar(String categoryKey, Color accentColor) {
+    final isWasher = categoryKey == 'cuci';
+    final machines = isWasher ? _washerMachines : _dryerMachines;
+    final usageMap = isWasher ? _washerUsageCountMap : _dryerUsageCountMap;
+    final totalRuns = isWasher ? _washerUsageHistory.length : _dryerUsageHistory.length;
+    final icon = isWasher ? Icons.local_laundry_service_rounded : Icons.wb_sunny_rounded;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: StyleConstants.borderLight),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 16, color: accentColor),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isWasher ? 'RINCIAN MESIN CUCI DIHIDUPKAN:' : 'RINCIAN PENGERING DIHIDUPKAN:',
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      color: StyleConstants.textMuted,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  Text(
+                    'Total $totalRuns Kali Berjalan Hari Ini',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: accentColor,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(width: 14),
+          const SizedBox(
+            height: 24,
+            child: VerticalDivider(color: StyleConstants.borderLight, thickness: 1.2),
+          ),
+          const SizedBox(width: 14),
+
+          // Machine Badges List
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: machines.map((m) {
+                  final count = usageMap[m.name] ?? 0;
+                  final hasRun = count > 0;
+
+                  return Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: hasRun ? accentColor.withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: hasRun ? accentColor.withValues(alpha: 0.35) : StyleConstants.borderLight,
+                        width: hasRun ? 1.4 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icon, size: 13, color: hasRun ? accentColor : StyleConstants.textMuted),
+                        const SizedBox(width: 6),
+                        Text(
+                          m.name,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: hasRun ? StyleConstants.textHeading : StyleConstants.textMuted,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: hasRun ? accentColor : const Color(0xFFE2E8F0),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$count Kali',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: hasRun ? Colors.white : StyleConstants.textMuted,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
