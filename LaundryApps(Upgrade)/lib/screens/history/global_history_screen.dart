@@ -1885,7 +1885,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: StyleConstants.borderLight),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF0F172A).withValues(alpha: 0.04),
@@ -1899,11 +1899,11 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         children: [
           // Table Header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             decoration: const BoxDecoration(
               color: Color(0xFFF8FAFC),
               borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-              border: Border(bottom: BorderSide(color: StyleConstants.borderLight)),
+              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1.5)),
             ),
             child: const Row(
               children: [
@@ -1918,17 +1918,19 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
             ),
           ),
 
-          // Scrollable Rows
+          // Scrollable Rows with Clear Borders & Alternating Background
           Expanded(
             child: ListView.separated(
               itemCount: items.length,
-              separatorBuilder: (ctx, i) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              separatorBuilder: (ctx, i) => const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
               itemBuilder: (ctx, i) {
                 final item = items[i];
                 final bool isExpense = item['type'] == 'expense';
+                final isEven = i % 2 == 0;
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                return Container(
+                  color: isEven ? Colors.white : const Color(0xFFF8FAFC),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                   child: Row(
                     children: [
                       SizedBox(
@@ -2003,7 +2005,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
             decoration: const BoxDecoration(
               color: Color(0xFFF8FAFC),
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(14)),
-              border: Border(top: BorderSide(color: StyleConstants.borderLight)),
+              border: Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1.5)),
             ),
             child: Row(
               children: [
@@ -2404,7 +2406,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                         shrinkWrap: true,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         itemCount: machines.length,
-                        separatorBuilder: (c, i) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        separatorBuilder: (c, i) => const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
                         itemBuilder: (c, i) {
                           final m = machines[i];
                           final count = usageMap[m.name] ?? 0;
@@ -2565,18 +2567,25 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: StyleConstants.borderLight),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Table Header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             decoration: const BoxDecoration(
               color: Color(0xFFF8FAFC),
               borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-              border: Border(bottom: BorderSide(color: StyleConstants.borderLight)),
+              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1.5)),
             ),
             child: Row(
               children: [
@@ -2594,19 +2603,21 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
             ),
           ),
 
-          // Scrollable Orders List
+          // Scrollable Orders List with Clear Row Separator & Alternating Background
           Expanded(
             child: ListView.separated(
               itemCount: orders.length,
-              separatorBuilder: (ctx, i) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              separatorBuilder: (ctx, i) => const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
               itemBuilder: (ctx, i) {
                 final order = orders[i];
                 final isDone = order.status.toLowerCase() == 'completed' || order.status.toLowerCase() == 'selesai' || order.status.toLowerCase() == 'siap diambil';
                 final isProcessing = order.status.toLowerCase() == 'proses' || order.status.toLowerCase() == 'processing';
                 final machineInfo = _getMachineInfoForOrder(order, defaultCategory: categoryKey);
+                final isEven = i % 2 == 0;
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                return Container(
+                  color: isEven ? Colors.white : const Color(0xFFF8FAFC),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                   child: Row(
                     children: [
                       SizedBox(
