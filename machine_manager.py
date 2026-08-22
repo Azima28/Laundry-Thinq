@@ -45,10 +45,8 @@ def get_machine_status(entity_id):
 def has_pending_items_in_orders(phone, name):
     """Check if the customer has any pending/unstarted laundry/drying runs in active orders."""
     try:
-        import sqlite3
         import wa_bridge
-        from config import DB_PATH
-        conn = sqlite3.connect(DB_PATH)
+        conn = database.get_db_connection()
         cursor = conn.cursor()
         
         # Normalize phone

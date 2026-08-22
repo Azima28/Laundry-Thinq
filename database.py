@@ -33,9 +33,22 @@ def decrypt_val(val):
     except Exception:
         return val_str
 
+def get_db_connection(row_factory=False):
+    """Get thread-safe, high-concurrency SQLite connection with 30s busy timeout and WAL mode."""
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
+    try:
+        conn.execute("PRAGMA busy_timeout = 30000")
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
+    except Exception:
+        pass
+    if row_factory:
+        conn.row_factory = sqlite3.Row
+    return conn
+
 def init_db():
     """Inisialisasi database dan buat tabel jika belum ada"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usage_logs (
@@ -172,8 +185,8 @@ def log_usage(entity_id, action, source='customer'):
     try:
         short_name = entity_id.split('.', 1)[1] if '.' in entity_id else entity_id
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        conn = sqlite3.connect(DB_PATH)
+
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO usage_logs (entity_id, short_name, action, source, timestamp)
@@ -188,8 +201,7 @@ def log_usage(entity_id, action, source='customer'):
 def get_recent_logs(limit=100, machine=None, action=None, date=None, source=None):
     """Ambil log terbaru dengan filter opsional"""
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection(row_factory=True)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM usage_logs WHERE 1=1'
@@ -228,12 +240,12 @@ def get_recent_logs(limit=100, machine=None, action=None, date=None, source=None
 def get_daily_stats():
     """Mengambil jumlah penggunaan harian untuk 30 hari terakhir (aksi ON saja)"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         # Mengambil tanggal dan jumlah ON untuk 30 hari terakhir
         query = '''
-            SELECT date(timestamp) as day, COUNT(*) as count 
-            FROM usage_logs 
+            SELECT date(timestamp) as day, COUNT(*) as count
+            FROM usage_logs
             WHERE action = 'ON' AND date(timestamp) >= date('now', 'localtime', '-29 days')
             GROUP BY day
             ORDER BY day ASC
@@ -249,11 +261,11 @@ def get_daily_stats():
 def get_machine_usage_stats():
     """Mengambil total penggunaan per mesin (aksi ON saja)"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         query = '''
-            SELECT short_name, COUNT(*) as count 
-            FROM usage_logs 
+            SELECT short_name, COUNT(*) as count
+            FROM usage_logs
             WHERE action = 'ON'
             GROUP BY short_name
             ORDER BY count DESC
@@ -274,7 +286,7 @@ def log_machine_completion(machine):
     """Log a machine completion event."""
     try:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO machine_logs (machine, completed_at, created_at)
@@ -289,29 +301,28 @@ def log_machine_completion(machine):
 def get_machine_logs(limit=100, machine=None, date=None, month=None):
     """Get machine completion logs with optional filters."""
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection(row_factory=True)
         cursor = conn.cursor()
-        
+
         query = 'SELECT * FROM machine_logs WHERE 1=1'
         params = []
-        
+
         if machine and machine != 'all':
             query += ' AND machine = ?'
             params.append(machine)
-            
+
         if date:
             query += ' AND date(completed_at) = ?'
             params.append(date)
-            
+
         if month:
             # month format: YYYY-MM
             query += " AND strftime('%Y-%m', completed_at) = ?"
             params.append(month)
-            
+
         query += ' ORDER BY completed_at DESC LIMIT ?'
         params.append(limit)
-        
+
         cursor.execute(query, params)
         rows = cursor.fetchall()
         logs = [dict(row) for row in rows]
@@ -324,7 +335,7 @@ def get_machine_logs(limit=100, machine=None, date=None, month=None):
 def get_machine_log_stats(machine=None, date=None):
     """Get machine log statistics with optional machine and date filter."""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         # Base date for calculations (defaults to today)
@@ -416,7 +427,7 @@ def save_active_timer(entity_id, end_time, source='customer', duration_minutes=5
         elif last_remain_seconds is None:
             last_remain_seconds = duration_minutes * 60
 
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
             INSERT OR REPLACE INTO active_timers (
@@ -441,7 +452,7 @@ def update_active_timer_checkpoint(entity_id, remain_seconds, run_state=None, is
     """Fast periodic checkpoint of remaining time and timestamp to SQLite database."""
     try:
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
 
         updates = ["last_saved_time = ?", "last_remain_seconds = ?"]
@@ -479,8 +490,7 @@ def get_active_timer(entity_id):
         dict with timer and customer fields or None if not found
     """
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection(row_factory=True)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM active_timers WHERE entity_id = ?', (entity_id,))
         row = cursor.fetchone()
@@ -502,8 +512,7 @@ def get_all_active_timers():
         list of dicts with all timer fields
     """
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection(row_factory=True)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM active_timers')
         rows = cursor.fetchall()
@@ -518,16 +527,15 @@ def get_all_active_timers():
     except Exception as e:
         print(f"[DB] Error getting all active timers: {e}")
         return []
-        return []
 
 def remove_active_timer(entity_id):
     """Remove an active timer from database (called when timer ends or machine is stopped).
-    
+
     Args:
         entity_id: Machine entity ID
     """
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM active_timers WHERE entity_id = ?', (entity_id,))
         conn.commit()
@@ -538,12 +546,12 @@ def remove_active_timer(entity_id):
 
 def get_customer_for_machine(entity_id):
     """Get customer name and phone for an active machine timer.
-    
+
     Returns:
         tuple (customer_name, customer_phone) or (None, None)
     """
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('SELECT customer_name, customer_phone FROM active_timers WHERE entity_id = ?', (entity_id,))
         row = cursor.fetchone()
@@ -562,7 +570,7 @@ def get_customer_for_machine(entity_id):
 def save_wa_outbox(phone, message):
     """Save a pending WA message to outbox for later retry."""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO wa_outbox (phone, message, status, created_at)
@@ -577,8 +585,7 @@ def save_wa_outbox(phone, message):
 def get_pending_wa_outbox(limit=10):
     """Get pending WA messages from outbox."""
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection(row_factory=True)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT * FROM wa_outbox 
@@ -601,7 +608,7 @@ def get_pending_wa_outbox(limit=10):
 def mark_wa_outbox_sent(outbox_id):
     """Mark a WA outbox message as sent."""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE wa_outbox SET status = 'sent', sent_at = ? WHERE id = ?
@@ -614,7 +621,7 @@ def mark_wa_outbox_sent(outbox_id):
 def mark_wa_outbox_failed(outbox_id):
     """Mark a WA outbox message as failed/expired."""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE wa_outbox SET status = 'failed' WHERE id = ?
@@ -627,7 +634,7 @@ def mark_wa_outbox_failed(outbox_id):
 def increment_wa_outbox_retry(outbox_id):
     """Increment retry count for a failed WA outbox message."""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('UPDATE wa_outbox SET retry_count = retry_count + 1 WHERE id = ?', (outbox_id,))
         conn.commit()
@@ -642,7 +649,7 @@ def increment_wa_outbox_retry(outbox_id):
 def log_wa_sent(machine, event_type, phone):
     """Log a successfully sent WA message for deduplication."""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO wa_sent_log (machine, event_type, phone, sent_at)
@@ -655,15 +662,15 @@ def log_wa_sent(machine, event_type, phone):
 
 def has_wa_been_sent(machine, event_type, phone, cooldown_seconds=300):
     """Check if a WA message of this type was already sent recently.
-    
+
     Returns True if a matching message was sent within cooldown_seconds.
     """
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cutoff = (datetime.datetime.now() - datetime.timedelta(seconds=cooldown_seconds)).strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute('''
-            SELECT COUNT(*) FROM wa_sent_log 
+            SELECT COUNT(*) FROM wa_sent_log
             WHERE machine = ? AND event_type = ? AND phone = ? AND sent_at > ?
         ''', (machine, event_type, encrypt_val(phone), cutoff))
         count = cursor.fetchone()[0]
@@ -681,12 +688,12 @@ def has_phone_received_event_recently(phone, event_type, cooldown_seconds=3600):
         normalized_phone = wa_bridge._normalize_phone(phone)
         if not normalized_phone:
             return False
-            
-        conn = sqlite3.connect(DB_PATH)
+
+        conn = get_db_connection()
         cursor = conn.cursor()
         cutoff = (datetime.datetime.now() - datetime.timedelta(seconds=cooldown_seconds)).strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute('''
-            SELECT COUNT(*) FROM wa_sent_log 
+            SELECT COUNT(*) FROM wa_sent_log
             WHERE event_type = ? AND phone = ? AND sent_at > ?
         ''', (event_type, encrypt_val(normalized_phone), cutoff))
         count = cursor.fetchone()[0]
@@ -699,8 +706,7 @@ def has_phone_received_event_recently(phone, event_type, cooldown_seconds=3600):
 def get_all_machines():
     """Ambil semua daftar mesin dari tabel machines, diurutkan berdasarkan sort_order"""
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection(row_factory=True)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM machines ORDER BY sort_order ASC, id ASC")
         rows = cursor.fetchall()
@@ -713,10 +719,10 @@ def get_all_machines():
 def save_machine(name, url, key, machine_id=None):
     """Simpan atau perbarui mesin"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
+
         if machine_id:
             cursor.execute(
                 "UPDATE machines SET name = ?, url = ?, key = ? WHERE id = ?",
@@ -746,7 +752,7 @@ def save_machine(name, url, key, machine_id=None):
 def delete_machine(machine_id):
     """Hapus mesin berdasarkan ID"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM machines WHERE id = ?", (machine_id,))
         conn.commit()
@@ -759,7 +765,7 @@ def delete_machine(machine_id):
 def reorder_machines(ids_list):
     """Pembaruan massal sort_order berdasarkan daftar ID yang diurutkan"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
         for index, machine_id in enumerate(ids_list):
             cursor.execute(
@@ -787,8 +793,8 @@ def get_current_wash_sequence(phone, name):
             return p
 
         normalized_phone = _normalize_phone_helper(phone) if phone else None
-        
-        conn = sqlite3.connect(DB_PATH)
+
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         # Get active orders

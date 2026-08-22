@@ -180,27 +180,44 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(
-      path,
-      version: _databaseVersion,
-      onCreate: _createDB,
-      onUpgrade: _onUpgrade,
-      onOpen: (db) async {
-        await _ensureMachineColumns(db);
-        await _ensureMachinesColumns(db);
-        await _ensureOrderAssignmentColumns(db);
-        await _ensureMachineUsageHistoryTable(db);
-        await _ensurePendingNotificationsTable(db);
-        await _ensurePaidAmountColumn(db);
-        await _ensureCustomerPhoneColumn(db);
-        await _ensureCustomersTable(db);
-        await _ensureExpensesTable(db);
-        await _ensureDurationDaysColumn(db);
-        await _ensureStaffRestockableColumn(db);
-        await _migrateExistingItems(db);
-        await _ensureIndexes(db);
-      },
-    );
+    int retries = 5;
+    while (retries > 0) {
+      try {
+        return await openDatabase(
+          path,
+          version: _databaseVersion,
+          onConfigure: (db) async {
+            try {
+              await db.execute('PRAGMA busy_timeout = 30000;');
+              await db.execute('PRAGMA journal_mode = WAL;');
+              await db.execute('PRAGMA synchronous = NORMAL;');
+            } catch (_) {}
+          },
+          onCreate: _createDB,
+          onUpgrade: _onUpgrade,
+          onOpen: (db) async {
+            await _ensureMachineColumns(db);
+            await _ensureMachinesColumns(db);
+            await _ensureOrderAssignmentColumns(db);
+            await _ensureMachineUsageHistoryTable(db);
+            await _ensurePendingNotificationsTable(db);
+            await _ensurePaidAmountColumn(db);
+            await _ensureCustomerPhoneColumn(db);
+            await _ensureCustomersTable(db);
+            await _ensureExpensesTable(db);
+            await _ensureDurationDaysColumn(db);
+            await _ensureStaffRestockableColumn(db);
+            await _migrateExistingItems(db);
+            await _ensureIndexes(db);
+          },
+        );
+      } catch (e) {
+        retries--;
+        if (retries <= 0) rethrow;
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+    }
+    throw Exception('Failed to open database after retries');
   }
 
   Future<void> _migrateExistingItems(Database db) async {
