@@ -700,27 +700,26 @@ def resume_active_timers():
             else:
                 last_remain_seconds = duration_minutes * 60
 
-        # Check clock validity:
-        # Clock is ACCURATE if:
-        # 1. now >= last_saved_dt - 60s (clock didn't jump backward)
-        # 2. now.year >= 2024 (valid modern year)
-        # 3. time difference is within reasonable bounds (< 30 days)
-        clock_is_accurate = False
-        if last_saved_dt:
-            time_diff = (now - last_saved_dt).total_seconds()
-            if -60 <= time_diff <= 86400 * 30 and now.year >= 2024:
-                clock_is_accurate = True
-
-        if clock_is_accurate:
-            # Case 1: RTC / System Clock is accurate
+        # Check clock validity & Prioritize Real-time Clock (jam, tgl, tahun, menit, detik)
+        effective_remaining = 0
+        if end_time_dt and now.year >= 2024:
+            # Priority 1: Real-time Clock against target end_time (date, year, month, day, hour, min, sec)
+            rem_from_end = (end_time_dt - now).total_seconds()
+            if rem_from_end > 0:
+                effective_remaining = int(rem_from_end)
+                print(f"[Timer Recovery - Real Clock Priority] {entity_id}: target end_time={end_time_str} (now={now.strftime('%Y-%m-%d %H:%M:%S')}). Exact remaining: {effective_remaining}s ({effective_remaining//60}m {effective_remaining%60}s)")
+            else:
+                effective_remaining = 0
+                print(f"[Timer Recovery - Expired] {entity_id}: target end_time={end_time_str} has passed (now={now.strftime('%Y-%m-%d %H:%M:%S')}).")
+        elif last_saved_dt and last_remain_seconds is not None and now.year >= 2024:
+            # Priority 2: Elapsed time since last saved checkpoint
             elapsed = max(0, (now - last_saved_dt).total_seconds())
             effective_remaining = max(0, int(last_remain_seconds - elapsed))
-            print(f"[Timer Recovery] Real Clock Accurate: {entity_id} elapsed {int(elapsed)}s since {last_saved_str}. Remaining: {effective_remaining}s")
+            print(f"[Timer Recovery - Checkpoint] {entity_id}: elapsed {int(elapsed)}s since {last_saved_str}. Remaining: {effective_remaining}s")
         else:
-            # Case 2: Clock is inaccurate / CMOS dead / clock went backwards
-            # Fallback to last recorded state minutes/seconds as requested!
-            effective_remaining = int(last_remain_seconds)
-            print(f"[Timer Recovery] Clock Inaccurate/Reset detected (now={now.strftime('%Y-%m-%d %H:%M:%S')}, saved={last_saved_str}). Restoring state from last recorded time: {effective_remaining}s ({effective_remaining//60} min)")
+            # Priority 3: Fallback if clock reset / CMOS battery dead
+            effective_remaining = max(0, int(last_remain_seconds)) if last_remain_seconds is not None else 0
+            print(f"[Timer Recovery - State Fallback] {entity_id}: clock invalid, using last recorded seconds: {effective_remaining}s")
 
         if effective_remaining > 0:
             # Calculate new target end_time based on current runtime reference

@@ -937,8 +937,11 @@ class _CuciContentState extends State<CuciContent> {
     dynamic entry,
   ) async {
     final String customerName = (entry?['customer_name'] ?? '').toString();
+    final bool isBooking = machineStatus == 'unready' ||
+        state.toUpperCase().contains('BOOKING') ||
+        state.toLowerCase().contains('booking');
 
-    // If machine is ready and empty (Green)
+    // 1. If machine is ready and empty (Green)
     if (machineStatus == 'ready' && customerName.isEmpty) {
       if (_selectedOrderItem != null) {
         _confirmAndAssign(_selectedOrderItem!, machine.id ?? 0, displayName);
@@ -946,7 +949,17 @@ class _CuciContentState extends State<CuciContent> {
       return;
     }
 
-    // Otherwise, trigger the new 2-button action dialog
+    // 2. If machine is in 5-minute BOOKING window -> LOCKED (cannot be managed/replaced during booking)
+    if (isBooking) {
+      final remainStr = (entry?['remain_time'] ?? '').toString();
+      final String timeInfo = remainStr.isNotEmpty && remainStr != '--:--' ? ' ($remainStr tersisa)' : '';
+      Globals.showWarningSnackBar(
+        'Mesin $displayName sedang dalam masa Booking$timeInfo untuk $customerName. Mesin terkunci selama periode 5 menit untuk dinyalakan di outlet.',
+      );
+      return;
+    }
+
+    // 3. Otherwise (Machine is RUNNING or COMPLETED or OCCUPIED) -> trigger action dialog
     _showActionDialog(machine, displayName, machineStatus, state, entry);
   }
 
