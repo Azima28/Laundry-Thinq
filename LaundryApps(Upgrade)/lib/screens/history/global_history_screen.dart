@@ -41,6 +41,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   String _statusFilter = 'Semua'; // 'Semua', 'Pending', 'Proses', 'Selesai'
   String _paymentFilter = 'Semua'; // 'Semua', 'Lunas', 'Belum Lunas', 'Cicilan'
   final TextEditingController _searchCtrl = TextEditingController();
+  Set<String> _selectedMachineFilter = {}; // Multi-select machine filter set
 
   // --- Data Containers ---
   int _totalPengeluaran = 0;
@@ -183,14 +184,10 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
 
       final allUsages = await _db.getMachineUsageHistory();
       final Map<int, List<Map<String, dynamic>>> allUsagesByOrderId = {};
-      final Map<int, Map<String, dynamic>> latestUsageByOrderId = {};
       for (var u in allUsages) {
         final orderId = u['order_id'] as int?;
         if (orderId != null) {
           allUsagesByOrderId.putIfAbsent(orderId, () => []).add(u);
-          if (!latestUsageByOrderId.containsKey(orderId)) {
-            latestUsageByOrderId[orderId] = u;
-          }
         }
       }
 
@@ -1526,7 +1523,12 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   Widget _categoryTabButton(String key, String label, IconData icon, String? badge) {
     final isSelected = _mainCategory == key;
     return InkWell(
-      onTap: () => setState(() => _mainCategory = key),
+      onTap: () {
+        setState(() {
+          _mainCategory = key;
+          _selectedMachineFilter.clear(); // Reset machine filter when switching main tabs
+        });
+      },
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
@@ -2013,7 +2015,18 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         if (_paymentFilter == 'Cicilan') matchesPayment = (!order.isPaid && order.paidAmount > 0);
       }
 
-      return matchesQuery && matchesStatus && matchesPayment;
+      bool matchesMachine = true;
+      if (_selectedMachineFilter.isNotEmpty && (categoryKey == 'cuci' || categoryKey == 'pengering' || categoryKey == 'order')) {
+        final usages = _allUsagesByOrderId[order.id] ?? [];
+        final assignedName = _machineNameMap[order.assignedMachineId];
+        final orderMachines = usages.map((u) => u['machine_name']?.toString() ?? '').toSet();
+        if (assignedName != null && assignedName.isNotEmpty) {
+          orderMachines.add(assignedName);
+        }
+        matchesMachine = orderMachines.any((m) => _selectedMachineFilter.contains(m));
+      }
+
+      return matchesQuery && matchesStatus && matchesPayment && matchesMachine;
     }).toList();
 
     int countSelesai = 0;
@@ -2103,14 +2116,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         ),
         const SizedBox(height: 12),
 
-        // 2. Machine Usage Breakdown Chips Ribbon (Per-Machine Activations Summary)
-        if (categoryKey == 'cuci' || categoryKey == 'pengering')
-          _buildMachineActivationSummaryBar(categoryKey, accentColor),
-
-        if (categoryKey == 'cuci' || categoryKey == 'pengering')
-          const SizedBox(height: 12),
-
-        // 3. Search Bar & Filter Chips
+        // 2. Search Bar & Filter Chips (Includes Dropdown Filter Mesin)
         Row(
           children: [
             Expanded(
@@ -2131,7 +2137,13 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
+
+            // Dropdown Filter Mesin (Multi-Select with Badge Runs)
+            if (categoryKey == 'cuci' || categoryKey == 'pengering' || categoryKey == 'order') ...[
+              _buildMachineFilterDropdown(categoryKey, accentColor),
+              const SizedBox(width: 8),
+            ],
 
             // Status Filter Chips
             _filterChipGroup(
@@ -2153,10 +2165,10 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         ),
         const SizedBox(height: 10),
 
-        // 4. Data Table
+        // 3. Data Table
         Expanded(
           child: filtered.isEmpty
-              ? _buildEmptyState('Tidak ada pesanan $title yang sesuai dengan filter tanggal atau pencarian.')
+              ? _buildEmptyState('Tidak ada pesanan $title yang sesuai dengan filter tanggal, mesin, atau pencarian.')
               : _buildCategoryOrdersTable(filtered, categoryKey, accentColor),
         ),
       ],
@@ -2164,131 +2176,276 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   }
 
   // ==========================================
-  // MACHINE USAGE BREAKDOWN CHIPS RIBBON
+  // DROPDOWN FILTER MESIN (MULTI-SELECT)
   // ==========================================
-  Widget _buildMachineActivationSummaryBar(String categoryKey, Color accentColor) {
+  Widget _buildMachineFilterDropdown(String categoryKey, Color accentColor) {
     final isWasher = categoryKey == 'cuci';
-    final machines = isWasher ? _washerMachines : _dryerMachines;
-    final usageMap = isWasher ? _washerUsageCountMap : _dryerUsageCountMap;
-    final totalRuns = isWasher ? _washerUsageHistory.length : _dryerUsageHistory.length;
-    final icon = isWasher ? Icons.local_laundry_service_rounded : Icons.wb_sunny_rounded;
+    final isDryer = categoryKey == 'pengering';
+    final List<MachineModel> targetMachines = isWasher
+        ? _washerMachines
+        : (isDryer ? _dryerMachines : [..._washerMachines, ..._dryerMachines]);
+    final Map<String, int> usageMap = isWasher
+        ? _washerUsageCountMap
+        : (isDryer ? _dryerUsageCountMap : {..._washerUsageCountMap, ..._dryerUsageCountMap});
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: StyleConstants.borderLight),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+    final bool hasSelection = _selectedMachineFilter.isNotEmpty;
+    final int selectedCount = _selectedMachineFilter.length;
+
+    String label = 'Filter Mesin';
+    if (selectedCount == 1) {
+      final mName = _selectedMachineFilter.first;
+      final runs = usageMap[mName] ?? 0;
+      label = '$mName ($runs Kali)';
+    } else if (selectedCount > 1) {
+      label = '$selectedCount Mesin Dipilih';
+    }
+
+    return InkWell(
+      onTap: () => _openMachineFilterModal(targetMachines, usageMap, accentColor, categoryKey),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: hasSelection ? accentColor.withValues(alpha: 0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: hasSelection ? accentColor : StyleConstants.borderLight,
+            width: hasSelection ? 1.5 : 1.0,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, size: 16, color: accentColor),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isDryer ? Icons.wb_sunny_rounded : Icons.local_laundry_service_rounded,
+              size: 16,
+              color: hasSelection ? accentColor : StyleConstants.textMuted,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: hasSelection ? FontWeight.w800 : FontWeight.w600,
+                color: hasSelection ? accentColor : StyleConstants.textBody,
               ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isWasher ? 'RINCIAN MESIN CUCI DIHIDUPKAN:' : 'RINCIAN PENGERING DIHIDUPKAN:',
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w900,
-                      color: StyleConstants.textMuted,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                  Text(
-                    'Total $totalRuns Kali Berjalan Hari Ini',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: accentColor,
-                    ),
-                  ),
-                ],
+            ),
+            if (hasSelection) ...[
+              const SizedBox(width: 6),
+              InkWell(
+                onTap: () => setState(() => _selectedMachineFilter.clear()),
+                child: Icon(Icons.cancel_rounded, size: 15, color: accentColor),
               ),
+            ] else ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.arrow_drop_down_rounded, size: 18, color: StyleConstants.textMuted),
             ],
-          ),
-          const SizedBox(width: 14),
-          const SizedBox(
-            height: 24,
-            child: VerticalDivider(color: StyleConstants.borderLight, thickness: 1.2),
-          ),
-          const SizedBox(width: 14),
+          ],
+        ),
+      ),
+    );
+  }
 
-          // Machine Badges List
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: machines.map((m) {
-                  final count = usageMap[m.name] ?? 0;
-                  final hasRun = count > 0;
+  void _openMachineFilterModal(
+    List<MachineModel> machines,
+    Map<String, int> usageMap,
+    Color accentColor,
+    String categoryKey,
+  ) {
+    final Set<String> tempSelected = Set<String>.from(_selectedMachineFilter);
+    final icon = categoryKey == 'pengering' ? Icons.wb_sunny_rounded : Icons.local_laundry_service_rounded;
 
-                  return Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              titlePadding: const EdgeInsets.fromLTRB(20, 18, 16, 12),
+              contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: hasRun ? accentColor.withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
+                      color: accentColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: hasRun ? accentColor.withValues(alpha: 0.35) : StyleConstants.borderLight,
-                        width: hasRun ? 1.4 : 1.0,
-                      ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    child: Icon(icon, size: 18, color: accentColor),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(icon, size: 13, color: hasRun ? accentColor : StyleConstants.textMuted),
-                        const SizedBox(width: 6),
                         Text(
-                          m.name,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: hasRun ? StyleConstants.textHeading : StyleConstants.textMuted,
-                          ),
+                          categoryKey == 'pengering'
+                              ? 'Filter Mesin Pengering'
+                              : 'Filter Unit Mesin Cuci',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: StyleConstants.textHeading),
                         ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: hasRun ? accentColor : const Color(0xFFE2E8F0),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '$count Kali',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: hasRun ? Colors.white : StyleConstants.textMuted,
-                            ),
-                          ),
+                        const Text(
+                          'Pilih satu atau beberapa mesin untuk difilter',
+                          style: TextStyle(fontSize: 11.5, color: StyleConstants.textMuted),
                         ),
                       ],
                     ),
-                  );
-                }).toList(),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
               ),
-            ),
-          ),
-        ],
-      ),
+              content: SizedBox(
+                width: 380,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Divider(height: 1),
+                    const SizedBox(height: 8),
+
+                    // Quick Actions Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            setDialogState(() {
+                              tempSelected.clear();
+                              for (var m in machines) {
+                                tempSelected.add(m.name);
+                              }
+                            });
+                          },
+                          child: Text('Pilih Semua', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: accentColor)),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setDialogState(() {
+                              tempSelected.clear();
+                            });
+                          },
+                          child: const Text('Reset (Semua)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: StyleConstants.textMuted)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Machine List with Checkbox & Run Badges
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 280),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: machines.length,
+                        separatorBuilder: (c, i) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        itemBuilder: (c, i) {
+                          final m = machines[i];
+                          final count = usageMap[m.name] ?? 0;
+                          final isChecked = tempSelected.contains(m.name);
+
+                          return InkWell(
+                            onTap: () {
+                              setDialogState(() {
+                                if (isChecked) {
+                                  tempSelected.remove(m.name);
+                                } else {
+                                  tempSelected.add(m.name);
+                                }
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                              child: Row(
+                                children: [
+                                  Checkbox(
+                                    value: isChecked,
+                                    activeColor: accentColor,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                    onChanged: (v) {
+                                      setDialogState(() {
+                                        if (v == true) {
+                                          tempSelected.add(m.name);
+                                        } else {
+                                          tempSelected.remove(m.name);
+                                        }
+                                      });
+                                    },
+                                  ),
+                                  Icon(icon, size: 16, color: count > 0 ? accentColor : StyleConstants.textMuted),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      m.name,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: isChecked ? FontWeight.w800 : FontWeight.w600,
+                                        color: isChecked ? StyleConstants.textHeading : StyleConstants.textBody,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                                    decoration: BoxDecoration(
+                                      color: count > 0 ? accentColor.withValues(alpha: 0.12) : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: count > 0 ? accentColor.withValues(alpha: 0.3) : StyleConstants.borderLight,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '$count Kali Berjalan',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: count > 0 ? accentColor : StyleConstants.textMuted,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+
+                    // Apply Button
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _selectedMachineFilter = tempSelected;
+                        });
+                        Navigator.pop(ctx);
+                      },
+                      child: Text(
+                        tempSelected.isEmpty
+                            ? 'Terapkan (Tampilkan Semua Mesin)'
+                            : 'Terapkan Filter (${tempSelected.length} Mesin Dipilih)',
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
