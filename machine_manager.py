@@ -788,14 +788,10 @@ def start_machine_monitoring(entity_id, customer_name=None, customer_phone=None,
         lg_manager.thinq_degraded
     )
 
-    # For offline machines or manual wash, set default duration (40m for cuci, 45m for pengering)
-    if is_currently_offline and duration_seconds <= 300:
-        if 'cuci' in entity_id.lower() or 'wash' in entity_id.lower():
-            duration_seconds = 40 * 60
-        elif 'pengering' in entity_id.lower() or 'dry' in entity_id.lower() or 'kering' in entity_id.lower():
-            duration_seconds = 45 * 60
-
-    duration_minutes = duration_seconds // 60
+    duration_minutes = duration_seconds // 60 if duration_seconds else 5
+    if duration_minutes <= 0:
+        duration_minutes = 5
+        duration_seconds = 300
     end_time = datetime.now() + timedelta(seconds=duration_seconds)
 
     # Initialize state tracker for the new transaction

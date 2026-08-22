@@ -1985,12 +1985,12 @@ class _PengeringContentState extends State<PengeringContent> {
       Globals.showErrorSnackBar('Gagal menyimpan ke database lokal: $e');
     }
 
-    // 2. Fire-and-forget the API call in the background
+    // 2. Fire-and-forget the API call in the background (5-minute booking window)
     service.startMachineMonitoring(
       entityId: machine.name,
       customerName: name.isNotEmpty ? name : 'Pelanggan',
       customerPhone: phone.isNotEmpty ? phone : null,
-      durationMinutes: 45,
+      durationMinutes: 5,
     ).then((res) {
       if (res['success'] != true) {
         Globals.showErrorSnackBar('Info IoT: ${res['error']}');

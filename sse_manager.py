@@ -11,12 +11,13 @@ _last_logged_broadcast = {}
 
 def broadcast(data):
     """Send data to all connected SSE clients."""
-    # Debug log only when data changes to prevent console flood
-    if not data.startswith("LOG|"):
-        key = data.split("|")[0] if "|" in data else data
-        if _last_logged_broadcast.get(key) != data:
-            _last_logged_broadcast[key] = data
-            print(f"[SSE] Update: {data}")
+    # Log significant state changes to console (suppress 1-second countdown tick spam)
+    if not data.startswith("LOG|") and "|" in data:
+        parts = data.split("|")
+        log_key = f"{parts[0]}_{parts[1] if len(parts)>1 else ''}_{parts[2] if len(parts)>2 else ''}_{parts[7] if len(parts)>7 else ''}"
+        if _last_logged_broadcast.get(parts[0]) != log_key:
+            _last_logged_broadcast[parts[0]] = log_key
+            print(f"[SSE] State Change: {data}")
 
     with subscribers_lock:
         for q in list(subscribers):
