@@ -1,12 +1,16 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
 import '../../database/models/database_helper.dart';
 import '../../database/models/customer_model.dart';
 import '../../database/models/order_model.dart';
 import '../../database/models/db_encryption_helper.dart';
 import '../../services/machine_status_service.dart';
 import '../../utils/style_constants.dart';
+import '../../utils/contact_import_export_helper.dart';
 
 class CustomerScreen extends StatefulWidget {
   const CustomerScreen({super.key});
@@ -643,6 +647,850 @@ class _CustomerScreenState extends State<CustomerScreen> {
     );
   }
 
+  Widget _buildTabPill({
+    required String title,
+    required IconData icon,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          decoration: BoxDecoration(
+            color: isActive ? primaryColor.withValues(alpha: 0.1) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isActive ? primaryColor : const Color(0xFFE2E8F0),
+              width: isActive ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: isActive ? primaryColor : const Color(0xFF64748B)),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                    color: isActive ? primaryColor : const Color(0xFF334155),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKpiBadge(String label, String count, Color textColor, Color bgColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            count,
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: textColor),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExportOptionTile({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8), size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Open Import Modal for Multi-Format Contacts (vCard, CSV, JSON)
+  Future<void> _openImportDialog() async {
+    String? selectedFileName;
+    int currentTab = 0; // 0 = File, 1 = Paste Text
+    bool isAnalyzing = false;
+    bool isImporting = false;
+    bool updateDuplicates = true;
+    ContactAnalysisReport? report;
+    final TextEditingController pasteCtrl = TextEditingController();
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> analyze(String content, {String? fileName}) async {
+              setModalState(() => isAnalyzing = true);
+              try {
+                final res = await ContactImportExportHelper.analyzeAndParseContent(content, fileName: fileName);
+                setModalState(() {
+                  report = res;
+                  isAnalyzing = false;
+                });
+              } catch (e) {
+                setModalState(() => isAnalyzing = false);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error menganalisis kontak: $e')));
+                }
+              }
+            }
+
+            Future<void> pickAndAnalyzeFile() async {
+              try {
+                final result = await FilePicker.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['vcf', 'csv', 'json', 'txt'],
+                );
+
+                if (result != null && result.files.single.path != null) {
+                  final path = result.files.single.path!;
+                  final name = result.files.single.name;
+                  selectedFileName = name;
+
+                  final file = File(path);
+                  final content = await file.readAsString();
+                  await analyze(content, fileName: name);
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal memilih file: $e')));
+                }
+              }
+            }
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              backgroundColor: Colors.white,
+              elevation: 16,
+              child: Container(
+                width: 760,
+                constraints: const BoxConstraints(maxHeight: 700),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 20, 20, 16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.contacts_rounded, color: Color(0xFF059669), size: 22),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Impor Kontak & Pelanggan Multi-Format',
+                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF0F172A)),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Mendukung vCard (.vcf) Android/iOS/Google, CSV Excel, & JSON (Aditif / Nambahin Data)',
+                                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+                    // Source Mode Switch Tabs
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                      child: Row(
+                        children: [
+                          _buildTabPill(
+                            title: 'Pilih File (.vcf / .csv / .json)',
+                            icon: Icons.folder_open_rounded,
+                            isActive: currentTab == 0,
+                            onTap: () => setModalState(() => currentTab = 0),
+                          ),
+                          const SizedBox(width: 10),
+                          _buildTabPill(
+                            title: 'Tempel Teks Kontak (Paste)',
+                            icon: Icons.paste_rounded,
+                            isActive: currentTab == 1,
+                            onTap: () => setModalState(() => currentTab = 1),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Body
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (currentTab == 0) ...[
+                              // File Picker Box
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      selectedFileName != null ? Icons.file_present_rounded : Icons.cloud_upload_outlined,
+                                      size: 40,
+                                      color: selectedFileName != null ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      selectedFileName ?? 'Pilih file kontak dari komputer Anda',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
+                                        color: selectedFileName != null ? const Color(0xFF0F172A) : const Color(0xFF334155),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'Format didukung: vCard (.vcf dari Android/Samsung/iPhone/Google), CSV (Excel/Google), JSON',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    ElevatedButton.icon(
+                                      onPressed: pickAndAnalyzeFile,
+                                      icon: const Icon(Icons.folder_open_rounded, size: 18),
+                                      label: Text(selectedFileName == null ? 'Jelajahi File...' : 'Ganti File Lain'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: primaryColor,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ] else ...[
+                              // Paste Text Box
+                              TextField(
+                                controller: pasteCtrl,
+                                maxLines: 5,
+                                style: const TextStyle(fontSize: 12.5, fontFamily: 'monospace'),
+                                decoration: InputDecoration(
+                                  hintText: 'Tempel data kontak di sini (misal teks vCard "BEGIN:VCARD...", baris CSV "Nama, No WA", atau JSON)...',
+                                  filled: true,
+                                  fillColor: const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                                  contentPadding: const EdgeInsets.all(12),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    if (pasteCtrl.text.trim().isNotEmpty) {
+                                      analyze(pasteCtrl.text.trim());
+                                    }
+                                  },
+                                  icon: const Icon(Icons.search_rounded, size: 16),
+                                  label: const Text('Analisis & Pratinjau Teks'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0284C7),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                              ),
+                            ],
+
+                            if (isAnalyzing) ...[
+                              const SizedBox(height: 24),
+                              const Center(
+                                child: Column(
+                                  children: [
+                                    CircularProgressIndicator(),
+                                    SizedBox(height: 12),
+                                    Text('Menganalisis format dan mengecek duplikasi database...', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                                  ],
+                                ),
+                              ),
+                            ],
+
+                            if (report != null && !isAnalyzing) ...[
+                              const SizedBox(height: 16),
+                              // Analysis Header Statistics
+                              Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF0FDF4),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFF86EFAC)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 18),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Format Terdeteksi: ${report!.detectedFormat}',
+                                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF166534)),
+                                        ),
+                                        const Spacer(),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFF86EFAC)),
+                                          ),
+                                          child: Text(
+                                            '${report!.totalFound} Kontak Ditemukan',
+                                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFF15803D)),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        _buildKpiBadge('Kontak Baru', '${report!.newCount}', const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
+                                        const SizedBox(width: 8),
+                                        _buildKpiBadge('Sudah Ada (Duplikat)', '${report!.existingCount}', const Color(0xFFD97706), const Color(0xFFFEF3C7)),
+                                        if (report!.invalidCount > 0) ...[
+                                          const SizedBox(width: 8),
+                                          _buildKpiBadge('Dilewati/Kosong', '${report!.invalidCount}', const Color(0xFFDC2626), const Color(0xFFFEE2E2)),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Duplicate Handling Options
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Checkbox(
+                                      value: updateDuplicates,
+                                      activeColor: primaryColor,
+                                      onChanged: (v) => setModalState(() => updateDuplicates = v ?? true),
+                                    ),
+                                    const Expanded(
+                                      child: Text(
+                                        'Perbarui data kontak jika nomor sudah ada (Smart Merge - tidak menduplikat & tidak menghapus riwayat)',
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Table Preview
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('PRATINJAU DAFTAR KONTAK:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFF64748B))),
+                                  Row(
+                                    children: [
+                                      TextButton(
+                                        onPressed: () {
+                                          setModalState(() {
+                                            for (final c in report!.allParsed) {
+                                              c.isSelected = true;
+                                            }
+                                          });
+                                        },
+                                        child: const Text('Pilih Semua', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          setModalState(() {
+                                            for (final c in report!.allParsed) {
+                                              c.isSelected = false;
+                                            }
+                                          });
+                                        },
+                                        child: const Text('Batal Semua', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+
+                              Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                constraints: const BoxConstraints(maxHeight: 220),
+                                child: ListView.separated(
+                                  shrinkWrap: true,
+                                  itemCount: report!.allParsed.length,
+                                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                                  itemBuilder: (ctx, i) {
+                                    final item = report!.allParsed[i];
+                                    return CheckboxListTile(
+                                      value: item.isSelected,
+                                      dense: true,
+                                      activeColor: primaryColor,
+                                      controlAffinity: ListTileControlAffinity.leading,
+                                      title: Row(
+                                        children: [
+                                          Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: item.isExisting ? const Color(0xFFFEF3C7) : const Color(0xFFDCFCE7),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              item.isExisting ? 'SUDAH ADA' : 'BARU',
+                                              style: TextStyle(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.w800,
+                                                color: item.isExisting ? const Color(0xFFB45309) : const Color(0xFF15803D),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      subtitle: Text(
+                                        '${item.phone.isNotEmpty ? item.phone : "Tanpa Nomor"}${item.address != null ? " • ${item.address}" : ""}',
+                                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                                      ),
+                                      onChanged: (v) => setModalState(() => item.isSelected = v ?? false),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Footer Action Buttons
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
+                      child: Row(
+                        children: [
+                          OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF64748B),
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                          const Spacer(),
+                          if (report != null && report!.allParsed.any((c) => c.isSelected)) ...[
+                            ElevatedButton.icon(
+                              onPressed: isImporting
+                                  ? null
+                                  : () async {
+                                      setModalState(() => isImporting = true);
+                                      final summary = await ContactImportExportHelper.executeImport(
+                                        contacts: report!.allParsed,
+                                        updateDuplicates: updateDuplicates,
+                                      );
+                                      setModalState(() => isImporting = false);
+                                      Navigator.pop(ctx);
+
+                                      // Show Result Modal
+                                      _showImportSummaryDialog(summary);
+                                      _loadCustomers();
+                                    },
+                              icon: isImporting
+                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                  : const Icon(Icons.file_download_done_rounded, size: 18),
+                              label: Text(isImporting
+                                  ? 'Mengimpor...'
+                                  : 'Impor (${report!.allParsed.where((c) => c.isSelected).length} Kontak)'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF059669),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Show Import Completion Summary Dialog
+  void _showImportSummaryDialog(ImportResultSummary summary) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 24),
+              SizedBox(width: 10),
+              Text('Hasil Impor Kontak', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+            ],
+          ),
+          content: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total ${summary.totalProcessed} kontak telah diproses ke database CRM.',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF334155)),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Kontak Baru Ditambahkan:', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                          Text('${summary.newlyAdded}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF16A34A))),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Kontak Diperbarui (Smart Merge):', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                          Text('${summary.updatedDuplicates}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF0284C7))),
+                        ],
+                      ),
+                      if (summary.skippedDuplicates > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Kontak Duplikat Dilewati:', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                            Text('${summary.skippedDuplicates}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFFD97706))),
+                          ],
+                        ),
+                      ],
+                      if (summary.invalidSkipped > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Baris Kosong/Invalid Dilewati:', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                            Text('${summary.invalidSkipped}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFFDC2626))),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Tutup & Lihat Data'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Open Export Modal for Multi-Format Contacts (vCard, CSV, JSON)
+  Future<void> _openExportDialog() async {
+    if (_customers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Belum ada data pelanggan untuk diekspor.')));
+      return;
+    }
+
+    bool isExporting = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> doExport(String formatType) async {
+              setModalState(() => isExporting = true);
+              try {
+                String content = '';
+                String ext = '';
+                String typeName = '';
+
+                final dateStamp = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+                if (formatType == 'vcf') {
+                  content = ContactImportExportHelper.exportToVcf(_customers);
+                  ext = 'vcf';
+                  typeName = 'vCard (.vcf)';
+                } else if (formatType == 'csv') {
+                  content = ContactImportExportHelper.exportToCsv(_customers);
+                  ext = 'csv';
+                  typeName = 'Excel / CSV (.csv)';
+                } else {
+                  content = ContactImportExportHelper.exportToJson(_customers);
+                  ext = 'json';
+                  typeName = 'JSON Backup (.json)';
+                }
+
+                final fileName = 'laundry_pelanggan_$dateStamp.$ext';
+                final savedFile = await ContactImportExportHelper.saveExportFile(
+                  fileName: fileName,
+                  content: content,
+                );
+
+                setModalState(() => isExporting = false);
+                Navigator.pop(ctx);
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Berhasil mengekspor ${_customers.length} pelanggan ke $typeName di:\n${savedFile.path}',
+                              style: const TextStyle(fontSize: 12.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                      action: SnackBarAction(
+                        label: 'Buka Folder',
+                        textColor: Colors.amber,
+                        onPressed: () {
+                          if (Platform.isWindows) {
+                            Process.run('explorer.exe', ['/select,', savedFile.path]);
+                          }
+                        },
+                      ),
+                      backgroundColor: const Color(0xFF0F172A),
+                      duration: const Duration(seconds: 8),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  );
+                }
+              } catch (e) {
+                setModalState(() => isExporting = false);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal mengekspor: $e')));
+                }
+              }
+            }
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              backgroundColor: Colors.white,
+              elevation: 16,
+              child: Container(
+                width: 580,
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.file_upload_outlined, color: primaryColor, size: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Ekspor Data Pelanggan',
+                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF0F172A)),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Pilih format ekspor untuk ${_customers.length} kontak pelanggan',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Format 1: vCard (.vcf)
+                    _buildExportOptionTile(
+                      title: 'vCard Kontak (.vcf)',
+                      subtitle: 'Format universal HP Android, Samsung, iPhone / iCloud, & kontak WhatsApp',
+                      icon: Icons.contact_phone_rounded,
+                      color: const Color(0xFF10B981),
+                      onTap: () => doExport('vcf'),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Format 2: CSV / Excel (.csv)
+                    _buildExportOptionTile(
+                      title: 'Excel / Spreadsheet (.csv)',
+                      subtitle: 'Format spreadsheet UTF-8 dengan BOM agar rapi saat dibuka di Microsoft Excel',
+                      icon: Icons.table_view_rounded,
+                      color: const Color(0xFF0284C7),
+                      onTap: () => doExport('csv'),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Format 3: JSON Backup (.json)
+                    _buildExportOptionTile(
+                      title: 'JSON Database Backup (.json)',
+                      subtitle: 'Format data terstruktur untuk backup lengkap database CRM',
+                      icon: Icons.data_object_rounded,
+                      color: const Color(0xFF7C3AED),
+                      onTap: () => doExport('json'),
+                    ),
+                    const SizedBox(height: 20),
+
+                    if (isExporting) ...[
+                      const Center(child: CircularProgressIndicator()),
+                      const SizedBox(height: 10),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildPresetChip({
     required String label,
     required IconData icon,
@@ -762,19 +1610,58 @@ class _CustomerScreenState extends State<CustomerScreen> {
               ),
               const Divider(height: 1, color: Color(0xFFE2E8F0)),
 
-              // Bottom Button Panel
+              // Bottom Action Button Panel
               Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: ElevatedButton.icon(
-                  onPressed: () => _addOrEditCustomer(),
-                  icon: const Icon(Icons.person_add_rounded, size: 18, color: Colors.white),
-                  label: const Text('Pelanggan Baru', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _addOrEditCustomer(),
+                        icon: const Icon(Icons.person_add_rounded, size: 18, color: Colors.white),
+                        label: const Text('Pelanggan Baru', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _openImportDialog,
+                            icon: const Icon(Icons.file_download_outlined, size: 16, color: Color(0xFF059669)),
+                            label: const Text('Impor Kontak', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Color(0xFF059669))),
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF0FDF4),
+                              side: const BorderSide(color: Color(0xFF86EFAC)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _openExportDialog,
+                            icon: const Icon(Icons.file_upload_outlined, size: 16, color: Color(0xFF0284C7)),
+                            label: const Text('Ekspor Data', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Color(0xFF0284C7))),
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF0F9FF),
+                              side: const BorderSide(color: Color(0xFFBAE6FD)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -806,6 +1693,20 @@ class _CustomerScreenState extends State<CustomerScreen> {
             tooltip: 'Kembali',
             onPressed: () => Navigator.pop(context),
           ),
+          actions: [
+            TextButton.icon(
+              onPressed: _openImportDialog,
+              icon: const Icon(Icons.file_download_outlined, size: 18, color: Color(0xFF059669)),
+              label: const Text('Impor Kontak', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF059669), fontSize: 12.5)),
+            ),
+            const SizedBox(width: 6),
+            TextButton.icon(
+              onPressed: _openExportDialog,
+              icon: const Icon(Icons.file_upload_outlined, size: 18, color: Color(0xFF0284C7)),
+              label: const Text('Ekspor', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0284C7), fontSize: 12.5)),
+            ),
+            const SizedBox(width: 14),
+          ],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(1),
             child: Container(color: StyleConstants.borderLight, height: 1),
@@ -901,6 +1802,36 @@ class _CustomerScreenState extends State<CustomerScreen> {
           const Text(
             'Pilih salah satu pelanggan di daftar sebelah kiri untuk kirim WhatsApp atau ubah profil.',
             style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ElevatedButton.icon(
+                onPressed: _openImportDialog,
+                icon: const Icon(Icons.file_download_outlined, size: 16),
+                label: const Text('Impor Kontak dari HP / Excel'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF059669),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                onPressed: _openExportDialog,
+                icon: const Icon(Icons.file_upload_outlined, size: 16),
+                label: const Text('Ekspor Data'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0284C7),
+                  side: const BorderSide(color: Color(0xFFBAE6FD)),
+                  backgroundColor: const Color(0xFFF0F9FF),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
