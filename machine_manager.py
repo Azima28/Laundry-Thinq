@@ -577,7 +577,7 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                         lg_manager.latest_state[ent] = state
                         broadcast(state)
                     else:
-                        state = f"{ent}|Ready|Idle|--:--|-|-|0|{control_time}"
+                        state = f"{ent}|Ready|Idle|{control_time}|-|-|0|{cust_name_str}"
                         lg_manager.latest_state[ent] = state
                         broadcast(state)
                 else:
@@ -586,7 +586,7 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                         siklus_label = f"{dur_min} Menit"
                         state = f"{ent}|Ready|{siklus_label}|{control_time}|-|-|0|{cust_name_str}"
                     else:
-                        state = f"{ent}|Ready|Idle|--:--|-|-|0|{cust_name_str}"
+                        state = f"{ent}|Ready|Idle|{control_time}|-|-|0|{cust_name_str}"
                     lg_manager.latest_state[ent] = state
                     broadcast(state)
 
@@ -751,10 +751,10 @@ def resume_active_timers():
             else:
                 # Booking state
                 if is_lg_machine:
-                    state = f"{entity_id}|Ready|Idle|--:--|-|-|0|{control_time}"
+                    state = f"{entity_id}|Ready|Idle|{control_time}|-|-|0|{cust_name_str}"
                 else:
                     siklus_label = f"{duration_minutes} Menit"
-                    state = f"{entity_id}|Ready|{siklus_label}|{control_time}|-|-|0|{control_time}"
+                    state = f"{entity_id}|Ready|{siklus_label}|{control_time}|-|-|0|{cust_name_str}"
 
             lg_manager.latest_state[entity_id] = state
             broadcast(state)
@@ -876,7 +876,7 @@ def start_machine_monitoring(entity_id, customer_name=None, customer_phone=None,
         state = f"{entity_id}|Running|Running (Offline)|{control_time}|-|-|0|{cust_name_str}"
     else:
         if is_lg_machine:
-            state = f"{entity_id}|Ready|Idle|--:--|-|-|0|{control_time}"
+            state = f"{entity_id}|Ready|Idle|{control_time}|-|-|0|{cust_name_str}"
         else:
             siklus_label = f"{duration_minutes} Menit"
             state = f"{entity_id}|Ready|{siklus_label}|{control_time}|-|-|0|{cust_name_str}"

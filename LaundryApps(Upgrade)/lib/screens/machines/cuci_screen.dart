@@ -873,11 +873,15 @@ class _CuciContentState extends State<CuciContent> {
                 Text(
                   runState == 'Detecting'
                       ? 'Menimbang Beban (Detecting)...'
-                      : (minutes > 0
-                          ? '$remain ($runState)'
-                          : ((runState == 'Idle' || runState == 'Standby' || runState == 'Initial')
-                              ? 'Siap Digunakan ($runState)'
-                              : runState)),
+                      : (machineStatus == 'unready'
+                          ? (remain.isNotEmpty && remain != '--:--'
+                              ? 'Booking ($remain tersisa)'
+                              : 'Booking (5:00)')
+                          : (minutes > 0
+                              ? '$remain ($runState)'
+                              : ((runState == 'Idle' || runState == 'Standby' || runState == 'Initial')
+                                  ? 'Siap Digunakan ($runState)'
+                                  : runState))),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
