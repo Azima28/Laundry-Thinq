@@ -929,9 +929,129 @@ class _PengeringContentState extends State<PengeringContent> {
     final String customerName = (entry?['customer_name'] ?? '').toString();
     String customerPhone = (entry?['customer_phone'] ?? '').toString();
     final bool waSent = entry?['wa_sent'] == true;
-    final List<dynamic> otherMachines = entry?['other_machines'] != null
-        ? List<dynamic>.from(entry['other_machines'])
-        : [];
+
+    final String currentCleanName = displayName.trim().toLowerCase();
+    final String currentMachineName = machine.name.trim().toLowerCase();
+    final Set<String> otherMachinesSet = {};
+
+    // 1. Add other machines from entry['other_machines'] if any
+    if (entry?['other_machines'] != null) {
+      for (final m in entry['other_machines']) {
+        final mStr = m.toString().trim();
+        if (mStr.isNotEmpty &&
+            mStr.toLowerCase() != currentCleanName &&
+            mStr.toLowerCase() != currentMachineName) {
+          otherMachinesSet.add(mStr);
+        }
+      }
+    }
+
+    // 2. Cross-check active machines across all live IoT statuses (washers & dryers)
+    final allStatuses = MachineStatusService.instance.states;
+    allStatuses.forEach((key, val) {
+      if (val is Map<String, dynamic>) {
+        final cName = (val['customer_name'] ?? '').toString().trim();
+        final cPhone = (val['customer_phone'] ?? '').toString().trim();
+        final isMatch = (customerName.isNotEmpty &&
+                customerName != '-' &&
+                customerName != 'null' &&
+                cName.toLowerCase() == customerName.toLowerCase()) ||
+            (customerPhone.isNotEmpty &&
+                cPhone.isNotEmpty &&
+                cPhone == customerPhone);
+
+        if (isMatch) {
+          final mDisp = (val['name'] ?? key).toString().replaceAll('_', ' ').trim();
+          if (mDisp.toLowerCase() != currentCleanName &&
+              mDisp.toLowerCase() != currentMachineName) {
+            final st = (val['status'] ?? '').toString().toLowerCase();
+            final runSt = (val['run_state'] ?? '').toString().toLowerCase();
+            final isCompleted = val['is_completed'] == true;
+            final isWaSent = val['wa_sent'] == true;
+
+            final isActive = st == 'unready' ||
+                runSt.contains('run') ||
+                runSt.contains('wash') ||
+                runSt.contains('rinse') ||
+                runSt.contains('spin') ||
+                runSt.contains('dry') ||
+                (cName.isNotEmpty && !isCompleted && !isWaSent);
+
+            if (isActive) {
+              otherMachinesSet.add(mDisp);
+            }
+          }
+        }
+      }
+    });
+
+    // 3. Query active orders & pending cycles in SQLite database
+    int pendingOrderCycles = 0;
+    final List<String> pendingBreakdowns = [];
+
+    if (customerName.isNotEmpty && customerName != '-' && customerName != 'null') {
+      try {
+        final db = await _db.database;
+        final activeOrders = await db.rawQuery(
+          'SELECT id FROM orders WHERE customer_name = ? AND LOWER(status) != "completed"',
+          [customerName],
+        );
+
+        for (final o in activeOrders) {
+          final orderId = o['id'] as int;
+          final items = await db.rawQuery(
+            '''
+            SELECT oi.item_name, oi.quantity, t.machine_type
+            FROM order_items oi
+            LEFT JOIN transactions t ON oi.item_id = t.id
+            WHERE oi.order_id = ?
+            ''',
+            [orderId],
+          );
+
+          int totalOrderCycles = 0;
+          int orderWashCount = 0;
+          int orderDryCount = 0;
+
+          for (final it in items) {
+            final qty = (it['quantity'] as num?)?.toInt() ?? 1;
+            final mType = (it['machine_type'] as String?)?.toLowerCase();
+            final iName = (it['item_name'] as String?)?.toLowerCase() ?? '';
+            if (mType == 'cuci' || iName.contains('cuci') || iName.contains('wash')) {
+              totalOrderCycles += qty;
+              orderWashCount += qty;
+            } else if (mType == 'pengering' || iName.contains('kering') || iName.contains('pengering') || iName.contains('dry')) {
+              totalOrderCycles += qty;
+              orderDryCount += qty;
+            }
+          }
+
+          if (totalOrderCycles == 0) continue;
+
+          final usedRows = await db.rawQuery(
+            'SELECT COUNT(*) as cnt FROM machine_usage_history WHERE order_id = ? AND status = "Success"',
+            [orderId],
+          );
+          final usedCycles = usedRows.isNotEmpty ? (usedRows.first['cnt'] as int? ?? 0) : 0;
+
+          final int remaining = (totalOrderCycles - usedCycles).clamp(0, 999999);
+          if (remaining > 0) {
+            pendingOrderCycles += remaining;
+            if (orderDryCount > 0) {
+              pendingBreakdowns.add('$orderDryCount Pengeringan');
+            }
+            if (orderWashCount > usedCycles) {
+              pendingBreakdowns.add('${orderWashCount - usedCycles} Cuci');
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error checking pending cycles: $e');
+      }
+    }
+
+    final List<String> otherMachines = otherMachinesSet.toList();
+    final bool isFinalCycle = otherMachines.isEmpty && pendingOrderCycles == 0;
 
     // If phone is missing in IoT state, look up phone number from local SQLite DB
     if (customerPhone.isEmpty && customerName.isNotEmpty && customerName != '-' && customerName != 'null') {
@@ -966,8 +1086,8 @@ class _PengeringContentState extends State<PengeringContent> {
         (newOrder.customerPhone == null ||
             newOrder.customerPhone!.trim().isEmpty);
 
-    // WA options
-    bool sendWa = !waSent; // default checked if not sent yet
+    // WA options: Only default to ON if this is the genuine final cycle to finish
+    bool sendWa = isFinalCycle && !waSent;
     bool isCustomMessage = false;
 
     final String defaultTemplate =
@@ -1171,39 +1291,106 @@ class _PengeringContentState extends State<PengeringContent> {
                             ),
                             const SizedBox(height: 16),
 
-                            // If other active machines exist for this customer
-                            if (otherMachines.isNotEmpty) ...[
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFFBEB),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFFFDE68A)),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '$customerName juga masih aktif di: ${otherMachines.join(", ")}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
-                                              color: Color(0xFF92400E),
+                            // Cycle Status Banner (Bukan Siklus Terakhir vs Siklus Terakhir)
+                            if (customerName.isNotEmpty && customerName != '-' && customerName != 'null') ...[
+                              if (!isFinalCycle) ...[
+                                Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFFBEB),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: const Color(0xFFFDE68A)),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 20),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Bukan Siklus Terakhir untuk $customerName',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 13,
+                                                color: Color(0xFF92400E),
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              otherMachines.isNotEmpty && pendingOrderCycles > 0
+                                                  ? '$customerName masih aktif di ${otherMachines.join(", ")} dan masih ada $pendingOrderCycles siklus antrian.'
+                                                  : (otherMachines.isNotEmpty
+                                                      ? '$customerName masih memiliki mesin aktif di: ${otherMachines.join(", ")}.'
+                                                      : '$customerName masih memiliki $pendingOrderCycles siklus lanjutan (${pendingBreakdowns.join(", ")}) dalam antrian pesanan.'),
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFFB45309),
+                                                height: 1.35,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 5),
+                                            const Text(
+                                              '💡 Notifikasi WhatsApp selesai otomatis diaktifkan saat siklus mesin terakhir diselesaikan.',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF78350F),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 16),
+                                const SizedBox(height: 16),
+                              ] else ...[
+                                Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF0FDF4),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: const Color(0xFF86EFAC)),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A), size: 20),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Siklus Mesin Terakhir Selesai! 🎉',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 13,
+                                                color: Color(0xFF166534),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              'Semua proses pengeringan untuk $customerName telah tuntas. Notifikasi WhatsApp siap dikirimkan ke pelanggan.',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF15803D),
+                                                height: 1.35,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
                             ],
 
                             // WhatsApp Studio Card (Compact & Modern)
@@ -1250,7 +1437,11 @@ class _PengeringContentState extends State<PengeringContent> {
                                                     ),
                                                   ),
                                                   Text(
-                                                    sendWa ? 'Otomatis kirim pesan konfirmasi cucian selesai' : 'Matikan jika tidak ingin mengirim notifikasi',
+                                                    sendWa
+                                                        ? 'Otomatis kirim pesan konfirmasi cucian selesai'
+                                                        : (isFinalCycle
+                                                            ? 'Matikan jika tidak ingin mengirim notifikasi'
+                                                            : 'Dinonaktifkan sementara (Menunggu siklus terakhir selesai)'),
                                                     style: TextStyle(
                                                       fontSize: 11.5,
                                                       color: sendWa ? const Color(0xFF15803D) : const Color(0xFF64748B),
