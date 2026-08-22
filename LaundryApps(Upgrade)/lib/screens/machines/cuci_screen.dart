@@ -712,7 +712,7 @@ class _CuciContentState extends State<CuciContent> {
         badgeTextColor = Colors.white;
         titleColor = const Color(0xFF78350F);
         subColor = const Color(0xFFB45309);
-        final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
+        final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : ' 5:00';
         badgeText = "BOOKING$timeText";
         canClick = true;
       } else {

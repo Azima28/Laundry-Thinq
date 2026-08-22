@@ -273,33 +273,8 @@ def set_machine_unready(entity_id, duration_seconds=300, source='customer',
             "wa_completion_sent": False
         }
 
-    def _timer_release(my_gen):
-        """Handle expiration of booking window timer."""
-        remaining = (end_time - datetime.now()).total_seconds()
-        if remaining > 0:
-            time.sleep(remaining)
-
-        # Check if booking timer was cancelled, replaced, or released early
-        if countdown_generation.get(entity_id) != my_gen:
-            print(f"[Timer] Booking timer for {entity_id} (gen={my_gen}) was superseded/released early, skipping auto-expire.")
-            return
-
-        with machine_status_lock:
-            if entity_id not in machine_status:
-                return
-
-        # Check if the machine is actually running (ThinQ detected RUNNING or offline running)
-        # If running, don't release — let completion handle it
-        existing_state = lg_manager.latest_state.get(entity_id, "")
-        if "Running" in existing_state:
-            print(f"[Timer] Machine {entity_id} is running ({existing_state.split('|')[2]}), keeping active")
-            return
-
-        # Booking window expired without starting -> expire booking (preserving customer)
-        _expire_booking(entity_id)
-
-    # Start background timer
-    threading.Thread(target=_timer_release, args=(gen,), daemon=True).start()
+    # Start countdown broadcast
+    _start_countdown_broadcast(entity_id, end_time, duration_minutes)
 
 
 def _expire_booking(entity_id):
@@ -519,20 +494,21 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                 s = int(remaining) % 60
                 control_time = f"{m}:{s:02d}"
 
-                # Periodic checkpointing to SQLite database on every tick!
-                try:
-                    curr_st = lg_manager.latest_state.get(ent, "")
-                    parts = curr_st.split("|") if curr_st else []
-                    curr_run_st = parts[2] if len(parts) > 2 else "Idle"
-                    is_run = 1 if (curr_run_st not in ("Idle", "-", "", "Ready") or "Offline" in curr_run_st) else 0
-                    database.update_active_timer_checkpoint(
-                        ent,
-                        remain_seconds=int(remaining),
-                        run_state=curr_run_st,
-                        is_running=is_run
-                    )
-                except Exception as db_err:
-                    pass
+                # Periodic checkpointing to SQLite database every 5 seconds
+                if int(remaining) % 5 == 0 or remaining <= 5:
+                    try:
+                        curr_st = lg_manager.latest_state.get(ent, "")
+                        parts = curr_st.split("|") if curr_st else []
+                        curr_run_st = parts[2] if len(parts) > 2 else "Idle"
+                        is_run = 1 if (curr_run_st not in ("Idle", "-", "", "Ready") or "Offline" in curr_run_st) else 0
+                        database.update_active_timer_checkpoint(
+                            ent,
+                            remain_seconds=int(remaining),
+                            run_state=curr_run_st,
+                            is_running=is_run
+                        )
+                    except Exception as db_err:
+                        pass
 
                 import lg_manager
                 config = lg_manager.load_lg_config()
@@ -546,20 +522,20 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                     is_running_flag = tracker.get("wa_start_sent", False) or (tracker.get("last_state") == "Running (Offline)")
 
                 if is_lg and not is_degraded_or_bypass:
-                    # Check if LG machine is currently reporting live sensor data from ThinQ cloud
+                    # Check if LG machine is currently reporting active wash cycle sensor data from ThinQ cloud
                     existing_state = lg_manager.latest_state.get(ent, "")
                     existing_parts = existing_state.split("|") if existing_state else []
                     run_st_val = existing_parts[2] if len(existing_parts) > 2 else ""
 
                     is_live_cloud_sensor = (
                         len(existing_parts) >= 6 and
-                        run_st_val in ("Rinsing", "Washing", "Spinning", "Drying", "Running", "Completed", "Idle") and
+                        run_st_val in ("Rinsing", "Washing", "Spinning", "Drying", "Running", "Completed") and
                         "Offline" not in run_st_val and
                         "Menit" not in run_st_val
                     )
 
                     if is_live_cloud_sensor:
-                        # Machine is online and actively monitored by LG Cloud API!
+                        # Machine is online and actively running cycle monitored by LG Cloud API!
                         # Do NOT overwrite with fallback - let LG polling broadcast live sensor data!
                         while len(existing_parts) < 7:
                             existing_parts.append("-")
@@ -575,6 +551,7 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                         lg_manager.latest_state[ent] = state
                         broadcast(state)
                     else:
+                        # Booking window timer ticking down
                         state = f"{ent}|Ready|Idle|{control_time}|-|-|0|{cust_name_str}"
                         lg_manager.latest_state[ent] = state
                         broadcast(state)
@@ -588,7 +565,7 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                     lg_manager.latest_state[ent] = state
                     broadcast(state)
 
-                time.sleep(5)  # Update and checkpoint every 5 seconds
+                time.sleep(1)  # Smooth 1-second countdown tick
 
             if cancelled or countdown_generation.get(ent) != my_gen:
                 print(f"[Countdown] Thread for {ent} (gen={my_gen}) exiting silently (cancelled/superseded).")
@@ -721,7 +698,7 @@ def resume_active_timers():
 
         if effective_remaining > 0:
             # Calculate new target end_time based on current runtime reference
-            new_end_time = now + timedelta(seconds=effective_remaining)
+            new_end_time = end_time_dt if (end_time_dt and end_time_dt > now) else (now + timedelta(seconds=effective_remaining))
             with machine_status_lock:
                 machine_status[entity_id] = new_end_time
 
@@ -759,21 +736,6 @@ def resume_active_timers():
 
             _start_countdown_broadcast(entity_id, new_end_time, duration_minutes)
             resumed_count += 1
-
-            # If it's a booking timer (not running), schedule booking expiration
-            if not is_running:
-                def _timer_release(ent, end_dt):
-                    rem = (end_dt - datetime.now()).total_seconds()
-                    if rem > 0:
-                        time.sleep(rem)
-                    existing_st = lg_manager.latest_state.get(ent, "")
-                    if "Running" in existing_st:
-                        print(f"[Timer] Machine {ent} is running (ThinQ), keeping active (resumed)")
-                        return
-                    print(f"[Timer] Booking window expired for {ent} (resumed), setting READY (preserving customer)")
-                    _expire_booking(ent)
-
-                threading.Thread(target=_timer_release, args=(entity_id, new_end_time), daemon=True).start()
         else:
             # Timer has expired while system was off
             print(f"[Timer Recovery] Timer expired for {entity_id} while offline. Customer: {customer_name}")
