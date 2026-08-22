@@ -50,6 +50,11 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     _loadBizProfile();
     _calculateDuration();
     _loadOrderUsages();
+
+    // Auto-print receipt directly upon opening screen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _printReceipt();
+    });
   }
 
   Future<void> _loadOrderUsages() async {
