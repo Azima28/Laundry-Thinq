@@ -1639,7 +1639,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
                             label: const Text('Impor Kontak', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Color(0xFF059669))),
                             style: OutlinedButton.styleFrom(
                               backgroundColor: const Color(0xFFF0FDF4),
-                              side: const BorderSide(color: Color(0xFF86EFAC)),
+                              side: const BorderSide(color: Color(0xFF86EFAC), width: 1.3),
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
@@ -1653,7 +1653,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
                             label: const Text('Ekspor Data', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Color(0xFF0284C7))),
                             style: OutlinedButton.styleFrom(
                               backgroundColor: const Color(0xFFF0F9FF),
-                              side: const BorderSide(color: Color(0xFFBAE6FD)),
+                              side: const BorderSide(color: Color(0xFFBAE6FD), width: 1.3),
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
@@ -1694,18 +1694,36 @@ class _CustomerScreenState extends State<CustomerScreen> {
             onPressed: () => Navigator.pop(context),
           ),
           actions: [
-            TextButton.icon(
-              onPressed: _openImportDialog,
-              icon: const Icon(Icons.file_download_outlined, size: 18, color: Color(0xFF059669)),
-              label: const Text('Impor Kontak', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF059669), fontSize: 12.5)),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: OutlinedButton.icon(
+                onPressed: _openImportDialog,
+                icon: const Icon(Icons.file_download_outlined, size: 17, color: Color(0xFF059669)),
+                label: const Text('Impor Kontak', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF059669), fontSize: 12.5)),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF0FDF4),
+                  side: const BorderSide(color: Color(0xFF86EFAC), width: 1.3),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
             ),
-            const SizedBox(width: 6),
-            TextButton.icon(
-              onPressed: _openExportDialog,
-              icon: const Icon(Icons.file_upload_outlined, size: 18, color: Color(0xFF0284C7)),
-              label: const Text('Ekspor', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0284C7), fontSize: 12.5)),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: OutlinedButton.icon(
+                onPressed: _openExportDialog,
+                icon: const Icon(Icons.file_upload_outlined, size: 17, color: Color(0xFF0284C7)),
+                label: const Text('Ekspor Data', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0284C7), fontSize: 12.5)),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF0F9FF),
+                  side: const BorderSide(color: Color(0xFFBAE6FD), width: 1.3),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 16),
           ],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(1),
