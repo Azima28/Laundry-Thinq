@@ -1885,13 +1885,11 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     double? width,
     int? flex,
     bool hasRightBorder = true,
-    EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-    Alignment alignment = Alignment.centerLeft,
-    Color borderColor = const Color(0xFFCBD5E1),
+    EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    Color borderColor = const Color(0xFFE2E8F0),
   }) {
     final content = Container(
       padding: padding,
-      alignment: alignment,
       decoration: BoxDecoration(
         border: hasRightBorder
             ? Border(right: BorderSide(color: borderColor, width: 1.0))
@@ -1913,11 +1911,11 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-            blurRadius: 8,
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
@@ -1929,18 +1927,18 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           // Table Header with Vertical Column Dividers
           Container(
             decoration: const BoxDecoration(
-              color: Color(0xFFF1F5F9),
-              border: Border(bottom: BorderSide(color: Color(0xFF94A3B8), width: 1.5)),
+              color: Color(0xFFF8FAFC),
+              border: Border(bottom: BorderSide(color: Color(0xFFCBD5E1), width: 1.5)),
             ),
             child: Row(
               children: [
-                _buildTableCell(width: 75, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                _buildTableCell(flex: 3, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('DESKRIPSI / PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                _buildTableCell(flex: 2, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('KATEGORI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                _buildTableCell(width: 95, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('METODE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                _buildTableCell(width: 115, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                _buildTableCell(width: 125, alignment: Alignment.centerRight, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('KAS MASUK', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.successColor))),
-                _buildTableCell(width: 125, alignment: Alignment.centerRight, hasRightBorder: false, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('KAS KELUAR', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.dangerColor))),
+                _buildTableCell(width: 75, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), child: const Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(flex: 3, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), child: const Text('DESKRIPSI / PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(flex: 2, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), child: const Text('KATEGORI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 95, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), child: const Text('METODE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 115, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), child: const Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 125, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), child: const Text('KAS MASUK', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.successColor))),
+                _buildTableCell(width: 125, hasRightBorder: false, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), child: const Text('KAS KELUAR', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.dangerColor))),
               ],
             ),
           ),
@@ -1957,7 +1955,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                 return Container(
                   decoration: const BoxDecoration(
                     border: Border(
-                      bottom: BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                      bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
                     ),
                   ),
                   color: isEven ? Colors.white : const Color(0xFFF8FAFC),
@@ -1965,8 +1963,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                     children: [
                       _buildTableCell(
                         width: 75,
-                        borderColor: const Color(0xFFCBD5E1),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           item['time'] ?? '--:--',
                           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: StyleConstants.textMuted),
@@ -1974,8 +1971,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       ),
                       _buildTableCell(
                         flex: 3,
-                        borderColor: const Color(0xFFCBD5E1),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           item['title'] ?? '-',
                           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading),
@@ -1983,8 +1979,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       ),
                       _buildTableCell(
                         flex: 2,
-                        borderColor: const Color(0xFFCBD5E1),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           item['category'] ?? '-',
                           style: TextStyle(
@@ -1996,8 +1991,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       ),
                       _buildTableCell(
                         width: 95,
-                        borderColor: const Color(0xFFCBD5E1),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           item['payment_method'] ?? 'TUNAI',
                           style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: StyleConstants.textBody),
@@ -2005,8 +1999,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       ),
                       _buildTableCell(
                         width: 115,
-                        borderColor: const Color(0xFFCBD5E1),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           item['status'] ?? '-',
                           style: TextStyle(
@@ -2018,9 +2011,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       ),
                       _buildTableCell(
                         width: 125,
-                        alignment: Alignment.centerRight,
-                        borderColor: const Color(0xFFCBD5E1),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           isExpense ? '-' : formatRp(item['income_amount'] ?? 0),
                           textAlign: TextAlign.right,
@@ -2029,9 +2020,8 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       ),
                       _buildTableCell(
                         width: 125,
-                        alignment: Alignment.centerRight,
                         hasRightBorder: false,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           isExpense ? formatRp(item['amount'] ?? 0) : '-',
                           textAlign: TextAlign.right,
@@ -2047,10 +2037,10 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
 
           // Table Footer Summary with Border
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: const BoxDecoration(
-              color: Color(0xFFF1F5F9),
-              border: Border(top: BorderSide(color: Color(0xFF94A3B8), width: 1.5)),
+              color: Color(0xFFF8FAFC),
+              border: Border(top: BorderSide(color: Color(0xFFCBD5E1), width: 1.5)),
             ),
             child: Row(
               children: [
@@ -2628,21 +2618,21 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           // Table Header with Vertical Column Dividers
           Container(
             decoration: const BoxDecoration(
-              color: Color(0xFFF1F5F9),
-              border: Border(bottom: BorderSide(color: Color(0xFF94A3B8), width: 1.5)),
+              color: Color(0xFFF8FAFC),
+              border: Border(bottom: BorderSide(color: Color(0xFFCBD5E1), width: 1.5)),
             ),
             child: Row(
               children: [
-                _buildTableCell(width: 75, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('NOTA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                _buildTableCell(width: 70, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 75, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), child: const Text('NOTA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 70, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), child: const Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
                 if (categoryKey == 'cuci' || categoryKey == 'pengering')
-                  _buildTableCell(flex: 3, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('MESIN DIGUNAKAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                _buildTableCell(flex: 3, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                _buildTableCell(flex: 3, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('RINCIAN ITEM', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                _buildTableCell(width: 125, alignment: Alignment.center, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 11), child: const Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                _buildTableCell(width: 110, alignment: Alignment.center, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 11), child: const Text('PEMBAYARAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                _buildTableCell(width: 110, alignment: Alignment.centerRight, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('TOTAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                _buildTableCell(width: 110, alignment: Alignment.center, hasRightBorder: false, padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 11), child: const Text('AKSI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                  _buildTableCell(flex: 3, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), child: const Text('MESIN DIGUNAKAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(flex: 3, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), child: const Text('PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(flex: 3, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), child: const Text('RINCIAN ITEM', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 125, padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10), child: const Center(child: Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)))),
+                _buildTableCell(width: 110, padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10), child: const Center(child: Text('PEMBAYARAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)))),
+                _buildTableCell(width: 110, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), child: const Align(alignment: Alignment.centerRight, child: Text('TOTAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)))),
+                _buildTableCell(width: 110, hasRightBorder: false, padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10), child: const Center(child: Text('AKSI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)))),
               ],
             ),
           ),
@@ -2661,7 +2651,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                 return Container(
                   decoration: const BoxDecoration(
                     border: Border(
-                      bottom: BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                      bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
                     ),
                   ),
                   color: isEven ? Colors.white : const Color(0xFFF8FAFC),
@@ -2669,7 +2659,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                     children: [
                       _buildTableCell(
                         width: 75,
-                        borderColor: const Color(0xFFCBD5E1),
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           '#${order.id}',
@@ -2678,7 +2667,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       ),
                       _buildTableCell(
                         width: 70,
-                        borderColor: const Color(0xFFCBD5E1),
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           DateFormat('HH:mm').format(order.orderDate),
@@ -2688,7 +2676,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       if (categoryKey == 'cuci' || categoryKey == 'pengering')
                         _buildTableCell(
                           flex: 3,
-                          borderColor: const Color(0xFFCBD5E1),
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                           child: Row(
                             children: [
@@ -2714,7 +2701,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                         ),
                       _buildTableCell(
                         flex: 3,
-                        borderColor: const Color(0xFFCBD5E1),
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2727,7 +2713,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       ),
                       _buildTableCell(
                         flex: 3,
-                        borderColor: const Color(0xFFCBD5E1),
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           order.items.map((it) => '${it.quantity}x ${it.itemName}').join(', '),
@@ -2738,62 +2723,62 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       ),
                       _buildTableCell(
                         width: 125,
-                        alignment: Alignment.center,
-                        borderColor: const Color(0xFFCBD5E1),
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                          decoration: BoxDecoration(
-                            color: isDone ? StyleConstants.statusSuccessBg : (isProcessing ? StyleConstants.statusInfoBg : StyleConstants.statusWarningBg),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            isDone ? 'SELESAI / SUKSES' : (isProcessing ? 'SEDANG PROSES' : 'PENDING'),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: isDone ? StyleConstants.statusSuccessText : (isProcessing ? StyleConstants.statusInfoText : StyleConstants.statusWarningText),
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                            decoration: BoxDecoration(
+                              color: isDone ? StyleConstants.statusSuccessBg : (isProcessing ? StyleConstants.statusInfoBg : StyleConstants.statusWarningBg),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            textAlign: TextAlign.center,
+                            child: Text(
+                              isDone ? 'SELESAI / SUKSES' : (isProcessing ? 'SEDANG PROSES' : 'PENDING'),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: isDone ? StyleConstants.statusSuccessText : (isProcessing ? StyleConstants.statusInfoText : StyleConstants.statusWarningText),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                         ),
                       ),
                       _buildTableCell(
                         width: 110,
-                        alignment: Alignment.center,
-                        borderColor: const Color(0xFFCBD5E1),
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                          decoration: BoxDecoration(
-                            color: order.isPaid ? StyleConstants.statusSuccessBg : StyleConstants.statusDangerBg,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            order.isPaid ? 'LUNAS' : (order.paidAmount > 0 ? 'CICILAN' : 'BELUM BAYAR'),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: order.isPaid ? StyleConstants.statusSuccessText : StyleConstants.statusDangerText,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                            decoration: BoxDecoration(
+                              color: order.isPaid ? StyleConstants.statusSuccessBg : StyleConstants.statusDangerBg,
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            textAlign: TextAlign.center,
+                            child: Text(
+                              order.isPaid ? 'LUNAS' : (order.paidAmount > 0 ? 'CICILAN' : 'BELUM BAYAR'),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: order.isPaid ? StyleConstants.statusSuccessText : StyleConstants.statusDangerText,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                         ),
                       ),
                       _buildTableCell(
                         width: 110,
-                        alignment: Alignment.centerRight,
-                        borderColor: const Color(0xFFCBD5E1),
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                        child: Text(
-                          formatRp(order.totalAmount),
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: StyleConstants.textHeading),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            formatRp(order.totalAmount),
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: StyleConstants.textHeading),
+                          ),
                         ),
                       ),
                       _buildTableCell(
                         width: 110,
-                        alignment: Alignment.center,
                         hasRightBorder: false,
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                         child: Row(
