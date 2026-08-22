@@ -1880,12 +1880,40 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     );
   }
 
+  Widget _buildTableCell({
+    required Widget child,
+    double? width,
+    int? flex,
+    bool hasRightBorder = true,
+    EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+    Alignment alignment = Alignment.centerLeft,
+    Color borderColor = const Color(0xFFCBD5E1),
+  }) {
+    final content = Container(
+      padding: padding,
+      alignment: alignment,
+      decoration: BoxDecoration(
+        border: hasRightBorder
+            ? Border(right: BorderSide(color: borderColor, width: 1.0))
+            : null,
+      ),
+      child: child,
+    );
+
+    if (width != null) {
+      return SizedBox(width: width, child: content);
+    } else if (flex != null) {
+      return Expanded(flex: flex, child: content);
+    }
+    return content;
+  }
+
   Widget _buildLedgerTable(List<Map<String, dynamic>> items, int totalIn, int totalOut) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF0F172A).withValues(alpha: 0.04),
@@ -1894,61 +1922,69 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           ),
         ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Table Header
+          // Table Header with Vertical Column Dividers
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             decoration: const BoxDecoration(
-              color: Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1.5)),
+              color: Color(0xFFF1F5F9),
+              border: Border(bottom: BorderSide(color: Color(0xFF94A3B8), width: 1.5)),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                SizedBox(width: 70, child: Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                Expanded(flex: 3, child: Text('DESKRIPSI / PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                Expanded(flex: 2, child: Text('KATEGORI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                SizedBox(width: 90, child: Text('METODE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                SizedBox(width: 110, child: Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                SizedBox(width: 120, child: Text('KAS MASUK', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.successColor))),
-                SizedBox(width: 120, child: Text('KAS KELUAR', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.dangerColor))),
+                _buildTableCell(width: 75, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(flex: 3, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('DESKRIPSI / PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(flex: 2, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('KATEGORI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 95, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('METODE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 115, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 125, alignment: Alignment.centerRight, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('KAS MASUK', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.successColor))),
+                _buildTableCell(width: 125, alignment: Alignment.centerRight, hasRightBorder: false, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('KAS KELUAR', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.dangerColor))),
               ],
             ),
           ),
 
-          // Scrollable Rows with Clear Borders & Alternating Background
+          // Scrollable Rows with Clear Grid Lines (Row & Column) & Alternating Background
           Expanded(
-            child: ListView.separated(
+            child: ListView.builder(
               itemCount: items.length,
-              separatorBuilder: (ctx, i) => const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
               itemBuilder: (ctx, i) {
                 final item = items[i];
                 final bool isExpense = item['type'] == 'expense';
                 final isEven = i % 2 == 0;
 
                 return Container(
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                    ),
+                  ),
                   color: isEven ? Colors.white : const Color(0xFFF8FAFC),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                   child: Row(
                     children: [
-                      SizedBox(
-                        width: 70,
+                      _buildTableCell(
+                        width: 75,
+                        borderColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                         child: Text(
                           item['time'] ?? '--:--',
                           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: StyleConstants.textMuted),
                         ),
                       ),
-                      Expanded(
+                      _buildTableCell(
                         flex: 3,
+                        borderColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                         child: Text(
                           item['title'] ?? '-',
                           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading),
                         ),
                       ),
-                      Expanded(
+                      _buildTableCell(
                         flex: 2,
+                        borderColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                         child: Text(
                           item['category'] ?? '-',
                           style: TextStyle(
@@ -1958,15 +1994,19 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                           ),
                         ),
                       ),
-                      SizedBox(
-                        width: 90,
+                      _buildTableCell(
+                        width: 95,
+                        borderColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                         child: Text(
                           item['payment_method'] ?? 'TUNAI',
                           style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: StyleConstants.textBody),
                         ),
                       ),
-                      SizedBox(
-                        width: 110,
+                      _buildTableCell(
+                        width: 115,
+                        borderColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                         child: Text(
                           item['status'] ?? '-',
                           style: TextStyle(
@@ -1976,16 +2016,22 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                           ),
                         ),
                       ),
-                      SizedBox(
-                        width: 120,
+                      _buildTableCell(
+                        width: 125,
+                        alignment: Alignment.centerRight,
+                        borderColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                         child: Text(
                           isExpense ? '-' : formatRp(item['income_amount'] ?? 0),
                           textAlign: TextAlign.right,
                           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.successColor),
                         ),
                       ),
-                      SizedBox(
-                        width: 120,
+                      _buildTableCell(
+                        width: 125,
+                        alignment: Alignment.centerRight,
+                        hasRightBorder: false,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                         child: Text(
                           isExpense ? formatRp(item['amount'] ?? 0) : '-',
                           textAlign: TextAlign.right,
@@ -1999,13 +2045,12 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
             ),
           ),
 
-          // Table Footer Summary
+          // Table Footer Summary with Border
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             decoration: const BoxDecoration(
-              color: Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(14)),
-              border: Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1.5)),
+              color: Color(0xFFF1F5F9),
+              border: Border(top: BorderSide(color: Color(0xFF94A3B8), width: 1.5)),
             ),
             child: Row(
               children: [
@@ -2566,8 +2611,8 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF0F172A).withValues(alpha: 0.04),
@@ -2576,38 +2621,36 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           ),
         ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Table Header
+          // Table Header with Vertical Column Dividers
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             decoration: const BoxDecoration(
-              color: Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1.5)),
+              color: Color(0xFFF1F5F9),
+              border: Border(bottom: BorderSide(color: Color(0xFF94A3B8), width: 1.5)),
             ),
             child: Row(
               children: [
-                const SizedBox(width: 70, child: Text('NOTA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                const SizedBox(width: 65, child: Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 75, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('NOTA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 70, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
                 if (categoryKey == 'cuci' || categoryKey == 'pengering')
-                  const Expanded(flex: 3, child: Text('MESIN DIGUNAKAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                const Expanded(flex: 3, child: Text('PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                const Expanded(flex: 3, child: Text('RINCIAN ITEM', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                const SizedBox(width: 110, child: Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                const SizedBox(width: 100, child: Text('PEMBAYARAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                const SizedBox(width: 110, child: Text('TOTAL', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
-                const SizedBox(width: 120, child: Text('AKSI', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                  _buildTableCell(flex: 3, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('MESIN DIGUNAKAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(flex: 3, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(flex: 3, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('RINCIAN ITEM', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 125, alignment: Alignment.center, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 11), child: const Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 110, alignment: Alignment.center, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 11), child: const Text('PEMBAYARAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 110, alignment: Alignment.centerRight, borderColor: const Color(0xFFCBD5E1), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11), child: const Text('TOTAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                _buildTableCell(width: 110, alignment: Alignment.center, hasRightBorder: false, padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 11), child: const Text('AKSI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
               ],
             ),
           ),
 
-          // Scrollable Orders List with Clear Row Separator & Alternating Background
+          // Scrollable Orders List with Clear Grid Lines (Row & Column) & Alternating Background
           Expanded(
-            child: ListView.separated(
+            child: ListView.builder(
               itemCount: orders.length,
-              separatorBuilder: (ctx, i) => const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
               itemBuilder: (ctx, i) {
                 final order = orders[i];
                 final isDone = order.status.toLowerCase() == 'completed' || order.status.toLowerCase() == 'selesai' || order.status.toLowerCase() == 'siap diambil';
@@ -2616,27 +2659,37 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                 final isEven = i % 2 == 0;
 
                 return Container(
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                    ),
+                  ),
                   color: isEven ? Colors.white : const Color(0xFFF8FAFC),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                   child: Row(
                     children: [
-                      SizedBox(
-                        width: 70,
+                      _buildTableCell(
+                        width: 75,
+                        borderColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           '#${order.id}',
                           style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5, color: StyleConstants.primaryColor),
                         ),
                       ),
-                      SizedBox(
-                        width: 65,
+                      _buildTableCell(
+                        width: 70,
+                        borderColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           DateFormat('HH:mm').format(order.orderDate),
                           style: const TextStyle(fontSize: 12, color: StyleConstants.textMuted, fontWeight: FontWeight.w600),
                         ),
                       ),
                       if (categoryKey == 'cuci' || categoryKey == 'pengering')
-                        Expanded(
+                        _buildTableCell(
                           flex: 3,
+                          borderColor: const Color(0xFFCBD5E1),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                           child: Row(
                             children: [
                               Icon(
@@ -2659,8 +2712,10 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                             ],
                           ),
                         ),
-                      Expanded(
+                      _buildTableCell(
                         flex: 3,
+                        borderColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -2670,8 +2725,10 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                           ],
                         ),
                       ),
-                      Expanded(
+                      _buildTableCell(
                         flex: 3,
+                        borderColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           order.items.map((it) => '${it.quantity}x ${it.itemName}').join(', '),
                           style: const TextStyle(fontSize: 12, color: StyleConstants.textBody),
@@ -2679,8 +2736,11 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      SizedBox(
-                        width: 110,
+                      _buildTableCell(
+                        width: 125,
+                        alignment: Alignment.center,
+                        borderColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                           decoration: BoxDecoration(
@@ -2698,8 +2758,11 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                           ),
                         ),
                       ),
-                      SizedBox(
-                        width: 100,
+                      _buildTableCell(
+                        width: 110,
+                        alignment: Alignment.center,
+                        borderColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                           decoration: BoxDecoration(
@@ -2717,16 +2780,22 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                           ),
                         ),
                       ),
-                      SizedBox(
+                      _buildTableCell(
                         width: 110,
+                        alignment: Alignment.centerRight,
+                        borderColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         child: Text(
                           formatRp(order.totalAmount),
                           textAlign: TextAlign.right,
                           style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: StyleConstants.textHeading),
                         ),
                       ),
-                      SizedBox(
-                        width: 120,
+                      _buildTableCell(
+                        width: 110,
+                        alignment: Alignment.center,
+                        hasRightBorder: false,
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
