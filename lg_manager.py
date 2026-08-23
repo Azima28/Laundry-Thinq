@@ -531,6 +531,9 @@ async def lg_polling_loop():
                         elif raw_state_str in ["INITIAL", "INIT", "STANDBY", "STAND_BY", "POWER_ON", "POWERON"]:
                             state = "Ready"
                             run_state = "Standby"
+                        elif "PAUSE" in raw_state_str:
+                            state = "Running"
+                            run_state = "Pause"
                         elif raw_state_str in ["RUNNING", "RUN", "WASHING", "RINSING", "SPINNING", "DRYING", "DETECTING"]:
                             state = "Running"
                             run_state = current_state_val.capitalize()
@@ -620,7 +623,9 @@ async def lg_polling_loop():
                         cfg_run_low = int(config.get("interval_running_low", 120))
                         
                         # Calculate and set dynamic interval
-                        if run_state == "Detecting" or raw_state_str == "DETECTING":
+                        if "PAUSE" in raw_state_str or run_state.lower() == "pause":
+                            interval = 30  # Machine paused -> poll every 30s to quickly detect when resumed/unpaused!
+                        elif run_state == "Detecting" or raw_state_str == "DETECTING":
                             interval = 15  # Active load weighing -> poll every 15s to get calculated wash time immediately!
                         elif run_state in ("Standby", "Initial") or raw_state_str in ["INITIAL", "INIT"]:
                             interval = 60  # Initial / Standby state -> 1 menit (60 detik)

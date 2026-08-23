@@ -577,14 +577,17 @@ class _PengeringContentState extends State<PengeringContent> {
     final bool waSent = entry != null && entry['wa_sent'] == true;
     final bool isError = state == 'ERROR' || state == 'OFFLINE';
 
-    final bool isRunning = state == 'RUNNING' ||
+    final bool isPause = runState.toLowerCase().contains('pause') ||
+        state.toLowerCase().contains('pause');
+
+    final bool isRunning = (state == 'RUNNING' ||
                            state == 'RUN' ||
                            (runState.isNotEmpty &&
                             runState != 'Idle' &&
                             runState != 'Completed' &&
                             runState != 'Ready' &&
                             runState != '-' &&
-                            runState != 'unknown');
+                            runState != 'unknown')) && !isPause;
 
     final bool isDetecting = runState.toLowerCase() == 'detecting';
 
@@ -595,6 +598,7 @@ class _PengeringContentState extends State<PengeringContent> {
 
     final bool isBooking = !isRunning &&
         !isDetecting &&
+        !isPause &&
         customerName.isNotEmpty &&
         (machineStatus == 'unready' ||
             state.toUpperCase().contains('BOOKING') ||
@@ -646,6 +650,24 @@ class _PengeringContentState extends State<PengeringContent> {
       subColor = const Color(0xFF9A3412);
       final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
       badgeText = "OFFLINE$timeText";
+      canClick = true;
+    } else if (isPause) {
+      // PAUSED STATE (Amber / Warning Yellow/Orange Full Gradient with Warning/Pause Icon)
+      cardGradient = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+      );
+      border = const Color(0xFFF59E0B);
+      iconBg = const Color(0xFFD97706);
+      iconColor = Colors.white;
+      machineIcon = Icons.pause_circle_filled_rounded;
+      badgeBg = const Color(0xFFD97706);
+      badgeTextColor = Colors.white;
+      titleColor = const Color(0xFF78350F);
+      subColor = const Color(0xFFB45309);
+      final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
+      badgeText = "PAUSE$timeText";
       canClick = true;
     } else if (isRunning) {
       // RUNNING (Blue/Amber Electric Full Gradient)
@@ -852,14 +874,27 @@ class _PengeringContentState extends State<PengeringContent> {
                             ),
                           ],
                         ),
-                        child: Text(
-                          badgeText,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w900,
-                            color: badgeTextColor,
-                            letterSpacing: 0.4,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isPause) ...[
+                              const Icon(
+                                Icons.warning_amber_rounded,
+                                size: 13,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            Text(
+                              badgeText,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w900,
+                                color: badgeTextColor,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -877,7 +912,11 @@ class _PengeringContentState extends State<PengeringContent> {
                   Text(
                     isDetecting
                         ? 'Menimbang Beban (Detecting)...'
-                        : (isBooking
+                        : (isPause
+                            ? (remain.isNotEmpty && remain != '--:--'
+                                ? '$remain (Dijeda / Pause)'
+                                : 'Mesin Dijeda (Pause)')
+                            : (isBooking
                             ? (remain.isNotEmpty && remain != '--:--'
                                 ? 'Booking ($remain tersisa)'
                                 : 'Booking (5:00)')
@@ -893,7 +932,7 @@ class _PengeringContentState extends State<PengeringContent> {
                                         ? (customerName.isNotEmpty
                                             ? (waSent ? 'Selesai (Sudah di-WA)' : 'Selesai (Menunggu Tindakan)')
                                             : 'Siap Digunakan (Idle)')
-                                        : runState)))),
+                                        : runState))))),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,

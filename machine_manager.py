@@ -422,7 +422,7 @@ def on_thinq_state_change(entity_id, new_run_state, remain_time_str, is_complete
         is_last = is_last_machine_for_customer(entity_id)
         if is_completed:
             should_send_completion = is_last
-        elif is_running and remain_minutes <= 3 and remain_minutes > 0:
+        elif is_running and new_run_state.lower() != "pause" and remain_minutes <= 3 and remain_minutes > 0:
             should_send_completion = is_last
             if is_last:
                 print(f"[WA] Machine {entity_id} has <=3 min remaining ({remain_time_str}), sending early completion WA (last machine)")
