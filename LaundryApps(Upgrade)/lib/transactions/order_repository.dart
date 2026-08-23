@@ -1,9 +1,11 @@
 import '../database/models/database_helper.dart';
 import '../database/models/order_model.dart';
+import '../services/machine_status_service.dart';
 
 class OrderRepository {
   final DatabaseHelper _databaseHelper = DatabaseHelper.instance;
-  
+  final MachineStatusService _statusService = MachineStatusService.instance;
+
   Future<int?> getLatestOrderId() async {
     try {
       final orders = await _databaseHelper.getAllOrders();
@@ -15,7 +17,48 @@ class OrderRepository {
     }
   }
 
-  Future<int?> createOrder(String customerName, List<OrderItem> items, int totalAmount, int userId, {String? customerPhone}) async {
+  Future<int?> createOrder(
+    String customerName,
+    List<OrderItem> items,
+    int totalAmount,
+    int userId, {
+    String? customerPhone,
+    String paymentMethod = 'Tunai / Cash',
+    int? paidAmount,
+    bool? isPaid,
+    int? assignedMachineId,
+  }) async {
+    // 1. Try Backend Atomic Creation & Price Verification
+    try {
+      final itemsPayload = items.map((it) => {
+        'item_id': it.itemId,
+        'quantity': it.quantity,
+        'note': it.note ?? '',
+      }).toList();
+
+      final res = await _statusService.createOrderBackend(
+        customerName: customerName,
+        customerPhone: customerPhone,
+        items: itemsPayload,
+        userId: userId,
+        paymentMethod: paymentMethod,
+        paidAmount: paidAmount,
+        isPaid: isPaid,
+        assignedMachineId: assignedMachineId,
+      );
+
+      if (res['success'] == true && res['order'] != null) {
+        final orderData = res['order'] as Map<String, dynamic>;
+        final orderId = orderData['id'] as int?;
+        if (orderId != null && orderId > 0) {
+          return orderId;
+        }
+      }
+    } catch (e) {
+      print('[OrderRepository] Backend createOrder fallback: $e');
+    }
+
+    // 2. Local SQLite Fallback
     try {
       final order = Order(
         customerName: customerName,
@@ -23,11 +66,14 @@ class OrderRepository {
         orderDate: DateTime.now(),
         totalAmount: totalAmount,
         items: items,
-        status: 'Pending', // Initial status
+        status: 'Pending',
         userId: userId,
-        isPaid: false, // Default payment status
+        isPaid: isPaid ?? (paidAmount != null && paidAmount >= totalAmount),
+        paidAmount: paidAmount ?? (paymentMethod == 'Tunai / Cash' ? totalAmount : 0),
+        paymentMethod: paymentMethod,
+        assignedMachineId: assignedMachineId,
       );
-      
+
       final id = await _databaseHelper.insertOrder(order);
       return id > 0 ? id : null;
     } catch (e) {

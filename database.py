@@ -109,6 +109,104 @@ def init_db():
             sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    # Users table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    # Orders table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_name TEXT NOT NULL,
+            customer_phone TEXT,
+            order_date TEXT NOT NULL,
+            total_amount INTEGER NOT NULL,
+            status TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            is_paid INTEGER NOT NULL DEFAULT 0,
+            paid_amount INTEGER NOT NULL DEFAULT 0,
+            payment_method TEXT NOT NULL DEFAULT 'cash',
+            qris_url TEXT,
+            qris_id TEXT,
+            payment_timestamp TEXT,
+            assigned_machine_id INTEGER,
+            machine_started_at TEXT
+        )
+    ''')
+    # Order items table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS order_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
+            item_name TEXT NOT NULL,
+            quantity INTEGER NOT NULL,
+            price INTEGER NOT NULL,
+            note TEXT,
+            FOREIGN KEY (order_id) REFERENCES orders (id),
+            FOREIGN KEY (item_id) REFERENCES transactions (id)
+        )
+    ''')
+    # Product / Service Catalog (transactions)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nama TEXT NOT NULL,
+            harga INTEGER NOT NULL,
+            stock INTEGER,
+            is_unlimited_stock INTEGER NOT NULL DEFAULT 0,
+            is_staff_restockable INTEGER NOT NULL DEFAULT 0,
+            type INTEGER NOT NULL DEFAULT 0,
+            machine_type TEXT,
+            machine_id INTEGER,
+            parent_id INTEGER,
+            is_used INTEGER NOT NULL DEFAULT 0,
+            duration_days INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
+        )
+    ''')
+    # Expenses table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    ''')
+    # Customers table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            phone TEXT,
+            address TEXT,
+            created_at TEXT NOT NULL
+        )
+    ''')
+    # Machine usage history
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS machine_usage_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            machine_id INTEGER NOT NULL,
+            machine_name TEXT NOT NULL,
+            customer_name TEXT,
+            status TEXT NOT NULL,
+            error_message TEXT,
+            started_at TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (order_id) REFERENCES orders (id)
+        )
+    ''')
     # Add source column to existing tables if not present
     try:
         cursor.execute("ALTER TABLE usage_logs ADD COLUMN source TEXT DEFAULT 'customer'")
@@ -821,9 +919,611 @@ def get_current_wash_sequence(phone, name):
         # Count current runs in history
         cursor.execute("SELECT COUNT(*) FROM machine_usage_history WHERE order_id = ?", (active_order_id,))
         current_runs = cursor.fetchone()[0]
-        
+
         conn.close()
         return max(1, current_runs)
     except Exception as e:
         print(f"[DB] Error getting current wash sequence: {e}")
         return 1
+
+# ----------------------
+# SECURE AUTHENTICATION & USER MANAGEMENT
+# ----------------------
+import hashlib
+import secrets
+import hmac
+import math
+
+def hash_password(password):
+    """Hash password using PBKDF2-HMAC-SHA256 with a unique random salt."""
+    if not password:
+        return ""
+    salt = secrets.token_hex(16)
+    iterations = 100000
+    hash_bytes = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), iterations)
+    hash_hex = hash_bytes.hex()
+    return f"pbkdf2:sha256:{iterations}${salt}${hash_hex}"
+
+def verify_password(stored_password, provided_password):
+    """Verify a provided password against stored password (handles PBKDF2 hashes & legacy plain-text).
+
+    Returns:
+        tuple (is_valid: bool, needs_upgrade: bool)
+    """
+    if not stored_password or not provided_password:
+        return False, False
+
+    if stored_password.startswith("pbkdf2:sha256:"):
+        try:
+            parts = stored_password.split("$")
+            if len(parts) == 3:
+                iter_part, salt, expected_hash = parts
+                iterations = int(iter_part.split(":")[2])
+                computed_hash = hashlib.pbkdf2_hmac(
+                    'sha256', provided_password.encode('utf-8'), salt.encode('utf-8'), iterations
+                ).hex()
+                return hmac.compare_digest(computed_hash, expected_hash), False
+        except Exception as e:
+            print(f"[Auth] Error verifying hashed password: {e}")
+            return False, False
+
+    # Legacy plain-text fallback (auto-upgrade trigger)
+    if stored_password == provided_password:
+        return True, True
+
+    return False, False
+
+def generate_auth_token(user_id, username, role, expires_in_days=30):
+    """Generate signed authentication token with HMAC-SHA256 signature."""
+    now_ts = int(datetime.datetime.now().timestamp())
+    exp_ts = now_ts + (expires_in_days * 86400)
+    payload_str = f"{user_id}:{username}:{role}:{exp_ts}"
+    sig = hmac.new(_key.encode('utf-8'), payload_str.encode('utf-8'), hashlib.sha256).hexdigest()
+    raw_token = f"{payload_str}:{sig}"
+    return base64.urlsafe_b64encode(raw_token.encode('utf-8')).decode('utf-8')
+
+def verify_auth_token(token_str):
+    """Verify signed auth token.
+
+    Returns:
+        dict: {"user_id": int, "username": str, "role": str} or None
+    """
+    if not token_str:
+        return None
+    try:
+        if token_str.startswith("Bearer "):
+            token_str = token_str[7:].strip()
+        decoded = base64.urlsafe_b64decode(token_str.encode('utf-8')).decode('utf-8')
+        parts = decoded.split(":")
+        if len(parts) != 5:
+            return None
+        user_id_str, username, role, exp_ts_str, sig = parts
+        payload_str = f"{user_id_str}:{username}:{role}:{exp_ts_str}"
+        expected_sig = hmac.new(_key.encode('utf-8'), payload_str.encode('utf-8'), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        if int(exp_ts_str) < int(datetime.datetime.now().timestamp()):
+            return None  # Expired
+        return {"user_id": int(user_id_str), "username": username, "role": role}
+    except Exception as e:
+        print(f"[Auth] Error verifying auth token: {e}")
+        return None
+
+def verify_user_login(username, password):
+    """Authenticate a user, automatic plain-text to hash migration, and generate token."""
+    if not username or not password:
+        return None, "Username dan password tidak boleh kosong"
+
+    conn = get_db_connection(row_factory=True)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE LOWER(username) = ? AND is_active = 1", (username.strip().lower(),))
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        return None, "Username atau password salah"
+
+    user_dict = dict(row)
+    stored_password = user_dict.get("password", "")
+    is_valid, needs_upgrade = verify_password(stored_password, password)
+
+    if not is_valid:
+        conn.close()
+        return None, "Username atau password salah"
+
+    # Upgrade to hash if legacy plain-text
+    if needs_upgrade:
+        try:
+            new_hash = hash_password(password)
+            cursor.execute("UPDATE users SET password = ? WHERE id = ?", (new_hash, user_dict["id"]))
+            conn.commit()
+            print(f"[Auth] Automatically upgraded legacy password to hash for user: {username}")
+        except Exception as e:
+            print(f"[Auth] Failed to upgrade password: {e}")
+
+    conn.close()
+    token = generate_auth_token(user_dict["id"], user_dict["username"], user_dict["role"])
+    return {
+        "id": user_dict["id"],
+        "username": user_dict["username"],
+        "role": user_dict["role"],
+        "is_active": user_dict["is_active"] == 1,
+        "token": token
+    }, None
+
+def check_admin_exists():
+    """Check if at least one admin exists in database."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1")
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count > 0
+    except Exception as e:
+        print(f"[Auth] Error checking admin: {e}")
+        return False
+
+def create_initial_admin(username, password):
+    """Create initial admin user during setup wizard."""
+    if not username or not password:
+        return None, "Username dan password tidak boleh kosong"
+    if check_admin_exists():
+        return None, "Admin sudah terdaftar"
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        hashed = hash_password(password)
+        created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute('''
+            INSERT INTO users (username, password, role, is_active, created_at)
+            VALUES (?, ?, 'admin', 1, ?)
+        ''', (username.strip(), hashed, created_at))
+        conn.commit()
+        admin_id = cursor.lastrowid
+        conn.close()
+        token = generate_auth_token(admin_id, username.strip(), 'admin')
+        return {
+            "id": admin_id,
+            "username": username.strip(),
+            "role": "admin",
+            "token": token
+        }, None
+    except Exception as e:
+        return None, str(e)
+
+def create_user_account(username, password, role='user'):
+    """Create a new user account with hashed password."""
+    if not username or not password:
+        return None, "Username dan password tidak boleh kosong"
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE LOWER(username) = ?", (username.strip().lower(),))
+        if cursor.fetchone():
+            conn.close()
+            return None, f"Username '{username}' sudah digunakan"
+
+        hashed = hash_password(password)
+        created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute('''
+            INSERT INTO users (username, password, role, is_active, created_at)
+            VALUES (?, ?, ?, 1, ?)
+        ''', (username.strip(), hashed, role, created_at))
+        conn.commit()
+        user_id = cursor.lastrowid
+        conn.close()
+        return {
+            "id": user_id,
+            "username": username.strip(),
+            "role": role,
+            "is_active": True
+        }, None
+    except Exception as e:
+        return None, str(e)
+
+def verify_admin_password(password):
+    """Verify if the provided password matches any active admin."""
+    if not password:
+        return False
+    try:
+        conn = get_db_connection(row_factory=True)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE role = 'admin' AND is_active = 1")
+        admins = cursor.fetchall()
+        for admin in admins:
+            stored_pwd = admin["password"]
+            is_valid, needs_upgrade = verify_password(stored_pwd, password)
+            if is_valid:
+                if needs_upgrade:
+                    try:
+                        new_hash = hash_password(password)
+                        cursor.execute("UPDATE users SET password = ? WHERE id = ?", (new_hash, admin["id"]))
+                        conn.commit()
+                    except Exception:
+                        pass
+                conn.close()
+                return True
+        conn.close()
+        return False
+    except Exception as e:
+        print(f"[Auth] Error verifying admin password: {e}")
+        return False
+
+def change_user_password(user_id, old_password, new_password, is_admin_override=False):
+    """Change password for a user with old password verification."""
+    if not new_password or len(new_password.strip()) < 4:
+        return False, "Password baru minimal 4 karakter"
+    try:
+        conn = get_db_connection(row_factory=True)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return False, "User tidak ditemukan"
+
+        if not is_admin_override:
+            stored_pwd = row["password"]
+            is_valid, _ = verify_password(stored_pwd, old_password)
+            if not is_valid:
+                conn.close()
+                return False, "Password lama salah"
+
+        new_hash = hash_password(new_password)
+        cursor.execute("UPDATE users SET password = ? WHERE id = ?", (new_hash, user_id))
+        conn.commit()
+        conn.close()
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+def get_all_active_users():
+    """Get all active users without exposing passwords."""
+    try:
+        conn = get_db_connection(row_factory=True)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username, role, is_active, created_at FROM users WHERE is_active = 1 ORDER BY id ASC")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"[Auth] Error getting users: {e}")
+        return []
+
+# ----------------------
+# SERVER-SIDE ORDERS & PRICING ENGINE
+# ----------------------
+
+def calculate_order_totals(items):
+    """Calculate verified subtotal and total for a list of items using catalog in database."""
+    if not items:
+        return {"total_amount": 0, "items": []}
+
+    conn = get_db_connection(row_factory=True)
+    cursor = conn.cursor()
+
+    validated_items = []
+    total_amount = 0
+
+    for it in items:
+        item_id = int(it.get("item_id", 0))
+        qty = float(it.get("quantity", 1))
+        note = it.get("note", "")
+
+        cursor.execute("SELECT * FROM transactions WHERE id = ?", (item_id,))
+        trx = cursor.fetchone()
+        if not trx:
+            continue
+
+        item_name = trx["nama"]
+        unit_price = int(trx["harga"])
+        trx_type = int(trx["type"]) if "type" in trx.keys() else 0
+
+        # Type 2 is iron / gosok (supports fractional weight)
+        if trx_type == 2:
+            subtotal = int(round(unit_price * qty))
+            line_qty = int(math.ceil(qty)) if qty > 0 else 1
+        else:
+            line_qty = int(qty)
+            subtotal = int(unit_price * line_qty)
+
+        total_amount += subtotal
+        validated_items.append({
+            "item_id": item_id,
+            "item_name": item_name,
+            "quantity": line_qty,
+            "weight": qty if trx_type == 2 else None,
+            "price": subtotal,
+            "unit_price": unit_price,
+            "note": note,
+            "duration_days": trx["duration_days"] if "duration_days" in trx.keys() else 0,
+            "machine_type": trx["machine_type"] if "machine_type" in trx.keys() else None
+        })
+
+    conn.close()
+    return {
+        "total_amount": total_amount,
+        "items": validated_items
+    }
+
+def create_order(customer_name, customer_phone, items, user_id=1,
+                 payment_method='Tunai / Cash', paid_amount=None, is_paid=None,
+                 assigned_machine_id=None, order_date=None):
+    """Atomically calculate, validate, and insert a new order and order_items in database."""
+    calc = calculate_order_totals(items)
+    total_amount = calc["total_amount"]
+    validated_items = calc["items"]
+
+    if not customer_name or not customer_name.strip():
+        return None, "Nama pelanggan tidak boleh kosong"
+    if not validated_items:
+        return None, "Order harus memiliki minimal satu item yang valid"
+
+    now_iso = order_date if order_date else datetime.datetime.now().isoformat()
+
+    # Determine payment state
+    if paid_amount is None:
+        if payment_method in ('Tunai / Cash', 'QRIS Dinamis'):
+            paid_amount = total_amount
+            is_paid_val = 1
+        elif 'DP' in payment_method:
+            paid_amount = int(paid_amount or 0)
+            is_paid_val = 1 if paid_amount >= total_amount else 0
+        else:
+            paid_amount = 0
+            is_paid_val = 0
+    else:
+        paid_amount = int(paid_amount)
+        is_paid_val = 1 if (is_paid is True or paid_amount >= total_amount) else 0
+
+    payment_timestamp = now_iso if (paid_amount > 0 or is_paid_val == 1) else None
+
+    conn = get_db_connection(row_factory=True)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('''
+            INSERT INTO orders (
+                customer_name, customer_phone, order_date, total_amount,
+                status, user_id, is_paid, paid_amount, payment_method,
+                payment_timestamp, assigned_machine_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            encrypt_val(customer_name.strip()),
+            encrypt_val(customer_phone.strip() if customer_phone else ""),
+            now_iso,
+            total_amount,
+            'Pending',
+            user_id,
+            is_paid_val,
+            paid_amount,
+            payment_method,
+            payment_timestamp,
+            assigned_machine_id
+        ))
+        order_id = cursor.lastrowid
+
+        # Insert line items & decrement stock
+        for it in validated_items:
+            cursor.execute('''
+                INSERT INTO order_items (order_id, item_id, item_name, quantity, price, note)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                order_id,
+                it["item_id"],
+                it["item_name"],
+                it["quantity"],
+                it["price"],
+                encrypt_val(it["note"]) if it["note"] else ""
+            ))
+            # Decrement stock if finite
+            cursor.execute('''
+                UPDATE transactions
+                SET stock = MAX(0, stock - ?)
+                WHERE id = ? AND is_unlimited_stock = 0 AND stock IS NOT NULL
+            ''', (it["quantity"], it["item_id"]))
+
+        conn.commit()
+
+        result_order = {
+            "id": order_id,
+            "customer_name": customer_name.strip(),
+            "customer_phone": customer_phone.strip() if customer_phone else "",
+            "order_date": now_iso,
+            "total_amount": total_amount,
+            "status": "Pending",
+            "user_id": user_id,
+            "is_paid": is_paid_val == 1,
+            "paid_amount": paid_amount,
+            "payment_method": payment_method,
+            "payment_timestamp": payment_timestamp,
+            "assigned_machine_id": assigned_machine_id,
+            "items": validated_items
+        }
+        conn.close()
+        print(f"[DB] Order #{order_id} created successfully for {customer_name} (Total: Rp {total_amount})")
+        return result_order, None
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        print(f"[DB] Error creating order: {e}")
+        return None, str(e)
+
+def update_order_payment(order_id, paid_amount, payment_method, is_paid=None):
+    """Atomically update order payment status."""
+    try:
+        conn = get_db_connection(row_factory=True)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM orders WHERE id = ?", (order_id,))
+        order = cursor.fetchone()
+        if not order:
+            conn.close()
+            return None, "Order tidak ditemukan"
+
+        total_amount = int(order["total_amount"])
+        paid_amount = int(paid_amount)
+        is_paid_val = 1 if (is_paid is True or paid_amount >= total_amount) else 0
+        now_iso = datetime.datetime.now().isoformat()
+
+        cursor.execute('''
+            UPDATE orders
+            SET paid_amount = ?, is_paid = ?, payment_method = ?, payment_timestamp = ?
+            WHERE id = ?
+        ''', (paid_amount, is_paid_val, payment_method, now_iso, order_id))
+        conn.commit()
+        conn.close()
+        return {
+            "id": order_id,
+            "paid_amount": paid_amount,
+            "is_paid": is_paid_val == 1,
+            "payment_method": payment_method,
+            "payment_timestamp": now_iso
+        }, None
+    except Exception as e:
+        return None, str(e)
+
+# ----------------------
+# EXPENSES & LEDGER (BUKU BESAR) ENGINE
+# ----------------------
+
+def create_expense(name, amount, date_str=None):
+    """Create a new operational expense."""
+    if not name or not name.strip():
+        return None, "Nama pengeluaran tidak boleh kosong"
+    try:
+        amount_int = int(amount)
+        if amount_int <= 0:
+            return None, "Nominal pengeluaran harus lebih besar dari 0"
+    except Exception:
+        return None, "Nominal pengeluaran tidak valid"
+
+    now = datetime.datetime.now()
+    date_val = date_str if date_str else now.strftime("%Y-%m-%d")
+    created_at_val = now.isoformat()
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO expenses (name, amount, date, created_at)
+            VALUES (?, ?, ?, ?)
+        ''', (name.strip(), amount_int, date_val, created_at_val))
+        conn.commit()
+        expense_id = cursor.lastrowid
+        conn.close()
+        return {
+            "id": expense_id,
+            "name": name.strip(),
+            "amount": amount_int,
+            "date": date_val,
+            "created_at": created_at_val
+        }, None
+    except Exception as e:
+        conn.close()
+        return None, str(e)
+
+def get_expenses_by_date(date_str=None, start_date=None, end_date=None):
+    """Get expenses filtered by date or date range."""
+    conn = get_db_connection(row_factory=True)
+    cursor = conn.cursor()
+    try:
+        if start_date and end_date:
+            cursor.execute("SELECT * FROM expenses WHERE date BETWEEN ? AND ? ORDER BY date DESC, id DESC", (start_date, end_date))
+        elif date_str:
+            cursor.execute("SELECT * FROM expenses WHERE date = ? ORDER BY id DESC", (date_str,))
+        else:
+            cursor.execute("SELECT * FROM expenses ORDER BY date DESC, id DESC LIMIT 200")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        conn.close()
+        print(f"[DB] Error fetching expenses: {e}")
+        return []
+
+def get_ledger_summary(start_date=None, end_date=None):
+    """Compute official verified financial ledger summary from database."""
+    conn = get_db_connection(row_factory=True)
+    cursor = conn.cursor()
+
+    try:
+        order_where = []
+        order_params = []
+        exp_where = []
+        exp_params = []
+
+        if start_date and end_date:
+            order_where.append("date(order_date) BETWEEN ? AND ?")
+            order_params.extend([start_date, end_date])
+            exp_where.append("date(date) BETWEEN ? AND ?")
+            exp_params.extend([start_date, end_date])
+        elif start_date:
+            order_where.append("date(order_date) = ?")
+            order_params.append(start_date)
+            exp_where.append("date(date) = ?")
+            exp_params.append(start_date)
+
+        order_sql = "SELECT * FROM orders"
+        if order_where:
+            order_sql += " WHERE " + " AND ".join(order_where)
+        cursor.execute(order_sql, order_params)
+        orders = cursor.fetchall()
+
+        exp_sql = "SELECT * FROM expenses"
+        if exp_where:
+            exp_sql += " WHERE " + " AND ".join(exp_where)
+        cursor.execute(exp_sql, exp_params)
+        expenses = cursor.fetchall()
+
+        total_orders_amount = 0
+        total_income_cash = 0
+        total_income_qris = 0
+        total_paid_amount = 0
+        total_piutang = 0
+        total_expenses = sum(int(e["amount"]) for e in expenses)
+
+        for o in orders:
+            tot = int(o["total_amount"])
+            paid = int(o["paid_amount"])
+            method = (o["payment_method"] or "").lower()
+
+            total_orders_amount += tot
+            total_paid_amount += paid
+
+            if tot > paid:
+                total_piutang += (tot - paid)
+
+            if "qris" in method or "transfer" in method:
+                total_income_qris += paid
+            else:
+                total_income_cash += paid
+
+        net_profit = total_paid_amount - total_expenses
+
+        conn.close()
+        return {
+            "total_orders_count": len(orders),
+            "total_order_amount": total_orders_amount,
+            "total_paid_amount": total_paid_amount,
+            "total_income_cash": total_income_cash,
+            "total_income_qris": total_income_qris,
+            "total_piutang": total_piutang,
+            "total_expenses": total_expenses,
+            "net_profit": net_profit
+        }
+    except Exception as e:
+        conn.close()
+        print(f"[DB] Error computing ledger summary: {e}")
+        return {
+            "total_orders_count": 0,
+            "total_order_amount": 0,
+            "total_paid_amount": 0,
+            "total_income_cash": 0,
+            "total_income_qris": 0,
+            "total_piutang": 0,
+            "total_expenses": 0,
+            "net_profit": 0
+        }

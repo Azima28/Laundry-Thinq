@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../database/models/database_helper.dart';
+import '../../services/machine_status_service.dart';
 import '../../utils/currency_format.dart';
 import '../../utils/style_constants.dart';
 
@@ -13,6 +14,7 @@ class PengeluaranScreen extends StatefulWidget {
 
 class _PengeluaranScreenState extends State<PengeluaranScreen> {
   final DatabaseHelper _db = DatabaseHelper.instance;
+  final MachineStatusService _statusService = MachineStatusService.instance;
   List<Map<String, dynamic>> _expenses = [];
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
@@ -89,12 +91,29 @@ class _PengeluaranScreenState extends State<PengeluaranScreen> {
       return;
     }
 
-    await _db.insertExpense({
-      'name': name,
-      'amount': amount,
-      'date': DateFormat('yyyy-MM-dd').format(_selectedDate),
-      'created_at': DateTime.now().toIso8601String(),
-    });
+    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+
+    // Try backend creation first
+    bool savedViaBackend = false;
+    try {
+      final res = await _statusService.createExpenseBackend(
+        name: name,
+        amount: amount,
+        date: dateStr,
+      );
+      if (res['success'] == true) {
+        savedViaBackend = true;
+      }
+    } catch (_) {}
+
+    if (!savedViaBackend) {
+      await _db.insertExpense({
+        'name': name,
+        'amount': amount,
+        'date': dateStr,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    }
 
     _nameController.clear();
     _amountController.clear();

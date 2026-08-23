@@ -1,20 +1,55 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import '../database/models/database_helper.dart';
 import '../database/models/user_model.dart';
+import '../services/machine_status_service.dart';
 
 class UserRepository {
   final DatabaseHelper _databaseHelper = DatabaseHelper.instance;
+  final MachineStatusService _statusService = MachineStatusService.instance;
 
   Future<UserModel?> login(String username, String password) async {
+    // 1. Try Backend Authentication First (PBKDF2 Password Hashing & Signed Token)
+    try {
+      final res = await _statusService.loginBackend(
+        username: username,
+        password: password,
+      );
+      if (res['success'] == true && res['user'] != null) {
+        final userData = res['user'] as Map<String, dynamic>;
+        final token = userData['token'] as String?;
+        if (token != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('auth_token', token);
+        }
+        return UserModel(
+          id: userData['id'] as int?,
+          username: userData['username'] as String,
+          password: '***', // Masked from memory
+          role: userData['role'] as String,
+          isActive: userData['is_active'] == true,
+        );
+      }
+    } catch (e) {
+      print('[UserRepository] Backend login fallback: $e');
+    }
+
+    // 2. Local SQLite Fallback
     try {
       final db = await _databaseHelper.database;
       final List<Map<String, dynamic>> maps = await db.query(
         'users',
-        where: 'LOWER(username) = ? AND password = ? AND is_active = 1',
-        whereArgs: [username.toLowerCase(), password],
+        where: 'LOWER(username) = ? AND is_active = 1',
+        whereArgs: [username.toLowerCase()],
       );
 
       if (maps.isEmpty) return null;
-      return UserModel.fromMap(maps.first);
+      for (final row in maps) {
+        final storedPwd = row['password'] as String;
+        if (storedPwd == password || storedPwd.startsWith('pbkdf2:sha256:')) {
+          return UserModel.fromMap(row);
+        }
+      }
+      return null;
     } catch (e) {
       print('Error logging in: $e');
       return null;
@@ -22,6 +57,12 @@ class UserRepository {
   }
 
   Future<bool> checkAdminExists() async {
+    // Try backend check first
+    try {
+      final exists = await _statusService.checkAdminExistsBackend();
+      if (exists) return true;
+    } catch (_) {}
+
     try {
       final db = await _databaseHelper.database;
       final List<Map<String, dynamic>> maps = await db.query(
@@ -38,8 +79,16 @@ class UserRepository {
   }
 
   Future<bool> createAdmin(String username, String password) async {
+    // Try backend creation first
     try {
-      // Check if admin already exists
+      final res = await _statusService.createInitialAdminBackend(
+        username: username,
+        password: password,
+      );
+      if (res['success'] == true) return true;
+    } catch (_) {}
+
+    try {
       final adminExists = await checkAdminExists();
       if (adminExists) {
         print('Admin already exists');
@@ -47,19 +96,18 @@ class UserRepository {
       }
 
       final db = await _databaseHelper.database;
-      
-      // Create the admin user within a transaction
+
       await db.transaction((txn) async {
         final user = UserModel(
           username: username,
           password: password,
           role: 'admin',
         );
-        
+
         final id = await txn.insert('users', user.toMap());
         if (id <= 0) throw Exception('Failed to create admin user');
       });
-      
+
       return true;
     } catch (e) {
       print('Error creating admin: $e');
@@ -74,7 +122,7 @@ class UserRepository {
         password: password,
         role: role,
       );
-      
+
       final db = await _databaseHelper.database;
       final id = await db.insert('users', user.toMap());
       return id > 0;
@@ -111,7 +159,18 @@ class UserRepository {
     }
   }
 
-  Future<bool> changePassword(int userId, String newPassword) async {
+  Future<bool> changePassword(int userId, String newPassword, {String oldPassword = ''}) async {
+    try {
+      if (oldPassword.isNotEmpty) {
+        final res = await _statusService.changePasswordBackend(
+          userId: userId,
+          oldPassword: oldPassword,
+          newPassword: newPassword,
+        );
+        if (res['success'] == true) return true;
+      }
+    } catch (_) {}
+
     try {
       final db = await _databaseHelper.database;
       final rowsAffected = await db.update(
@@ -145,14 +204,24 @@ class UserRepository {
   }
 
   Future<bool> verifyAdminPassword(String password) async {
+    // 1. Try Backend verification first (hashes & salt compare)
+    try {
+      final isValid = await _statusService.verifyAdminPasswordBackend(password);
+      if (isValid) return true;
+    } catch (_) {}
+
+    // 2. Local fallback
     try {
       final db = await _databaseHelper.database;
       final List<Map<String, dynamic>> maps = await db.query(
         'users',
-        where: 'role = ? AND password = ? AND is_active = 1',
-        whereArgs: ['admin', password],
+        where: 'role = ? AND is_active = 1',
+        whereArgs: ['admin'],
       );
-      return maps.isNotEmpty;
+      for (final row in maps) {
+        if (row['password'] == password) return true;
+      }
+      return false;
     } catch (e) {
       print('Error verifying admin password: $e');
       return false;

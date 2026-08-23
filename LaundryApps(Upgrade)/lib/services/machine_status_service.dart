@@ -534,4 +534,262 @@ class MachineStatusService {
       return [];
     }
   }
+
+  // ==========================================
+  // BACKEND-CENTRIC AUTH & SECURITY SERVICES
+  // ==========================================
+
+  /// Login via backend API with PBKDF2 verification
+  Future<Map<String, dynamic>> loginBackend({
+    required String username,
+    required String password,
+  }) async {
+    try {
+      final uri = Uri.parse('$_dashboardUrl/api/auth/login');
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'username': username, 'password': password}),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      final data = json.decode(resp.body) as Map<String, dynamic>;
+      return data;
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Check if admin exists in database via backend
+  Future<bool> checkAdminExistsBackend() async {
+    try {
+      final uri = Uri.parse('$_dashboardUrl/api/auth/check-admin-exists');
+      final resp = await http.get(uri).timeout(const Duration(seconds: 5));
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body) as Map<String, dynamic>;
+        return data['admin_exists'] == true;
+      }
+    } catch (e) {
+      print('Error checking admin exists backend: $e');
+    }
+    return false;
+  }
+
+  /// Create initial admin via backend
+  Future<Map<String, dynamic>> createInitialAdminBackend({
+    required String username,
+    required String password,
+  }) async {
+    try {
+      final uri = Uri.parse('$_dashboardUrl/api/auth/create-initial-admin');
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'username': username, 'password': password}),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      return json.decode(resp.body) as Map<String, dynamic>;
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Verify admin password via backend
+  Future<bool> verifyAdminPasswordBackend(String password) async {
+    try {
+      final uri = Uri.parse('$_dashboardUrl/api/auth/verify-admin');
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'password': password}),
+          )
+          .timeout(const Duration(seconds: 6));
+
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body) as Map<String, dynamic>;
+        return data['valid'] == true;
+      }
+    } catch (e) {
+      print('Error verifying admin password backend: $e');
+    }
+    return false;
+  }
+
+  /// Change user password via backend
+  Future<Map<String, dynamic>> changePasswordBackend({
+    required int userId,
+    required String oldPassword,
+    required String newPassword,
+    bool isAdminOverride = false,
+  }) async {
+    try {
+      final uri = Uri.parse('$_dashboardUrl/api/auth/change-password');
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'user_id': userId,
+              'old_password': oldPassword,
+              'new_password': newPassword,
+              'is_admin_override': isAdminOverride,
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      return json.decode(resp.body) as Map<String, dynamic>;
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  // ==========================================
+  // BACKEND-CENTRIC ORDERS & PRICING SERVICES
+  // ==========================================
+
+  /// Calculate verified order totals on backend
+  Future<Map<String, dynamic>?> calculateOrderTotalsBackend({
+    required List<Map<String, dynamic>> items,
+  }) async {
+    try {
+      final uri = Uri.parse('$_dashboardUrl/api/orders/calculate');
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'items': items}),
+          )
+          .timeout(const Duration(seconds: 6));
+
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body) as Map<String, dynamic>;
+        return data['calculation'] as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      print('Error calculating order totals on backend: $e');
+    }
+    return null;
+  }
+
+  /// Atomically create order on backend
+  Future<Map<String, dynamic>> createOrderBackend({
+    required String customerName,
+    String? customerPhone,
+    required List<Map<String, dynamic>> items,
+    required int userId,
+    required String paymentMethod,
+    int? paidAmount,
+    bool? isPaid,
+    int? assignedMachineId,
+  }) async {
+    try {
+      final uri = Uri.parse('$_dashboardUrl/api/orders/create');
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'customer_name': customerName,
+              'customer_phone': customerPhone ?? '',
+              'items': items,
+              'user_id': userId,
+              'payment_method': paymentMethod,
+              'paid_amount': paidAmount,
+              'is_paid': isPaid,
+              'assigned_machine_id': assignedMachineId,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      return json.decode(resp.body) as Map<String, dynamic>;
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Update order payment on backend
+  Future<Map<String, dynamic>> updateOrderPaymentBackend({
+    required int orderId,
+    required int paidAmount,
+    required String paymentMethod,
+    bool? isPaid,
+  }) async {
+    try {
+      final uri = Uri.parse('$_dashboardUrl/api/orders/$orderId/payment');
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'paid_amount': paidAmount,
+              'payment_method': paymentMethod,
+              'is_paid': isPaid,
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      return json.decode(resp.body) as Map<String, dynamic>;
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  // ==========================================
+  // BACKEND-CENTRIC FINANCE & LEDGER SERVICES
+  // ==========================================
+
+  /// Record expense via backend
+  Future<Map<String, dynamic>> createExpenseBackend({
+    required String name,
+    required int amount,
+    String? date,
+  }) async {
+    try {
+      final uri = Uri.parse('$_dashboardUrl/api/expenses/create');
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'name': name,
+              'amount': amount,
+              'date': date,
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      return json.decode(resp.body) as Map<String, dynamic>;
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Get verified financial ledger summary from backend
+  Future<Map<String, dynamic>?> getLedgerSummaryBackend({
+    String? startDate,
+    String? endDate,
+    String? date,
+  }) async {
+    try {
+      String query = '';
+      if (startDate != null && endDate != null) {
+        query = '?start_date=$startDate&end_date=$endDate';
+      } else if (date != null) {
+        query = '?date=$date';
+      }
+      final uri = Uri.parse('$_dashboardUrl/api/ledger/summary$query');
+      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body) as Map<String, dynamic>;
+        return data['summary'] as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      print('Error getting ledger summary from backend: $e');
+    }
+    return null;
+  }
 }

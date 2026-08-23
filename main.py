@@ -1497,6 +1497,210 @@ def api_connectivity():
 
 
 # -------------------
+# BACKEND-CENTRIC AUTH & USER API
+# -------------------
+@app.route('/api/auth/login', methods=['POST'])
+@api_app.route('/api/auth/login', methods=['POST'])
+def api_auth_login():
+    """Authenticate user with username & password, returns user info and signed token."""
+    data = request.get_json() or {}
+    username = data.get('username', '')
+    password = data.get('password', '')
+
+    user_info, err = database.verify_user_login(username, password)
+    if err:
+        return jsonify({"success": False, "error": err}), 401
+    return jsonify({"success": True, "user": user_info})
+
+@app.route('/api/auth/check-admin-exists', methods=['GET'])
+@api_app.route('/api/auth/check-admin-exists', methods=['GET'])
+def api_auth_check_admin():
+    """Check if at least one admin exists in database."""
+    exists = database.check_admin_exists()
+    return jsonify({"success": True, "admin_exists": exists})
+
+@app.route('/api/auth/create-initial-admin', methods=['POST'])
+@api_app.route('/api/auth/create-initial-admin', methods=['POST'])
+def api_auth_create_initial_admin():
+    """Create initial admin user during setup wizard."""
+    data = request.get_json() or {}
+    username = data.get('username', '')
+    password = data.get('password', '')
+
+    res, err = database.create_initial_admin(username, password)
+    if err:
+        return jsonify({"success": False, "error": err}), 400
+    return jsonify({"success": True, "user": res})
+
+@app.route('/api/auth/create-user', methods=['POST'])
+@api_app.route('/api/auth/create-user', methods=['POST'])
+def api_auth_create_user():
+    """Create a new user account (Admin only)."""
+    auth_header = request.headers.get('Authorization', '')
+    token_data = database.verify_auth_token(auth_header)
+    if not token_data or token_data.get('role') != 'admin':
+        data = request.get_json() or {}
+        admin_pwd = data.get('admin_password', '')
+        if not database.verify_admin_password(admin_pwd):
+            return jsonify({"success": False, "error": "Akses ditolak: Hanya untuk admin"}), 403
+    else:
+        data = request.get_json() or {}
+
+    username = data.get('username', '')
+    password = data.get('password', '')
+    role = data.get('role', 'user')
+
+    res, err = database.create_user_account(username, password, role)
+    if err:
+        return jsonify({"success": False, "error": err}), 400
+    return jsonify({"success": True, "user": res})
+
+@app.route('/api/auth/verify-admin', methods=['POST'])
+@api_app.route('/api/auth/verify-admin', methods=['POST'])
+def api_auth_verify_admin():
+    """Verify admin password before sensitive operations."""
+    data = request.get_json() or {}
+    password = data.get('password', '')
+    is_valid = database.verify_admin_password(password)
+    if not is_valid:
+        return jsonify({"success": False, "valid": False, "error": "Password admin salah"}), 401
+    return jsonify({"success": True, "valid": True})
+
+@app.route('/api/auth/change-password', methods=['POST'])
+@api_app.route('/api/auth/change-password', methods=['POST'])
+def api_auth_change_password():
+    """Change password for user."""
+    data = request.get_json() or {}
+    user_id = data.get('user_id')
+    old_password = data.get('old_password', '')
+    new_password = data.get('new_password', '')
+    is_admin = data.get('is_admin_override', False)
+
+    ok, err = database.change_user_password(user_id, old_password, new_password, is_admin_override=is_admin)
+    if not ok:
+        return jsonify({"success": False, "error": err}), 400
+    return jsonify({"success": True, "message": "Password berhasil diubah"})
+
+@app.route('/api/auth/users', methods=['GET'])
+@api_app.route('/api/auth/users', methods=['GET'])
+def api_auth_get_users():
+    """Get list of all active users."""
+    users = database.get_all_active_users()
+    return jsonify({"success": True, "users": users})
+
+@app.route('/api/auth/verify-token', methods=['GET', 'POST'])
+@api_app.route('/api/auth/verify-token', methods=['GET', 'POST'])
+def api_auth_verify_token():
+    """Verify if a session token is valid."""
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header and request.is_json:
+        data = request.get_json() or {}
+        auth_header = data.get('token', '')
+    token_data = database.verify_auth_token(auth_header)
+    if not token_data:
+        return jsonify({"success": False, "valid": False, "error": "Token tidak valid atau sudah kedaluwarsa"}), 401
+    return jsonify({"success": True, "valid": True, "user": token_data})
+
+# -------------------
+# BACKEND-CENTRIC ORDERS & PRICING API
+# -------------------
+@app.route('/api/orders/calculate', methods=['POST'])
+@api_app.route('/api/orders/calculate', methods=['POST'])
+def api_orders_calculate():
+    """Server-side calculation of order items subtotal and total amount."""
+    data = request.get_json() or {}
+    items = data.get('items', [])
+    calc = database.calculate_order_totals(items)
+    return jsonify({"success": True, "calculation": calc})
+
+@app.route('/api/orders/create', methods=['POST'])
+@api_app.route('/api/orders/create', methods=['POST'])
+def api_orders_create():
+    """Atomically calculate, validate, and create order in database."""
+    data = request.get_json() or {}
+    cust_name = data.get('customer_name', '')
+    cust_phone = data.get('customer_phone', '')
+    items = data.get('items', [])
+    user_id = data.get('user_id', 1)
+    payment_method = data.get('payment_method', 'Tunai / Cash')
+    paid_amount = data.get('paid_amount')
+    is_paid = data.get('is_paid')
+    assigned_machine_id = data.get('assigned_machine_id')
+    order_date = data.get('order_date')
+
+    order, err = database.create_order(
+        customer_name=cust_name,
+        customer_phone=cust_phone,
+        items=items,
+        user_id=user_id,
+        payment_method=payment_method,
+        paid_amount=paid_amount,
+        is_paid=is_paid,
+        assigned_machine_id=assigned_machine_id,
+        order_date=order_date
+    )
+    if err:
+        return jsonify({"success": False, "error": err}), 400
+    return jsonify({"success": True, "order": order})
+
+@app.route('/api/orders/<int:order_id>/payment', methods=['POST'])
+@api_app.route('/api/orders/<int:order_id>/payment', methods=['POST'])
+def api_orders_update_payment(order_id):
+    """Update order payment status."""
+    data = request.get_json() or {}
+    paid_amount = data.get('paid_amount', 0)
+    payment_method = data.get('payment_method', 'Tunai / Cash')
+    is_paid = data.get('is_paid')
+
+    res, err = database.update_order_payment(order_id, paid_amount, payment_method, is_paid=is_paid)
+    if err:
+        return jsonify({"success": False, "error": err}), 400
+    return jsonify({"success": True, "order": res})
+
+# -------------------
+# BACKEND-CENTRIC FINANCE & LEDGER API
+# -------------------
+@app.route('/api/expenses/create', methods=['POST'])
+@api_app.route('/api/expenses/create', methods=['POST'])
+def api_expenses_create():
+    """Create operational expense."""
+    data = request.get_json() or {}
+    name = data.get('name', '')
+    amount = data.get('amount', 0)
+    date_str = data.get('date')
+
+    res, err = database.create_expense(name, amount, date_str=date_str)
+    if err:
+        return jsonify({"success": False, "error": err}), 400
+    return jsonify({"success": True, "expense": res})
+
+@app.route('/api/expenses', methods=['GET'])
+@api_app.route('/api/expenses', methods=['GET'])
+def api_expenses_list():
+    """List expenses by date or date range."""
+    date_str = request.args.get('date')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    expenses = database.get_expenses_by_date(date_str=date_str, start_date=start_date, end_date=end_date)
+    return jsonify({"success": True, "expenses": expenses})
+
+@app.route('/api/ledger/summary', methods=['GET'])
+@api_app.route('/api/ledger/summary', methods=['GET'])
+def api_ledger_summary():
+    """Get verified financial ledger summary from backend."""
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    date_str = request.args.get('date')
+
+    if date_str and not start_date:
+        start_date = date_str
+
+    summary = database.get_ledger_summary(start_date=start_date, end_date=end_date)
+    return jsonify({"success": True, "summary": summary})
+
+
+# -------------------
 # mDNS BROADCASTER
 # -------------------
 def start_mdns_broadcaster(ip, port):
