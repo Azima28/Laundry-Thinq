@@ -259,23 +259,39 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           }
         }
 
+        String categoryName = 'Layanan Cuci';
+        if (hasCuci && hasPengering) {
+          categoryName = 'Cuci & Pengering';
+        } else if (hasCuci) {
+          categoryName = 'Layanan Cuci';
+        } else if (hasPengering) {
+          categoryName = 'Layanan Pengering';
+        } else if (isPureGosok || hasGosok) {
+          categoryName = 'Setrika / Gosok';
+        } else {
+          categoryName = 'Produk Toko';
+        }
+
+        final orderSummaryData = {
+          'id': order.id,
+          'title': order.customerName,
+          'category': categoryName,
+          'status': paymentStatus,
+          'payment_method': order.paymentMethod.toUpperCase(),
+          'income_amount': order.paidAmount,
+          'total_order': order.totalAmount,
+          'type': 'income',
+          'time': DateFormat('HH:mm').format(order.orderDate),
+          'timestamp': order.orderDate,
+          'items_count': order.items.fold<int>(0, (s, it) => s + it.quantity),
+          'order_obj': order,
+        };
+
+        // All Orders list holds 1 row per transaction slip
+        allOrdersList.add(orderSummaryData);
+
         if (order.items.isEmpty) {
-          final itemData = {
-            'id': order.id,
-            'title': order.customerName,
-            'category': 'Layanan Cuci',
-            'status': paymentStatus,
-            'payment_method': order.paymentMethod.toUpperCase(),
-            'income_amount': order.paidAmount,
-            'total_order': order.totalAmount,
-            'type': 'income',
-            'time': DateFormat('HH:mm').format(order.orderDate),
-            'timestamp': order.orderDate,
-            'items_count': 1,
-            'order_obj': order,
-          };
-          allOrdersList.add(itemData);
-          cuciLedgerList.add(itemData);
+          cuciLedgerList.add(orderSummaryData);
         } else {
           for (var item in order.items) {
             final bool isCuci = _isCuciItem(item);
@@ -315,7 +331,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
               'order_obj': order,
             };
 
-            allOrdersList.add(itemData);
             if (isCuci) cuciLedgerList.add(itemData);
             if (isPengering) keringLedgerList.add(itemData);
             if (isGosok) gosokList.add(itemData);
