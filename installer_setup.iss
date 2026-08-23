@@ -40,8 +40,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "LaundryApps(Upgrade)\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Python Backend Executable
 Source: "main.exe"; DestDir: "{app}"; Flags: ignoreversion
-; WhatsApp Web Node.js Service
-Source: "wa_service\*"; DestDir: "{app}\wa_service"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "node_modules\.cache\*,*.log,.wwebjs_auth\*,*.bak"
+; WhatsApp Web Node.js Service (Clean code only: excludes non-runtime definitions & docs to maximize install speed)
+Source: "wa_service\*"; DestDir: "{app}\wa_service"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "node_modules\.cache\*,*.log,.wwebjs_auth\*,*.bak,*.d.ts,*.md,*.map,*.tsbuildinfo,*.tgz"
 ; Configuration
 Source: "config.json"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
 

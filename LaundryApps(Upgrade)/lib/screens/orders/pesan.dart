@@ -30,8 +30,36 @@ class _PesanPageState extends State<PesanPage> {
   List<TransactionModel> _filteredItems = [];
   Map<int, int> _quantities = {};
   final Map<int, String> _notes = {};
+  String _selectedCategory = 'semua'; // 'semua', 'cuci', 'pengering', 'toko', 'gosok'
   bool _isLoading = true;
   bool _isSubmitting = false;
+
+  int get _cuciCount => _allItems.where((it) {
+        final mType = (it.machineType ?? '').toLowerCase();
+        final name = it.nama.toLowerCase();
+        return mType == 'cuci' || name.contains('cuci') || name.contains('wash');
+      }).length;
+
+  int get _pengeringCount => _allItems.where((it) {
+        final mType = (it.machineType ?? '').toLowerCase();
+        final name = it.nama.toLowerCase();
+        return mType == 'pengering' || name.contains('kering') || name.contains('dry');
+      }).length;
+
+  int get _gosokCount => _allItems.where((it) {
+        final mType = (it.machineType ?? '').toLowerCase();
+        final name = it.nama.toLowerCase();
+        return mType == 'gosok' || mType == 'iron' || name.contains('gosok') || name.contains('setrika');
+      }).length;
+
+  int get _tokoCount => _allItems.where((it) {
+        final mType = (it.machineType ?? '').toLowerCase();
+        final name = it.nama.toLowerCase();
+        final isCuci = mType == 'cuci' || name.contains('cuci') || name.contains('wash');
+        final isKering = mType == 'pengering' || name.contains('kering') || name.contains('dry');
+        final isGosok = mType == 'gosok' || mType == 'iron' || name.contains('gosok') || name.contains('setrika');
+        return !isCuci && !isKering && !isGosok;
+      }).length;
 
   // Customer Management
   final TextEditingController _customerNameController = TextEditingController();
@@ -113,18 +141,13 @@ class _PesanPageState extends State<PesanPage> {
   Future<void> _loadItems() async {
     try {
       final items = await _repository.getAllTransactions();
-      final washItems = items.where((it) {
-        final name = it.nama.toLowerCase();
-        return it.machineType == 'cuci' || name.contains('cuci') || name.contains('wash');
-      }).toList();
-
       if (mounted) {
         setState(() {
-          _allItems = washItems;
-          _filteredItems = washItems;
+          _allItems = items;
           _quantities = {for (var item in _allItems) item.id ?? 0: 0};
           _isLoading = false;
         });
+        _filterProducts();
       }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
@@ -134,13 +157,30 @@ class _PesanPageState extends State<PesanPage> {
   void _filterProducts() {
     final query = _searchProductController.text.toLowerCase().trim();
     setState(() {
-      if (query.isEmpty) {
-        _filteredItems = List.from(_allItems);
-      } else {
-        _filteredItems = _allItems.where((item) {
-          return item.nama.toLowerCase().contains(query);
-        }).toList();
-      }
+      _filteredItems = _allItems.where((item) {
+        final nameLower = item.nama.toLowerCase();
+        final mType = (item.machineType ?? '').toLowerCase();
+
+        // Category filter check
+        bool matchesCategory = true;
+        if (_selectedCategory == 'cuci') {
+          matchesCategory = mType == 'cuci' || nameLower.contains('cuci') || nameLower.contains('wash');
+        } else if (_selectedCategory == 'pengering') {
+          matchesCategory = mType == 'pengering' || nameLower.contains('kering') || nameLower.contains('dry');
+        } else if (_selectedCategory == 'gosok') {
+          matchesCategory = mType == 'gosok' || mType == 'iron' || nameLower.contains('gosok') || nameLower.contains('setrika');
+        } else if (_selectedCategory == 'toko') {
+          final isCuci = mType == 'cuci' || nameLower.contains('cuci') || nameLower.contains('wash');
+          final isKering = mType == 'pengering' || nameLower.contains('kering') || nameLower.contains('dry');
+          final isGosok = mType == 'gosok' || mType == 'iron' || nameLower.contains('gosok') || nameLower.contains('setrika');
+          matchesCategory = !isCuci && !isKering && !isGosok;
+        }
+
+        if (!matchesCategory) return false;
+
+        if (query.isEmpty) return true;
+        return nameLower.contains(query);
+      }).toList();
     });
   }
 
@@ -160,9 +200,20 @@ class _PesanPageState extends State<PesanPage> {
 
   void _updateQuantity(int? id, bool increment) {
     if (id == null) return;
+    final item = _allItems.firstWhere((it) => it.id == id, orElse: () => _allItems.first);
     setState(() {
       int current = _quantities[id] ?? 0;
       if (increment) {
+        if (!item.isUnlimitedStock && item.stock != null && current >= item.stock!) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Stok ${item.nama} tidak mencukupi (sisa: ${item.stock})!'),
+              backgroundColor: StyleConstants.warningColor,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          return;
+        }
         _quantities[id] = current + 1;
       } else {
         if (current > 0) _quantities[id] = current - 1;
@@ -741,46 +792,71 @@ class _PesanPageState extends State<PesanPage> {
                                   children: [
                                     // Catalog Header Ribbon
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                                      padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
                                       decoration: const BoxDecoration(
                                         color: Color(0xFFF8FAFC),
                                         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                                         border: Border(bottom: BorderSide(color: StyleConstants.borderLight)),
                                       ),
-                                      child: Row(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
                                         children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(6),
-                                            decoration: BoxDecoration(
-                                              color: StyleConstants.primaryColor.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: const Icon(Icons.grid_view_rounded, size: 16, color: StyleConstants.primaryColor),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          const Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                          Row(
                                             children: [
-                                              Text(
-                                                'Katalog Layanan & Paket Cuci',
-                                                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
+                                              Container(
+                                                padding: const EdgeInsets.all(6),
+                                                decoration: BoxDecoration(
+                                                  color: StyleConstants.primaryColor.withValues(alpha: 0.1),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: const Icon(Icons.grid_view_rounded, size: 16, color: StyleConstants.primaryColor),
                                               ),
-                                              Text(
-                                                'Pilih paket cucian untuk dimasukkan ke nota transaksi',
-                                                style: TextStyle(fontSize: 10.5, color: StyleConstants.textMuted),
+                                              const SizedBox(width: 10),
+                                              const Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'Katalog Layanan & Produk Laundry',
+                                                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
+                                                  ),
+                                                  Text(
+                                                    'Pilih paket cuci, pengering, dan produk toko untuk nota transaksi',
+                                                    style: TextStyle(fontSize: 10.5, color: StyleConstants.textMuted),
+                                                  ),
+                                                ],
+                                              ),
+                                              const Spacer(),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFE2E8F0),
+                                                  borderRadius: BorderRadius.circular(20),
+                                                ),
+                                                child: Text(
+                                                  '${_filteredItems.length} Item',
+                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
+                                                ),
                                               ),
                                             ],
                                           ),
-                                          const Spacer(),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFE2E8F0),
-                                              borderRadius: BorderRadius.circular(20),
-                                            ),
-                                            child: Text(
-                                              '${_filteredItems.length} Layanan',
-                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
+                                          const SizedBox(height: 10),
+                                          // Segment Filter Chips
+                                          SingleChildScrollView(
+                                            scrollDirection: Axis.horizontal,
+                                            child: Row(
+                                              children: [
+                                                _buildCategoryChip('semua', 'Semua (${_allItems.length})', Icons.dashboard_outlined),
+                                                const SizedBox(width: 6),
+                                                _buildCategoryChip('cuci', 'Cuci ($_cuciCount)', Icons.local_laundry_service_outlined),
+                                                const SizedBox(width: 6),
+                                                _buildCategoryChip('pengering', 'Pengering ($_pengeringCount)', Icons.wb_sunny_outlined),
+                                                const SizedBox(width: 6),
+                                                _buildCategoryChip('toko', 'Produk Toko ($_tokoCount)', Icons.shopping_bag_outlined),
+                                                if (_gosokCount > 0) ...[
+                                                  const SizedBox(width: 6),
+                                                  _buildCategoryChip('gosok', 'Setrika ($_gosokCount)', Icons.iron_outlined),
+                                                ],
+                                              ],
                                             ),
                                           ),
                                         ],
@@ -965,37 +1041,119 @@ class _PesanPageState extends State<PesanPage> {
     );
   }
 
+  Widget _buildCategoryChip(String categoryKey, String label, IconData icon) {
+    final bool isSelected = _selectedCategory == categoryKey;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedCategory = categoryKey;
+        });
+        _filterProducts();
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? StyleConstants.primaryColor : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? StyleConstants.primaryColor : StyleConstants.borderLight,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: StyleConstants.primaryColor.withValues(alpha: 0.25),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? Colors.white : StyleConstants.textMuted,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? Colors.white : StyleConstants.textHeading,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // --- SUB-WIDGET: PRODUCT CARD RICH ACCENTS ---
   Widget _buildProductCard(TransactionModel item, int quantity) {
     final isSelected = quantity > 0;
     final nameLower = item.nama.toLowerCase();
-    final isKiloan = nameLower.contains('kg') || nameLower.contains('kilo');
-    final isExpress = nameLower.contains('exp') || nameLower.contains('kilat');
-    final isBedcover = nameLower.contains('bed') || nameLower.contains('selimut') || nameLower.contains('sepatu');
+    final mType = (item.machineType ?? '').toLowerCase();
+
+    final bool isCuci = mType == 'cuci' || nameLower.contains('cuci') || nameLower.contains('wash');
+    final bool isPengering = mType == 'pengering' || nameLower.contains('kering') || nameLower.contains('dry');
+    final bool isGosok = mType == 'gosok' || mType == 'iron' || nameLower.contains('gosok') || nameLower.contains('setrika');
+    final bool isKiloan = nameLower.contains('kg') || nameLower.contains('kilo');
+    final bool isExpress = nameLower.contains('exp') || nameLower.contains('kilat');
+    final bool isBedcover = nameLower.contains('bed') || nameLower.contains('selimut') || nameLower.contains('sepatu');
 
     // Distinct Theme Accent Color
     final Color accentColor = isExpress
         ? StyleConstants.warningColor
-        : (isKiloan
-            ? StyleConstants.successColor
-            : (isBedcover ? StyleConstants.secondaryColor : StyleConstants.primaryColor));
+        : (isPengering
+            ? const Color(0xFFD97706) // Amber for Dryer
+            : (isCuci
+                ? StyleConstants.primaryColor // Blue for Washer
+                : (isGosok
+                    ? const Color(0xFF7C3AED) // Purple for Ironing
+                    : (isKiloan
+                        ? StyleConstants.successColor
+                        : (isBedcover ? StyleConstants.secondaryColor : const Color(0xFF059669)))))); // Emerald for Store Products/Sabun
 
     final IconData categoryIcon = isExpress
         ? Icons.bolt_rounded
-        : (isKiloan
-            ? Icons.scale_rounded
-            : (isBedcover ? Icons.inventory_2_rounded : Icons.local_laundry_service_rounded));
+        : (isPengering
+            ? Icons.wb_sunny_rounded
+            : (isCuci
+                ? Icons.local_laundry_service_rounded
+                : (isGosok
+                    ? Icons.iron_rounded
+                    : (isKiloan
+                        ? Icons.scale_rounded
+                        : (isBedcover ? Icons.inventory_2_rounded : Icons.shopping_bag_outlined)))));
 
     final String categoryBadge = isExpress
         ? 'EXPRESS'
-        : (isKiloan ? 'KILOAN' : (isBedcover ? 'SATUAN' : 'REGULER'));
+        : (isPengering
+            ? 'PENGERING'
+            : (isCuci
+                ? 'CUCI'
+                : (isGosok
+                    ? 'GOSOK'
+                    : (isKiloan ? 'KILOAN' : (isBedcover ? 'SATUAN' : 'PRODUK')))));
+
+    final bool hasStockLimit = !item.isUnlimitedStock && item.stock != null;
+    final bool isOutOfStock = hasStockLimit && (item.stock ?? 0) <= 0;
 
     return Container(
       decoration: BoxDecoration(
-        color: isSelected ? accentColor.withValues(alpha: 0.06) : Colors.white,
+        color: isOutOfStock
+            ? Colors.grey[100]
+            : (isSelected ? accentColor.withValues(alpha: 0.06) : Colors.white),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isSelected ? accentColor : StyleConstants.borderLight,
+          color: isOutOfStock
+              ? Colors.grey[300]!
+              : (isSelected ? accentColor : StyleConstants.borderLight),
           width: isSelected ? 2 : 1,
         ),
         boxShadow: [
@@ -1011,7 +1169,7 @@ class _PesanPageState extends State<PesanPage> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => _updateQuantity(item.id, true),
+          onTap: isOutOfStock ? null : () => _updateQuantity(item.id, true),
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.all(10),
@@ -1026,14 +1184,16 @@ class _PesanPageState extends State<PesanPage> {
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? accentColor
-                            : accentColor.withValues(alpha: 0.12),
+                        color: isOutOfStock
+                            ? Colors.grey[300]
+                            : (isSelected
+                                ? accentColor
+                                : accentColor.withValues(alpha: 0.12)),
                         borderRadius: BorderRadius.circular(7),
                       ),
                       child: Icon(
                         categoryIcon,
-                        color: isSelected ? Colors.white : accentColor,
+                        color: isOutOfStock ? Colors.grey[600] : (isSelected ? Colors.white : accentColor),
                         size: 16,
                       ),
                     ),
@@ -1042,29 +1202,53 @@ class _PesanPageState extends State<PesanPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: accentColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              categoryBadge,
-                              style: TextStyle(
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.w900,
-                                color: accentColor,
-                                letterSpacing: 0.4,
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: accentColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  categoryBadge,
+                                  style: TextStyle(
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: accentColor,
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
                               ),
-                            ),
+                              if (hasStockLimit) ...[
+                                const SizedBox(width: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: isOutOfStock
+                                        ? StyleConstants.dangerColor.withValues(alpha: 0.1)
+                                        : StyleConstants.successColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    isOutOfStock ? 'Habis' : '${item.stock} unit',
+                                    style: TextStyle(
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: isOutOfStock ? StyleConstants.dangerColor : StyleConstants.successColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           const SizedBox(height: 2),
                           Text(
                             item.nama,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 12.5,
-                              color: StyleConstants.textHeading,
+                              color: isOutOfStock ? StyleConstants.textMuted : StyleConstants.textHeading,
                               letterSpacing: -0.2,
                               height: 1.1,
                             ),
@@ -1094,7 +1278,9 @@ class _PesanPageState extends State<PesanPage> {
                       style: StyleConstants.tabularNumbers(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w900,
-                        color: isSelected ? accentColor : StyleConstants.textHeading,
+                        color: isOutOfStock
+                            ? StyleConstants.textMuted
+                            : (isSelected ? accentColor : StyleConstants.textHeading),
                       ),
                     ),
 
@@ -1132,9 +1318,11 @@ class _PesanPageState extends State<PesanPage> {
                             icon: const Icon(Icons.add_rounded, size: 14),
                             padding: const EdgeInsets.all(2),
                             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                            color: accentColor,
-                            onPressed: () => _updateQuantity(item.id, true),
-                            tooltip: 'Tambah',
+                            color: (isOutOfStock || (hasStockLimit && quantity >= (item.stock ?? 0))) ? Colors.grey[400] : accentColor,
+                            onPressed: (isOutOfStock || (hasStockLimit && quantity >= (item.stock ?? 0)))
+                                ? null
+                                : () => _updateQuantity(item.id, true),
+                            tooltip: isOutOfStock ? 'Stok Habis' : 'Tambah',
                           ),
                         ],
                       ),
