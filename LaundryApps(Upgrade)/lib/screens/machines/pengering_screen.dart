@@ -625,7 +625,7 @@ class _PengeringContentState extends State<PengeringContent> {
     bool canClick = false;
 
     if (isError) {
-      // ERROR (Red Full Gradient)
+      // ERROR / OFFLINE (Red Full Gradient)
       cardGradient = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
@@ -634,12 +634,12 @@ class _PengeringContentState extends State<PengeringContent> {
       border = const Color(0xFFFCA5A5);
       iconBg = const Color(0xFFEF4444);
       iconColor = Colors.white;
-      machineIcon = Icons.error_outline_rounded;
+      machineIcon = (state == 'OFFLINE') ? Icons.cloud_off_rounded : Icons.error_outline_rounded;
       badgeBg = const Color(0xFFDC2626);
       badgeTextColor = Colors.white;
       titleColor = const Color(0xFF7F1D1D);
       subColor = const Color(0xFF991B1B);
-      badgeText = "ERROR";
+      badgeText = (state == 'OFFLINE') ? "OFFLINE" : "ERROR";
       canClick = true;
     } else if (isOfflineRunning) {
       // OFFLINE RUNNING (Amber / Warm Orange Gradient)
@@ -915,27 +915,29 @@ class _PengeringContentState extends State<PengeringContent> {
                   Text(
                     isDetecting
                         ? 'Menimbang Beban (Detecting)...'
-                        : (isPause
-                            ? (remain.isNotEmpty && remain != '--:--'
-                                ? '$remain (Dijeda / Pause)'
-                                : 'Mesin Dijeda (Pause)')
-                            : (isBooking
-                            ? (remain.isNotEmpty && remain != '--:--'
-                                ? 'Booking ($remain tersisa)'
-                                : 'Booking (5:00)')
-                            : (isRunning
+                        : (isError
+                            ? (state == 'OFFLINE' ? 'Mesin Terputus (Offline)' : 'Gangguan Mesin (Error)')
+                            : (isPause
                                 ? (remain.isNotEmpty && remain != '--:--'
-                                    ? '$remain ($runState)'
-                                    : runState)
-                                : (customerName.isEmpty && (runState.toLowerCase().contains('on') || state.contains('ON') || (entry != null && entry['is_relay_on'] == true))
+                                    ? '$remain (Dijeda / Pause)'
+                                    : 'Mesin Dijeda (Pause)')
+                                : (isBooking
                                     ? (remain.isNotEmpty && remain != '--:--'
-                                        ? 'Stopkontak Menyala ($remain tersisa)'
-                                        : 'Stopkontak Menyala (Standby)')
-                                    : ((runState == 'Idle' || runState == 'Standby' || runState == 'Initial')
-                                        ? (customerName.isNotEmpty
-                                            ? (waSent ? 'Selesai (Sudah di-WA)' : 'Selesai (Menunggu Tindakan)')
-                                            : 'Siap Digunakan (Idle)')
-                                        : runState))))),
+                                        ? 'Booking ($remain tersisa)'
+                                        : 'Booking (5:00)')
+                                    : (isRunning
+                                        ? (remain.isNotEmpty && remain != '--:--'
+                                            ? '$remain ($runState)'
+                                            : runState)
+                                        : (customerName.isEmpty && isRelayOn
+                                            ? (remain.isNotEmpty && remain != '--:--'
+                                                ? 'Stopkontak Menyala ($remain tersisa)'
+                                                : 'Stopkontak Menyala (Standby)')
+                                            : ((runState == 'Idle' || runState == 'Standby' || runState == 'Initial')
+                                                ? (customerName.isNotEmpty
+                                                    ? (waSent ? 'Selesai (Sudah di-WA)' : 'Selesai (Menunggu Tindakan)')
+                                                    : 'Siap Digunakan (Idle)')
+                                                : runState)))))),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
