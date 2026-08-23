@@ -129,14 +129,4 @@ class OrderRepository {
       return false;
     }
   }
-
-  Future<bool> deleteOrder(int id) async {
-    try {
-      final rowsAffected = await _databaseHelper.deleteOrder(id);
-      return rowsAffected > 0;
-    } catch (e) {
-      print('Error deleting order: $e');
-      return false;
-    }
-  }
 }

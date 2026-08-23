@@ -835,19 +835,6 @@ class DatabaseHelper {
     return await db.delete('transactions', where: 'id = ?', whereArgs: [id]);
   }
 
-  Future<int> deleteOrder(int id) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      // Delete machine usage history first
-      await txn.delete('machine_usage_history', where: 'order_id = ?', whereArgs: [id]);
-      // Delete order items (due to foreign key constraint)
-      await txn.delete('order_items', where: 'order_id = ?', whereArgs: [id]);
-      // Then delete the order
-      await txn.delete('orders', where: 'id = ?', whereArgs: [id]);
-    });
-    return 1; // Return 1 to indicate success
-  }
-
   Future<int> assignMachineToOrder(
     int orderId,
     int machineId,
