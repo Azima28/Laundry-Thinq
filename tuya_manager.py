@@ -143,17 +143,96 @@ def get_switch_code(cloud_client, device_id):
         pass
     return "switch_1"
 
+def get_local_outlet(dev):
+    """Instantiate a local tinytuya OutletDevice configured for offline LAN socket control."""
+    if not dev or not dev.get("id") or not dev.get("local_key"):
+        return None
+    try:
+        ip = dev.get("ip") or dev.get("local_ip")
+        version = float(dev.get("version", 3.3))
+        d = tinytuya.OutletDevice(
+            dev_id=dev["id"],
+            address=ip,
+            local_key=dev["local_key"],
+            version=version
+        )
+        d.set_socketPersistent(False)
+        d.set_socketTimeout(2.0)
+        return d
+    except Exception as e:
+        print(f"[Tuya Local] Error initializing local outlet device: {e}")
+        return None
+
+def start_dryer_local(dev, duration_minutes):
+    """Priority 1: Attempt to start dryer via local Wi-Fi (Offline TCP LAN)."""
+    outlet = get_local_outlet(dev)
+    if not outlet:
+        return False, "No local key/device configuration"
+    try:
+        res = outlet.turn_on(switch=1)
+        if isinstance(res, dict) and not res.get("Error"):
+            print(f"[Tuya Local] Successfully turned ON {dev.get('name')} via Local LAN (0ms offline)")
+            return True, None
+        return False, res.get("Error", "Local command failed")
+    except Exception as e:
+        return False, str(e)
+
+def stop_dryer_local(dev):
+    """Priority 1: Attempt to stop dryer via local Wi-Fi (Offline TCP LAN)."""
+    outlet = get_local_outlet(dev)
+    if not outlet:
+        return False, "No local key/device configuration"
+    try:
+        res = outlet.turn_off(switch=1)
+        if isinstance(res, dict) and not res.get("Error"):
+            print(f"[Tuya Local] Successfully turned OFF {dev.get('name')} via Local LAN (0ms offline)")
+            return True, None
+        return False, res.get("Error", "Local command failed")
+    except Exception as e:
+        return False, str(e)
+
+def get_dryer_status_local(dev):
+    """Priority 1: Attempt to read status via local Wi-Fi (Offline TCP LAN)."""
+    outlet = get_local_outlet(dev)
+    if not outlet:
+        return None
+    try:
+        data = outlet.status()
+        if isinstance(data, dict) and "dps" in data:
+            dps = data["dps"]
+            switch_val = bool(dps.get("1") or dps.get("switch_1") or False)
+            power_val = float(dps.get("19", 0)) / 10.0 if "19" in dps else 0.0
+            return {
+                "success": True,
+                "online": True,
+                "switch": switch_val,
+                "countdown": 0,
+                "power": power_val,
+                "mode": "local_lan"
+            }
+        return None
+    except Exception:
+        return None
+
 def start_dryer(entity_id, duration_minutes):
-    """Turn Bardi smart plug ON, set countdown, and set recovery state to OFF."""
+    """Turn Bardi smart plug ON: Local LAN First -> Fallback to Cloud."""
     dev = resolve_tuya_device(entity_id)
     if not dev:
         print(f"[Tuya] Device matching {entity_id} not found in devices.json")
         return {"success": False, "error": "Device not found"}
-        
+
+    # --- 1. LOCAL LAN FIRST (OFFLINE 0ms) ---
+    ok_local, err_local = start_dryer_local(dev, duration_minutes)
+    if ok_local:
+        return {"success": True, "mode": "local_lan"}
+
+    print(f"[Tuya] Local LAN failed ({err_local}), falling back to Tuya Cloud API...")
+
+    # --- 2. FALLBACK: TUYA CLOUD API ---
     creds = load_tuya_credentials()
     if not (creds["access_id"] and creds["access_secret"]):
-        return {"success": False, "error": "Tuya credentials not configured"}
-        
+        return {"success": False, "error": f"Local LAN failed ({err_local}) and Tuya Cloud credentials not configured"}
+
     try:
         c = tinytuya.Cloud(
             apiRegion="us",
@@ -163,7 +242,7 @@ def start_dryer(entity_id, duration_minutes):
         device_id = dev["id"]
         switch_code = get_switch_code(c, device_id)
         duration_seconds = duration_minutes * 60
-        
+
         payload = {
             "commands": [
                 {
@@ -180,11 +259,11 @@ def start_dryer(entity_id, duration_minutes):
                 }
             ]
         }
-        
-        print(f"[Tuya] Starting dryer {entity_id} ({device_id}) for {duration_minutes} min...")
+
+        print(f"[Tuya Cloud] Starting dryer {entity_id} ({device_id}) for {duration_minutes} min...")
         res = c.sendcommand(device_id, payload)
         if isinstance(res, dict) and res.get("success"):
-            return {"success": True}
+            return {"success": True, "mode": "cloud"}
         else:
             msg = res.get("msg") if isinstance(res, dict) else "Cloud command rejected"
             return {"success": False, "error": msg}
@@ -193,16 +272,24 @@ def start_dryer(entity_id, duration_minutes):
         return {"success": False, "error": str(e)}
 
 def stop_dryer(entity_id):
-    """Turn Bardi smart plug OFF and reset countdown to 0."""
+    """Turn Bardi smart plug OFF: Local LAN First -> Fallback to Cloud."""
     dev = resolve_tuya_device(entity_id)
     if not dev:
         print(f"[Tuya] Device matching {entity_id} not found in devices.json")
         return {"success": False, "error": "Device not found"}
-        
+
+    # --- 1. LOCAL LAN FIRST (OFFLINE 0ms) ---
+    ok_local, err_local = stop_dryer_local(dev)
+    if ok_local:
+        return {"success": True, "mode": "local_lan"}
+
+    print(f"[Tuya] Local LAN failed ({err_local}), falling back to Tuya Cloud API...")
+
+    # --- 2. FALLBACK: TUYA CLOUD API ---
     creds = load_tuya_credentials()
     if not (creds["access_id"] and creds["access_secret"]):
-        return {"success": False, "error": "Tuya credentials not configured"}
-        
+        return {"success": False, "error": f"Local LAN failed ({err_local}) and Tuya Cloud credentials not configured"}
+
     try:
         c = tinytuya.Cloud(
             apiRegion="us",
@@ -211,7 +298,7 @@ def stop_dryer(entity_id):
         )
         device_id = dev["id"]
         switch_code = get_switch_code(c, device_id)
-        
+
         payload = {
             "commands": [
                 {
@@ -224,11 +311,11 @@ def stop_dryer(entity_id):
                 }
             ]
         }
-        
-        print(f"[Tuya] Stopping dryer {entity_id} ({device_id})...")
+
+        print(f"[Tuya Cloud] Stopping dryer {entity_id} ({device_id})...")
         res = c.sendcommand(device_id, payload)
         if isinstance(res, dict) and res.get("success"):
-            return {"success": True}
+            return {"success": True, "mode": "cloud"}
         else:
             msg = res.get("msg") if isinstance(res, dict) else "Cloud command rejected"
             return {"success": False, "error": msg}
@@ -237,15 +324,21 @@ def stop_dryer(entity_id):
         return {"success": False, "error": str(e)}
 
 def get_dryer_status(entity_id):
-    """Query Tuya Cloud for smart plug status."""
+    """Query smart plug status: Local LAN First -> Fallback to Cloud."""
     dev = resolve_tuya_device(entity_id)
     if not dev:
         return {"success": False, "error": "Device not found", "online": False}
-        
+
+    # --- 1. LOCAL LAN FIRST (OFFLINE) ---
+    local_stat = get_dryer_status_local(dev)
+    if local_stat:
+        return local_stat
+
+    # --- 2. FALLBACK: TUYA CLOUD API ---
     creds = load_tuya_credentials()
     if not (creds["access_id"] and creds["access_secret"]):
         return {"success": False, "error": "Tuya credentials not configured", "online": False}
-        
+
     try:
         c = tinytuya.Cloud(
             apiRegion="us",
@@ -254,16 +347,16 @@ def get_dryer_status(entity_id):
         )
         device_id = dev["id"]
         res = c.cloudrequest(f"/v1.0/devices/{device_id}")
-        
+
         if isinstance(res, dict) and res.get("success"):
             result = res.get("result", {})
             online = result.get("online", False)
             status_list = result.get("status", [])
-            
+
             switch_val = False
             countdown_val = 0
             power_val = 0.0
-            
+
             for status in status_list:
                 code = status.get("code")
                 val = status.get("value")
@@ -273,13 +366,14 @@ def get_dryer_status(entity_id):
                     countdown_val = int(val)
                 elif code == "cur_power":
                     power_val = float(val)
-                    
+
             return {
                 "success": True,
                 "online": online,
                 "switch": switch_val,
                 "countdown": countdown_val,
-                "power": power_val
+                "power": power_val,
+                "mode": "cloud"
             }
         else:
             return {"success": False, "online": False, "error": "Status request failed"}
