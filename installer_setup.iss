@@ -42,8 +42,9 @@ Source: "LaundryApps(Upgrade)\build\windows\x64\runner\Release\*"; DestDir: "{ap
 Source: "main.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; WhatsApp Web Node.js Service (Clean code only: excludes non-runtime definitions & docs to maximize install speed)
 Source: "wa_service\*"; DestDir: "{app}\wa_service"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "node_modules\.cache\*,*.log,.wwebjs_auth\*,*.bak,*.d.ts,*.md,*.map,*.tsbuildinfo,*.tgz"
-; Configuration
+; Configuration & Tuya Smartplug Defaults
 Source: "config.json"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
+Source: "smartplug_controller\*"; DestDir: "{app}\smartplug_controller"; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"

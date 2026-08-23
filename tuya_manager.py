@@ -5,15 +5,7 @@ import sys
 from datetime import datetime
 import tinytuya
 import lg_manager
-
-def get_base_path():
-    if len(sys.argv) > 0 and sys.argv[0]:
-        argv_lower = sys.argv[0].lower()
-        if not (argv_lower.endswith('.py') or argv_lower.endswith('.pyw')):
-            return os.path.dirname(os.path.abspath(sys.argv[0]))
-    return os.path.dirname(os.path.abspath(__file__))
-
-DEVICES_JSON_PATH = os.path.join(get_base_path(), "smartplug_controller", "devices.json")
+from config import DEVICES_JSON_PATH, get_base_path
 
 def load_tuya_credentials():
     """Load Tuya credentials from config.json, with fallback to devices.json."""

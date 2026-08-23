@@ -9,7 +9,7 @@ import uuid
 import base64
 from wideq.core_async import ClientAsync
 from wideq.factory import get_lge_device
-from config import MONITORING_INTERVAL
+from config import MONITORING_INTERVAL, CONFIG_JSON_PATH, get_base_path
 import database
 from sse_manager import broadcast, latest_state
 
@@ -36,21 +36,6 @@ def _get_customer_name(target_name):
         pass
     return None
 
-
-import sys
-
-def get_base_path():
-    import sys
-    # Jika di-bundle sebagai executable (Nuitka / PyInstaller)
-    # Nuitka onefile membongkar payload ke folder temp, sys.executable menunjuk ke folder temp tersebut.
-    # Namun sys.argv[0] tetap menunjuk ke path asli dari executable yang dijalankan.
-    if len(sys.argv) > 0 and sys.argv[0]:
-        argv_lower = sys.argv[0].lower()
-        if not (argv_lower.endswith('.py') or argv_lower.endswith('.pyw')):
-            return os.path.dirname(os.path.abspath(sys.argv[0]))
-    return os.path.dirname(os.path.abspath(__file__))
-
-CONFIG_JSON_PATH = os.path.join(get_base_path(), "config.json")
 
 # Dynamic device list - auto-populated from LG ThinQ
 discovered_devices = []

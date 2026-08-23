@@ -15,7 +15,34 @@ def get_base_path():
             return os.path.dirname(os.path.abspath(sys.argv[0]))
     return os.path.dirname(os.path.abspath(__file__))
 
-CONFIG_JSON_PATH = os.path.join(get_base_path(), "config.json")
+def resolve_appdata_file(filename, subfolder=None):
+    """Resolve file path in %APPDATA%\SmartLaundry to prevent UAC write permission errors in Program Files."""
+    if sys.platform == 'win32':
+        appdata = os.environ.get('APPDATA')
+        if appdata:
+            data_dir = os.path.join(appdata, 'SmartLaundry')
+            if subfolder:
+                data_dir = os.path.join(data_dir, subfolder)
+            os.makedirs(data_dir, exist_ok=True)
+            target = os.path.join(data_dir, filename)
+
+            # Auto copy initial bundle file to AppData if not present
+            base_file = os.path.join(get_base_path(), subfolder, filename) if subfolder else os.path.join(get_base_path(), filename)
+            if not os.path.exists(target) and os.path.exists(base_file):
+                try:
+                    import shutil
+                    shutil.copy2(base_file, target)
+                    print(f"[Config] Initialized {filename} at {target}")
+                except Exception as e:
+                    print(f"[Config] Error copying {filename}: {e}")
+            return target
+
+    if subfolder:
+        return os.path.join(get_base_path(), subfolder, filename)
+    return os.path.join(get_base_path(), filename)
+
+CONFIG_JSON_PATH = resolve_appdata_file("config.json")
+DEVICES_JSON_PATH = resolve_appdata_file("devices.json", "smartplug_controller")
 
 import base64
 
