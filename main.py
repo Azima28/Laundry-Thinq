@@ -1724,26 +1724,25 @@ def start_parent_watchdog(parent_pid):
         import ctypes
         import time
         kernel32 = ctypes.windll.kernel32
-        PROCESS_QUERY_INFORMATION = 0x0400
         SYNCHRONIZE = 0x00100000
-        STILL_ACTIVE = 259
-        
+        WAIT_OBJECT_0 = 0x00000000
+
+        handle = kernel32.OpenProcess(SYNCHRONIZE, False, parent_pid)
+        if handle == 0:
+            print("[Watchdog] Proses induk tidak ditemukan. Mengakhiri python...")
+            os._exit(0)
+
         while True:
-            handle = kernel32.OpenProcess(PROCESS_QUERY_INFORMATION | SYNCHRONIZE, False, parent_pid)
-            if handle == 0:
-                print("[Watchdog] Proses induk tidak ditemukan. Mengakhiri python...")
+            res = kernel32.WaitForSingleObject(handle, 1000)
+            if res == WAIT_OBJECT_0:
+                print("[Watchdog] Proses induk telah keluar (signaled). Mengakhiri python...")
+                kernel32.CloseHandle(handle)
                 os._exit(0)
-            
-            exit_code = ctypes.c_ulong()
-            kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
-            kernel32.CloseHandle(handle)
-            
-            if exit_code.value != STILL_ACTIVE:
-                print("[Watchdog] Proses induk telah keluar. Mengakhiri python...")
+            elif res != 0x00000102:  # WAIT_TIMEOUT is 258 (0x102)
+                print("[Watchdog] Status induk tidak aktif. Mengakhiri python...")
+                kernel32.CloseHandle(handle)
                 os._exit(0)
-                
-            time.sleep(3)
-            
+
     t = threading.Thread(target=watchdog_thread, daemon=True)
     t.start()
                 

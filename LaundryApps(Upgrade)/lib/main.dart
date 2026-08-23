@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -41,6 +42,17 @@ void main() async {
   if (Platform.isAndroid || Platform.isIOS) {
     FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   }
+
+  // Graceful shutdown listener for Windows Desktop
+  AppLifecycleListener(
+    onDetach: () {
+      BackendServicesManager.instance.stopServices();
+    },
+    onExitRequested: () async {
+      await BackendServicesManager.instance.stopServices();
+      return AppExitResponse.exit;
+    },
+  );
 
   if (Platform.isWindows || Platform.isLinux) {
     sqfliteFfiInit();

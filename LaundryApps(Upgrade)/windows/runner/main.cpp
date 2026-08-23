@@ -17,6 +17,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
+  // Automatically terminate all child processes (Python main.exe and Node.js wa_service) when Flutter exits
+  HANDLE hJob = ::CreateJobObject(nullptr, nullptr);
+  if (hJob != nullptr) {
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = { 0 };
+    jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK;
+    ::SetInformationJobObject(hJob, JobObjectExtendedLimitInformation, &jeli, sizeof(jeli));
+    ::AssignProcessToJobObject(hJob, ::GetCurrentProcess());
+  }
+
   flutter::DartProject project(L"data");
 
   std::vector<std::string> command_line_arguments =

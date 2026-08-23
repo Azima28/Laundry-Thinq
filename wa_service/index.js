@@ -261,7 +261,7 @@ if (parentPidArg) {
                 console.log("[Watchdog] Proses induk tidak ditemukan/keluar. Mengakhiri Node...");
                 process.exit(0);
             }
-        }, 3000);
+        }, 1000);
     }
 }
 
