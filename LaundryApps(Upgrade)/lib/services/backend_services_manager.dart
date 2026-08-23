@@ -18,14 +18,16 @@ class BackendServicesManager {
     final int parentPid = pid;
     debugPrint('[ServicesManager] Parent process PID: $parentPid');
 
-    // Clean lingering processes on ports 3000, 5000, 5001 (Windows-only)
+    // Clean lingering processes on ports 3000, 5000, 5001 (Windows-only, non-blocking)
     try {
       if (Platform.isWindows) {
         debugPrint('[ServicesManager] Cleaning lingering backend processes on ports 3000, 5000, 5001...');
-        Process.runSync('powershell', [
+        await Process.run('powershell', [
+          '-NoProfile',
+          '-NonInteractive',
           '-Command',
-          'Get-NetTCPConnection -LocalPort 3000, 5000, 5001 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id \$_.OwningProcess -Force }'
-        ]);
+          'Get-NetTCPConnection -LocalPort 3000, 5000, 5001 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id \$_.OwningProcess -Force -ErrorAction SilentlyContinue }'
+        ]).timeout(const Duration(seconds: 2), onTimeout: () => ProcessResult(0, 0, '', ''));
       }
     } catch (e) {
       debugPrint('[ServicesManager] Error cleaning lingering processes: $e');
