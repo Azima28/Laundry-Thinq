@@ -164,16 +164,31 @@ def get_local_outlet(dev):
         return None
 
 def start_dryer_local(dev, duration_minutes):
-    """Priority 1: Attempt to start dryer via local Wi-Fi (Offline TCP LAN)."""
+    """Priority 1: Attempt to start dryer via local Wi-Fi (Offline TCP LAN) with hardware countdown."""
     outlet = get_local_outlet(dev)
     if not outlet:
         return False, "No local key/device configuration"
     try:
-        res = outlet.turn_on(switch=1)
+        duration_seconds = duration_minutes * 60
+        # Turn on switch (DPS 1) and set hardware timer (DPS 9)
+        res = outlet.set_multiple_values({
+            1: True,
+            9: duration_seconds
+        })
         if isinstance(res, dict) and not res.get("Error"):
-            print(f"[Tuya Local] Successfully turned ON {dev.get('name')} via Local LAN (0ms offline)")
+            print(f"[Tuya Local] Successfully turned ON {dev.get('name')} and set {duration_minutes}m ({duration_seconds}s) hardware countdown via LAN")
             return True, None
-        return False, res.get("Error", "Local command failed")
+
+        # Fallback to single turn_on + set_value
+        res2 = outlet.turn_on(switch=1)
+        if isinstance(res2, dict) and not res2.get("Error"):
+            try:
+                outlet.set_value(9, duration_seconds)
+            except Exception:
+                pass
+            print(f"[Tuya Local] Successfully turned ON {dev.get('name')} via LAN (0ms offline)")
+            return True, None
+        return False, res2.get("Error", "Local command failed")
     except Exception as e:
         return False, str(e)
 
@@ -183,16 +198,28 @@ def stop_dryer_local(dev):
     if not outlet:
         return False, "No local key/device configuration"
     try:
-        res = outlet.turn_off(switch=1)
+        # Turn off switch and clear hardware countdown
+        res = outlet.set_multiple_values({
+            1: False,
+            9: 0
+        })
         if isinstance(res, dict) and not res.get("Error"):
             print(f"[Tuya Local] Successfully turned OFF {dev.get('name')} via Local LAN (0ms offline)")
             return True, None
-        return False, res.get("Error", "Local command failed")
+
+        res2 = outlet.turn_off(switch=1)
+        if isinstance(res2, dict) and not res2.get("Error"):
+            try:
+                outlet.set_value(9, 0)
+            except Exception:
+                pass
+            return True, None
+        return False, res2.get("Error", "Local command failed")
     except Exception as e:
         return False, str(e)
 
 def get_dryer_status_local(dev):
-    """Priority 1: Attempt to read status via local Wi-Fi (Offline TCP LAN)."""
+    """Priority 1: Read exact live status and hardware countdown directly from Tuya chip via LAN."""
     outlet = get_local_outlet(dev)
     if not outlet:
         return None
@@ -200,13 +227,14 @@ def get_dryer_status_local(dev):
         data = outlet.status()
         if isinstance(data, dict) and "dps" in data:
             dps = data["dps"]
-            switch_val = bool(dps.get("1") or dps.get("switch_1") or False)
-            power_val = float(dps.get("19", 0)) / 10.0 if "19" in dps else 0.0
+            switch_val = bool(dps.get("1") or dps.get(1) or dps.get("switch_1") or False)
+            countdown_val = int(dps.get("9") or dps.get(9) or dps.get("countdown_1") or dps.get("countdown") or 0)
+            power_val = float(dps.get("19", 0)) / 10.0 if ("19" in dps or 19 in dps) else 0.0
             return {
                 "success": True,
                 "online": True,
                 "switch": switch_val,
-                "countdown": 0,
+                "countdown": countdown_val,
                 "power": power_val,
                 "mode": "local_lan"
             }

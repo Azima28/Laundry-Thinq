@@ -699,26 +699,48 @@ def resume_active_timers():
             else:
                 last_remain_seconds = duration_minutes * 60
 
-        # Check clock validity & Prioritize Real-time Clock (jam, tgl, tahun, menit, detik)
+        # For Tuya smartplugs, prioritize reading live hardware countdown from Tuya device
+        is_tuya_device = tuya_manager.resolve_tuya_device(entity_id) is not None
+        tuya_hardware_read = False
         effective_remaining = 0
-        if end_time_dt and now.year >= 2024:
-            # Priority 1: Real-time Clock against target end_time (date, year, month, day, hour, min, sec)
-            rem_from_end = (end_time_dt - now).total_seconds()
-            if rem_from_end > 0:
-                effective_remaining = int(rem_from_end)
-                print(f"[Timer Recovery - Real Clock Priority] {entity_id}: target end_time={end_time_str} (now={now.strftime('%Y-%m-%d %H:%M:%S')}). Exact remaining: {effective_remaining}s ({effective_remaining//60}m {effective_remaining%60}s)")
+
+        if is_tuya_device:
+            try:
+                tuya_stat = tuya_manager.get_dryer_status(entity_id)
+                if tuya_stat and tuya_stat.get("success"):
+                    is_on = tuya_stat.get("switch", False)
+                    tuya_countdown = tuya_stat.get("countdown", 0)
+                    if is_on and tuya_countdown > 0:
+                        effective_remaining = int(tuya_countdown)
+                        tuya_hardware_read = True
+                        print(f"[Timer Recovery - Tuya Hardware Direct] {entity_id}: read exact hardware countdown directly from Tuya chip: {effective_remaining}s ({effective_remaining//60}m {effective_remaining%60}s)")
+                    elif not is_on:
+                        effective_remaining = 0
+                        tuya_hardware_read = True
+                        print(f"[Timer Recovery - Tuya Hardware Direct] {entity_id}: Tuya hardware reported switch OFF. Marking expired.")
+            except Exception as tuya_e:
+                print(f"[Timer Recovery] Error reading direct hardware countdown from Tuya for {entity_id}: {tuya_e}")
+
+        if not tuya_hardware_read:
+            # Check clock validity & Prioritize Real-time Clock (jam, tgl, tahun, menit, detik)
+            if end_time_dt and now.year >= 2024:
+                # Priority 1: Real-time Clock against target end_time (date, year, month, day, hour, min, sec)
+                rem_from_end = (end_time_dt - now).total_seconds()
+                if rem_from_end > 0:
+                    effective_remaining = int(rem_from_end)
+                    print(f"[Timer Recovery - Real Clock Priority] {entity_id}: target end_time={end_time_str} (now={now.strftime('%Y-%m-%d %H:%M:%S')}). Exact remaining: {effective_remaining}s ({effective_remaining//60}m {effective_remaining%60}s)")
+                else:
+                    effective_remaining = 0
+                    print(f"[Timer Recovery - Expired] {entity_id}: target end_time={end_time_str} has passed (now={now.strftime('%Y-%m-%d %H:%M:%S')}).")
+            elif last_saved_dt and last_remain_seconds is not None and now.year >= 2024:
+                # Priority 2: Elapsed time since last saved checkpoint
+                elapsed = max(0, (now - last_saved_dt).total_seconds())
+                effective_remaining = max(0, int(last_remain_seconds - elapsed))
+                print(f"[Timer Recovery - Checkpoint] {entity_id}: elapsed {int(elapsed)}s since {last_saved_str}. Remaining: {effective_remaining}s")
             else:
-                effective_remaining = 0
-                print(f"[Timer Recovery - Expired] {entity_id}: target end_time={end_time_str} has passed (now={now.strftime('%Y-%m-%d %H:%M:%S')}).")
-        elif last_saved_dt and last_remain_seconds is not None and now.year >= 2024:
-            # Priority 2: Elapsed time since last saved checkpoint
-            elapsed = max(0, (now - last_saved_dt).total_seconds())
-            effective_remaining = max(0, int(last_remain_seconds - elapsed))
-            print(f"[Timer Recovery - Checkpoint] {entity_id}: elapsed {int(elapsed)}s since {last_saved_str}. Remaining: {effective_remaining}s")
-        else:
-            # Priority 3: Fallback if clock reset / CMOS battery dead
-            effective_remaining = max(0, int(last_remain_seconds)) if last_remain_seconds is not None else 0
-            print(f"[Timer Recovery - State Fallback] {entity_id}: clock invalid, using last recorded seconds: {effective_remaining}s")
+                # Priority 3: Fallback if clock reset / CMOS battery dead
+                effective_remaining = max(0, int(last_remain_seconds)) if last_remain_seconds is not None else 0
+                print(f"[Timer Recovery - State Fallback] {entity_id}: clock invalid, using last recorded seconds: {effective_remaining}s")
 
         if effective_remaining > 0:
             # Calculate new target end_time based on current runtime reference
