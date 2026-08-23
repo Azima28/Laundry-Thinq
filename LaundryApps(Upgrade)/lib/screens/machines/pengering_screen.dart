@@ -1011,18 +1011,19 @@ class _PengeringContentState extends State<PengeringContent> {
               mDisp.toLowerCase() != currentMachineName) {
             final st = (val['status'] ?? '').toString().toLowerCase();
             final runSt = (val['run_state'] ?? '').toString().toLowerCase();
-            final isCompleted = val['is_completed'] == true;
-            final isWaSent = val['wa_sent'] == true;
+            final stateVal = (val['state'] ?? '').toString().toUpperCase();
+            final isBooking = st == 'unready';
+            final isRunning = stateVal == 'RUNNING' ||
+                stateVal == 'RUN' ||
+                (runSt.isNotEmpty &&
+                    runSt != 'idle' &&
+                    runSt != 'ready' &&
+                    runSt != 'completed' &&
+                    runSt != 'standby' &&
+                    runSt != '-' &&
+                    runSt != 'unknown');
 
-            final isActive = st == 'unready' ||
-                runSt.contains('run') ||
-                runSt.contains('wash') ||
-                runSt.contains('rinse') ||
-                runSt.contains('spin') ||
-                runSt.contains('dry') ||
-                (cName.isNotEmpty && !isCompleted && !isWaSent);
-
-            if (isActive) {
+            if (isBooking || isRunning) {
               otherMachinesSet.add(mDisp);
             }
           }

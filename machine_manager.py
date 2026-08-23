@@ -169,32 +169,47 @@ def is_last_machine_for_customer(entity_id):
 
 
 def get_other_active_machines(entity_id):
-    """Return a list of display names of other active machines for this customer."""
+    """Return a list of display names of other genuinely active (running/booking) machines for this customer."""
     info = get_customer_info(entity_id)
     if not info:
         return []
-        
+
     name = info.get("name", "").strip().lower()
     phone = info.get("phone")
-    
+
     normalized_phone = wa_bridge._normalize_phone(phone) if phone else None
-    
+
     other_machines = []
     with customer_info_lock:
         for eid, cinfo in customer_info.items():
             if eid != entity_id:
-                # 1. Match by phone if both have phone numbers
+                match = False
                 p = cinfo.get("phone")
                 if p and normalized_phone:
                     if wa_bridge._normalize_phone(p) == normalized_phone:
+                        match = True
+                else:
+                    n = cinfo.get("name", "").strip().lower()
+                    if n and name and n == name and name not in ("pelanggan", "guest", "", "-"):
+                        match = True
+
+                if match:
+                    # Check if this other machine is currently booking or running
+                    is_booking = get_machine_status(eid) == "unready"
+
+                    existing_state = lg_manager.latest_state.get(eid, "")
+                    parts = existing_state.split("|")
+                    state_val = parts[1].upper() if len(parts) > 1 else ""
+                    run_state_val = parts[2].lower() if len(parts) > 2 else ""
+
+                    is_running = state_val in ("RUNNING", "RUN") or (
+                        run_state_val not in ("", "-", "idle", "ready", "completed", "unknown", "standby")
+                    )
+
+                    if is_booking or is_running:
                         display_name = eid.replace("_", " ")
                         other_machines.append(display_name)
-                        continue
-                # 2. Match by customer name if phone is not available, avoiding generic words
-                n = cinfo.get("name", "").strip().lower()
-                if n and name and n == name and name not in ("pelanggan", "guest", "", "-"):
-                    display_name = eid.replace("_", " ")
-                    other_machines.append(display_name)
+
     return other_machines
 
 
