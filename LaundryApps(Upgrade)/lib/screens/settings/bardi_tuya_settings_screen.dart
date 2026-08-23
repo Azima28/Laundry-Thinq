@@ -191,33 +191,31 @@ class _BardiTuyaSettingsScreenState extends State<BardiTuyaSettingsScreen> {
           )
           .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          final List<dynamic> devices = data['devices'] ?? [];
-          setState(() {
-            _scannedPlugs = devices;
-          });
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Berhasil mensinkronkan ${devices.length} stopkontak Bardi (kategori cz).'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          await _loadDryerMachines();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Sinkronisasi gagal: ${data['error']}'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
-        }
-      } else {
+      dynamic data;
+      try {
+        data = json.decode(response.body);
+      } catch (_) {}
+
+      if (response.statusCode == 200 && data != null && data['success'] == true) {
+        final List<dynamic> devices = data['devices'] ?? [];
+        setState(() {
+          _scannedPlugs = devices;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Server Error: HTTP ${response.statusCode}'),
+            content: Text('Berhasil mensinkronkan ${devices.length} stopkontak Bardi (kategori cz).'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        await _loadDryerMachines();
+      } else {
+        final errorMsg = (data is Map && data['error'] != null)
+            ? data['error']
+            : 'Server Error: HTTP ${response.statusCode}';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sinkronisasi gagal: $errorMsg'),
             backgroundColor: Colors.redAccent,
           ),
         );

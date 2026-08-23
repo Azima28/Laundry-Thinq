@@ -1,3 +1,18 @@
+import sys
+import os
+
+# Ensure valid stdout/stderr streams when compiled with --noconsole / running without console
+class _SafeStreamWriter:
+    def write(self, s):
+        pass
+    def flush(self):
+        pass
+
+if sys.stdout is None:
+    sys.stdout = _SafeStreamWriter()
+if sys.stderr is None:
+    sys.stderr = _SafeStreamWriter()
+
 from flask import Flask, Response, render_template, jsonify, request
 import requests
 try:
@@ -8,7 +23,6 @@ except Exception:
 import json
 import threading
 import socket
-import os
 import asyncio
 from datetime import datetime
 from zeroconf import ServiceInfo, Zeroconf
