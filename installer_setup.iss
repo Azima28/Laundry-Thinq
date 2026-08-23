@@ -30,7 +30,6 @@ SolidCompression=yes
 WizardStyle=modern
 
 [Languages]
-Name: "indonesian"; MessagesFile: "compiler:Languages\Indonesian.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
@@ -42,7 +41,7 @@ Source: "LaundryApps(Upgrade)\build\windows\x64\runner\Release\*"; DestDir: "{ap
 ; Python Backend Executable
 Source: "main.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; WhatsApp Web Node.js Service
-Source: "wa_service\*"; DestDir: "{app}\wa_service"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "node_modules\.cache\*,*.log"
+Source: "wa_service\*"; DestDir: "{app}\wa_service"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "node_modules\.cache\*,*.log,.wwebjs_auth\*,*.bak"
 ; Configuration
 Source: "config.json"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
 

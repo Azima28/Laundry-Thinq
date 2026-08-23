@@ -5,12 +5,13 @@ echo ================================================================
 echo.
 
 echo [1/3] Compiling Python Backend (main.py -> main.exe)...
-python -m pip install nuitka zstandard >nul 2>&1
-python -m nuitka --standalone --onefile --show-progress main.py
-if %ERRORLEVEL% NEQ 0 (
+pyinstaller --onefile --noconsole --name main main.py >nul 2>&1
+if exist "dist\main.exe" (
+    copy /y "dist\main.exe" "main.exe" >nul
+) else (
     echo [ERROR] Gagal mengompilasi Python backend!
     pause
-    exit /b %ERRORLEVEL%
+    exit /b 1
 )
 echo.
 
@@ -27,7 +28,10 @@ cd ..
 echo.
 
 echo [3/3] Compiling Installer using Inno Setup...
-set "INNO_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+set "INNO_PATH=%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe"
+if not exist "%INNO_PATH%" (
+    set "INNO_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+)
 if not exist "%INNO_PATH%" (
     set "INNO_PATH=C:\Program Files\Inno Setup 6\ISCC.exe"
 )
