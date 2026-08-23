@@ -67,18 +67,7 @@ def machines_json():
     except Exception as e:
         print(f"[API] Error reading machines: {e}")
         db_machines = []
-        
-    # In case DB is empty (first run), fallback to default simulation list
-    if not db_machines:
-        defaults = [
-            {"name": "Mesin Cuci 1", "url": "Mesin_Cuci_1", "key": "cuci"},
-            {"name": "Mesin Cuci 2", "url": "Mesin_Cuci_2", "key": "cuci"},
-            {"name": "Mesin Cuci 3", "url": "Mesin_Cuci_3", "key": "cuci"},
-            {"name": "Mesin Cuci 4", "url": "Mesin_Cuci_4", "key": "cuci"},
-            {"name": "Mesin Cuci 5", "url": "Mesin_Cuci_5", "key": "cuci"},
-        ]
-        db_machines = defaults
-        
+
     for m in db_machines:
         sensor = m.get("name").replace(' ', '_')
         url = m.get("url", "-")

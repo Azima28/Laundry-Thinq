@@ -251,23 +251,6 @@ def init_db():
     except sqlite3.OperationalError:
         pass
 
-    # Seed default machines if table is empty
-    cursor.execute("SELECT COUNT(*) FROM machines")
-    count = cursor.fetchone()[0]
-    if count == 0:
-        default_machines = [
-            ("Mesin Cuci 1", "Mesin_Cuci_1", "cuci"),
-            ("Mesin Cuci 2", "Mesin_Cuci_2", "cuci"),
-            ("Mesin Cuci 3", "Mesin_Cuci_3", "cuci"),
-            ("Mesin Cuci 4", "Mesin_Cuci_4", "cuci"),
-            ("Mesin Cuci 5", "Mesin_Cuci_5", "cuci"),
-        ]
-        cursor.executemany(
-            "INSERT INTO machines (name, url, key) VALUES (?, ?, ?)",
-            default_machines
-        )
-        conn.commit()
-
     conn.close()
     print(f"[DB] Database initialized at {DB_PATH}")
 
