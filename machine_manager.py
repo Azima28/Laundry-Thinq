@@ -482,6 +482,7 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
     def _update_countdown(ent, end_dt, dur_min, is_lg, my_gen):
         is_tuya = tuya_manager.resolve_tuya_device(ent) is not None
         cancelled = False
+        loop_tick = 0
         try:
             while True:
                 # Check cancellation token & generation
@@ -494,25 +495,29 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                         cancelled = True
                         break
 
-                if is_tuya:
-                    status = tuya_manager.get_dryer_status(ent)
-                    if status.get("success"):
-                        if not status.get("switch"):
-                            print(f"[Tuya] Dryer {ent} switch detected as OFF. Stopping countdown.")
-                            break
-                        remaining = status.get("countdown", 0)
-                        if remaining <= 0:
-                            print(f"[Tuya] Dryer {ent} countdown reached 0. Stopping countdown.")
-                            break
-                    else:
-                        # Fallback to local clock calculation if API fails
-                        remaining = (end_dt - datetime.now()).total_seconds()
-                        if remaining <= 0:
-                            break
-                else:
-                    remaining = (end_dt - datetime.now()).total_seconds()
-                    if remaining <= 0:
-                        break
+                # Smooth 1-second local decrement from end_dt
+                remaining = max(0, (end_dt - datetime.now()).total_seconds())
+
+                # Periodic hardware verification every 5 seconds for Tuya smartplugs
+                if is_tuya and (loop_tick % 5 == 0):
+                    try:
+                        status = tuya_manager.get_cached_dryer_status(ent)
+                        if not status or not status.get("success"):
+                            status = tuya_manager.get_dryer_status(ent)
+                        if status and status.get("success"):
+                            if not status.get("switch", False):
+                                print(f"[Tuya] Dryer {ent} switch detected as OFF (5s hardware poll). Stopping countdown.")
+                                break
+                            tuya_cd = status.get("countdown", 0)
+                            if tuya_cd > 0 and abs(tuya_cd - remaining) > 3:
+                                # Resync end_dt gently if hardware timer drifted
+                                end_dt = datetime.now() + timedelta(seconds=tuya_cd)
+                                remaining = tuya_cd
+                    except Exception:
+                        pass
+
+                if remaining <= 0:
+                    break
 
                 m = int(remaining) // 60
                 s = int(remaining) % 60
@@ -590,6 +595,7 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                     broadcast(state)
 
                 time.sleep(1)  # Smooth 1-second countdown tick
+                loop_tick += 1
 
             if cancelled or countdown_generation.get(ent) != my_gen:
                 print(f"[Countdown] Thread for {ent} (gen={my_gen}) exiting silently (cancelled/superseded).")

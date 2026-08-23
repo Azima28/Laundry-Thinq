@@ -204,7 +204,7 @@ def start_tuya_thread():
                         sse_manager.broadcast(st)
             except Exception as e:
                 print(f"[Tuya Background] Error: {e}")
-            time.sleep(3)
+            time.sleep(5)
 
     t = threading.Thread(target=_worker, daemon=True)
     t.start()
