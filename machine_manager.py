@@ -343,8 +343,8 @@ def on_thinq_state_change(entity_id, new_run_state, remain_time_str, is_complete
     
     This is the core v2 logic for triggering WA notifications:
     - Idle -> Running: Send "cucian mulai" WA
-    - remain ≤ 4 min OR is_completed: Send "cucian selesai" WA, mark as WA_SENT
-    
+    - remain ≤ 3 min OR is_completed: Send "cucian selesai" WA, mark as WA_SENT
+
     After WA completion is sent, machine stays in WA_SENT state (not auto-released).
     Kasir must manually replace/release via the UI.
     
@@ -408,7 +408,7 @@ def on_thinq_state_change(entity_id, new_run_state, remain_time_str, is_complete
             is_running=1, run_state=new_run_state
         )
     
-    # Check remaining time for early WA trigger (≤4 minutes)
+    # Check remaining time for early WA trigger (≤3 minutes)
     remain_minutes = 999
     try:
         parts = remain_time_str.split(":")
@@ -416,16 +416,16 @@ def on_thinq_state_change(entity_id, new_run_state, remain_time_str, is_complete
             remain_minutes = int(parts[0]) * 60 + int(parts[1])
     except:
         pass
-    
+
     should_send_completion = False
     if not wa_completion_sent:
         is_last = is_last_machine_for_customer(entity_id)
         if is_completed:
             should_send_completion = is_last
-        elif is_running and remain_minutes <= 4 and remain_minutes > 0:
+        elif is_running and remain_minutes <= 3 and remain_minutes > 0:
             should_send_completion = is_last
             if is_last:
-                print(f"[WA] Machine {entity_id} has <=4 min remaining ({remain_time_str}), sending early completion WA (last machine)")
+                print(f"[WA] Machine {entity_id} has <=3 min remaining ({remain_time_str}), sending early completion WA (last machine)")
     
     if should_send_completion and customer_phone:
         print(f"[WA] Sending completion WA for {entity_id} to {customer_phone}")
