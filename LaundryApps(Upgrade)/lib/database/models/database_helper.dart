@@ -23,6 +23,27 @@ class DatabaseHelper {
   }
 
   Future<String> getDatabasePath() async {
+    if (Platform.isWindows) {
+      try {
+        final appData = Platform.environment['APPDATA'];
+        if (appData != null && appData.isNotEmpty) {
+          final dbDir = Directory(join(appData, 'SmartLaundry'));
+          if (!await dbDir.exists()) {
+            await dbDir.create(recursive: true);
+          }
+          return join(dbDir.path, 'laundry.db');
+        }
+        final docDir = await getApplicationDocumentsDirectory();
+        final dbDir = Directory(join(docDir.path, 'SmartLaundry'));
+        if (!await dbDir.exists()) {
+          await dbDir.create(recursive: true);
+        }
+        return join(dbDir.path, 'laundry.db');
+      } catch (_) {
+        final docDir = await getApplicationDocumentsDirectory();
+        return join(docDir.path, 'laundry.db');
+      }
+    }
     final dbPath = await getDatabasesPath();
     return join(dbPath, 'laundry.db');
   }
@@ -177,8 +198,7 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
+    final path = await getDatabasePath();
 
     int retries = 5;
     while (retries > 0) {

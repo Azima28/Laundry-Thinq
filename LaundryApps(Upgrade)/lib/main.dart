@@ -38,7 +38,9 @@ import 'utils/error_boundary.dart';
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  if (Platform.isAndroid || Platform.isIOS) {
+    FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  }
 
   if (Platform.isWindows || Platform.isLinux) {
     sqfliteFfiInit();
@@ -77,8 +79,10 @@ void main() async {
   // 3. Jalankan tugas NON-KRITIS di background SETELAH UI muncul
   // User tidak akan merasa loading karena ini jalan di belakang layar
   WidgetsBinding.instance.addPostFrameCallback((_) async {
-    // Hilangkan splash screen
-    FlutterNativeSplash.remove();
+    // Hilangkan splash screen jika di mobile
+    if (Platform.isAndroid || Platform.isIOS) {
+      FlutterNativeSplash.remove();
+    }
 
     // Inisialisasi notifikasi
     try {

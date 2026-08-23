@@ -89,7 +89,21 @@ WORKER_THREADS = _config.get("worker_threads", 32)
 SSE_KEEP_ALIVE_TIMEOUT = _config.get("sse_keep_alive_timeout", 15)
 REQUEST_TIMEOUT = _config.get("request_timeout", 5)
 
-DB_PATH = _config.get("db_path", "laundry.db")
+def _resolve_db_path():
+    raw_path = _config.get("db_path", "")
+    if raw_path and os.path.isabs(raw_path):
+        return raw_path
+
+    if sys.platform == 'win32':
+        appdata = os.environ.get('APPDATA')
+        if appdata:
+            data_dir = os.path.join(appdata, 'SmartLaundry')
+            os.makedirs(data_dir, exist_ok=True)
+            return os.path.join(data_dir, 'laundry.db')
+
+    return os.path.join(get_base_path(), "laundry.db")
+
+DB_PATH = _resolve_db_path()
 
 def get_config():
     """Get fresh config (for runtime changes)."""
