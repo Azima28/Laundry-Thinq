@@ -45,7 +45,8 @@ class UserRepository {
       if (maps.isEmpty) return null;
       for (final row in maps) {
         final storedPwd = row['password'] as String;
-        if (storedPwd == password || storedPwd.startsWith('pbkdf2:sha256:')) {
+        // Verify exact plain-text password match if legacy unhashed
+        if (!storedPwd.startsWith('pbkdf2:sha256:') && storedPwd == password) {
           return UserModel.fromMap(row);
         }
       }

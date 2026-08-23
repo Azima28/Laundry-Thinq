@@ -1563,9 +1563,22 @@ def api_auth_change_password():
     user_id = data.get('user_id')
     old_password = data.get('old_password', '')
     new_password = data.get('new_password', '')
-    is_admin = data.get('is_admin_override', False)
+    is_admin_requested = data.get('is_admin_override', False)
 
-    ok, err = database.change_user_password(user_id, old_password, new_password, is_admin_override=is_admin)
+    is_admin_verified = False
+    if is_admin_requested:
+        auth_header = request.headers.get('Authorization', '')
+        token_data = database.verify_auth_token(auth_header)
+        if token_data and token_data.get('role') == 'admin':
+            is_admin_verified = True
+        else:
+            admin_pwd = data.get('admin_password', '')
+            if database.verify_admin_password(admin_pwd):
+                is_admin_verified = True
+            else:
+                return jsonify({"success": False, "error": "Akses ditolak: Verifikasi admin diperlukan"}), 403
+
+    ok, err = database.change_user_password(user_id, old_password, new_password, is_admin_override=is_admin_verified)
     if not ok:
         return jsonify({"success": False, "error": err}), 400
     return jsonify({"success": True, "message": "Password berhasil diubah"})

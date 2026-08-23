@@ -418,50 +418,59 @@ def get_machine_log_stats(machine=None, date=None):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        # Base date for calculations (defaults to today)
-        ref_date = f"'{date}'" if date else "date('now', 'localtime')"
-        ref_month = f"strftime('%Y-%m', '{date}')" if date else "strftime('%Y-%m', 'now', 'localtime')"
-        
+
+        # Build parameterized date expressions
+        if date:
+            date_expr = "date(?)"
+            month_expr = "strftime('%Y-%m', ?)"
+            date_params = [str(date)]
+        else:
+            date_expr = "date('now', 'localtime')"
+            month_expr = "strftime('%Y-%m', 'now', 'localtime')"
+            date_params = []
+
         # Build machine filter
         machine_filter = ""
-        params = []
+        machine_params = []
         if machine and machine != 'all':
             machine_filter = " AND machine = ?"
-            params = [machine]
-        
+            machine_params = [machine]
+
         # Today / Selected Date count
+        today_params = date_params + machine_params
         cursor.execute(f'''
-            SELECT COUNT(*) FROM machine_logs 
-            WHERE date(completed_at) = {ref_date}{machine_filter}
-        ''', params)
+            SELECT COUNT(*) FROM machine_logs
+            WHERE date(completed_at) = {date_expr}{machine_filter}
+        ''', today_params)
         today = cursor.fetchone()[0]
-        
+
         # Weekly count relative to ref_date
+        week_params = date_params + date_params + machine_params
         cursor.execute(f'''
-            SELECT COUNT(*) FROM machine_logs 
-            WHERE date(completed_at) >= date({ref_date}, 'weekday 0', '-7 days')
-            AND date(completed_at) <= date({ref_date}, 'weekday 0', '-1 day'){machine_filter}
-        ''', params)
+            SELECT COUNT(*) FROM machine_logs
+            WHERE date(completed_at) >= date({date_expr}, 'weekday 0', '-7 days')
+            AND date(completed_at) <= date({date_expr}, 'weekday 0', '-1 day'){machine_filter}
+        ''', week_params)
         week = cursor.fetchone()[0]
-        
+
         # Monthly count relative to ref_date
+        month_params = date_params + machine_params
         cursor.execute(f'''
-            SELECT COUNT(*) FROM machine_logs 
-            WHERE strftime('%Y-%m', completed_at) = {ref_month}{machine_filter}
-        ''', params)
+            SELECT COUNT(*) FROM machine_logs
+            WHERE strftime('%Y-%m', completed_at) = {month_expr}{machine_filter}
+        ''', month_params)
         month = cursor.fetchone()[0]
-        
-        # Per machine count (always relative to ref_date / month if needed, but usually overall for the selected period)
+
+        # Per machine count
         by_machine = {}
         if not machine or machine == 'all':
             cursor.execute(f'''
-                SELECT machine, COUNT(*) as count FROM machine_logs 
-                WHERE date(completed_at) = {ref_date}
+                SELECT machine, COUNT(*) as count FROM machine_logs
+                WHERE date(completed_at) = {date_expr}
                 GROUP BY machine ORDER BY count DESC
-            ''')
+            ''', date_params)
             by_machine = dict(cursor.fetchall())
-        
+
         conn.close()
         return {
             "today": today,
