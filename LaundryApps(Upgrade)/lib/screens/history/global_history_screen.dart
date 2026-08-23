@@ -84,21 +84,19 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   }
 
   bool _isCuciItem(OrderItem it) {
+    final mType = (it.machineType ?? '').toLowerCase();
+    if (mType == 'cuci') return true;
+    if (mType == 'pengering' || mType == 'gosok' || mType == 'toko') return false;
     final name = it.itemName.toLowerCase();
     return name.contains('cuci') ||
         name.contains('wash') ||
-        name.contains('kiloan') ||
-        name.contains('bedcover') ||
-        name.contains('selimut') ||
-        name.contains('sprei') ||
-        name.contains('karpet') ||
-        name.contains('boneka') ||
-        name.contains('sepatu') ||
-        name.contains('tas') ||
-        name.contains('jas');
+        name.contains('basah');
   }
 
   bool _isPengeringItem(OrderItem it) {
+    final mType = (it.machineType ?? '').toLowerCase();
+    if (mType == 'pengering') return true;
+    if (mType == 'cuci' || mType == 'gosok' || mType == 'toko') return false;
     final name = it.itemName.toLowerCase();
     return name.contains('kering') ||
         name.contains('pengering') ||
@@ -107,6 +105,9 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   }
 
   bool _isGosokItem(OrderItem it, Set<int?> ironItemIds) {
+    final mType = (it.machineType ?? '').toLowerCase();
+    if (mType == 'gosok' || mType == 'iron') return true;
+    if (mType == 'cuci' || mType == 'pengering' || mType == 'toko') return false;
     final name = it.itemName.toLowerCase();
     return ironItemIds.contains(it.itemId) ||
         name.contains('gosok') ||
@@ -217,7 +218,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         final bool hasCuci = order.items.any((it) => _isCuciItem(it));
         final bool hasPengering = order.items.any((it) => _isPengeringItem(it));
         final bool hasGosok = order.items.any((it) => _isGosokItem(it, ironItemIds));
-        final bool hasToko = order.items.any((it) => !_isCuciItem(it) && !_isPengeringItem(it) && !_isGosokItem(it, ironItemIds));
 
         if (hasCuci) cuciOrders.add(order);
         if (hasPengering) pengeringOrders.add(order);
@@ -225,19 +225,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
 
         bool isPureGosok = order.items.isNotEmpty &&
             order.items.every((item) => ironItemIds.contains(item.itemId));
-
-        String categoryName = 'Layanan Cuci';
-        if (hasCuci && hasPengering) {
-          categoryName = 'Cuci & Pengering';
-        } else if (hasCuci) {
-          categoryName = 'Layanan Cuci';
-        } else if (hasPengering) {
-          categoryName = 'Layanan Pengering';
-        } else if (isPureGosok || hasGosok) {
-          categoryName = 'Setrika / Gosok';
-        } else if (hasToko) {
-          categoryName = 'Produk Toko';
-        }
 
         int unpaid = (order.totalAmount - order.paidAmount).clamp(0, order.totalAmount);
 
@@ -247,24 +234,6 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         } else if (unpaid > 0) {
           paymentStatus = 'Cicilan (Sisa ${formatRp(unpaid)})';
         }
-
-        Map<String, dynamic> itemData = {
-          'id': order.id,
-          'title': order.customerName,
-          'category': categoryName,
-          'status': paymentStatus,
-          'payment_method': order.paymentMethod.toUpperCase(),
-          'income_amount': order.paidAmount,
-          'total_order': order.totalAmount,
-          'type': 'income',
-          'time': DateFormat('HH:mm').format(order.orderDate),
-          'timestamp': order.orderDate,
-          'items_count': order.items.fold<int>(0, (s, it) => s + it.quantity),
-          'has_cuci': hasCuci,
-          'has_pengering': hasPengering,
-          'has_gosok': hasGosok,
-          'has_toko': hasToko,
-        };
 
         _CategoryData target = isPureGosok ? gosok : laundry;
         target.totalPendapatan += order.totalAmount;
@@ -290,19 +259,68 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           }
         }
 
-        allOrdersList.add(itemData);
-
-        if (hasCuci) {
+        if (order.items.isEmpty) {
+          final itemData = {
+            'id': order.id,
+            'title': order.customerName,
+            'category': 'Layanan Cuci',
+            'status': paymentStatus,
+            'payment_method': order.paymentMethod.toUpperCase(),
+            'income_amount': order.paidAmount,
+            'total_order': order.totalAmount,
+            'type': 'income',
+            'time': DateFormat('HH:mm').format(order.orderDate),
+            'timestamp': order.orderDate,
+            'items_count': 1,
+            'order_obj': order,
+          };
+          allOrdersList.add(itemData);
           cuciLedgerList.add(itemData);
-        }
-        if (hasPengering) {
-          keringLedgerList.add(itemData);
-        }
-        if (hasToko && !hasCuci && !hasPengering && !hasGosok) {
-          tokoLedgerList.add(itemData);
-        }
-        if (isPureGosok || hasGosok) {
-          gosokList.add(itemData);
+        } else {
+          for (var item in order.items) {
+            final bool isCuci = _isCuciItem(item);
+            final bool isPengering = _isPengeringItem(item);
+            final bool isGosok = _isGosokItem(item, ironItemIds);
+            final bool isToko = !isCuci && !isPengering && !isGosok;
+
+            String catName = 'Layanan Cuci';
+            if (isCuci) {
+              catName = 'Layanan Cuci';
+            } else if (isPengering) {
+              catName = 'Layanan Pengering';
+            } else if (isGosok) {
+              catName = 'Setrika / Gosok';
+            } else {
+              catName = 'Produk Toko';
+            }
+
+            final int itemSubtotal = item.price * item.quantity;
+            int itemPaid = 0;
+            if (order.totalAmount > 0) {
+              itemPaid = ((itemSubtotal / order.totalAmount) * order.paidAmount).round();
+            }
+
+            final itemData = {
+              'id': order.id,
+              'title': '${order.customerName} • ${item.quantity}x ${item.itemName}',
+              'category': catName,
+              'status': paymentStatus,
+              'payment_method': order.paymentMethod.toUpperCase(),
+              'income_amount': itemPaid,
+              'total_order': itemSubtotal,
+              'type': 'income',
+              'time': DateFormat('HH:mm').format(order.orderDate),
+              'timestamp': order.orderDate,
+              'items_count': item.quantity,
+              'order_obj': order,
+            };
+
+            allOrdersList.add(itemData);
+            if (isCuci) cuciLedgerList.add(itemData);
+            if (isPengering) keringLedgerList.add(itemData);
+            if (isGosok) gosokList.add(itemData);
+            if (isToko) tokoLedgerList.add(itemData);
+          }
         }
       }
 
@@ -1947,6 +1965,9 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   }
 
   Widget _buildLedgerTable(List<Map<String, dynamic>> items, int totalIn, int totalOut) {
+    final int itemsIn = items.where((it) => it['type'] != 'expense').fold<int>(0, (sum, it) => sum + ((it['income_amount'] as int?) ?? 0));
+    final int itemsOut = items.where((it) => it['type'] == 'expense').fold<int>(0, (sum, it) => sum + ((it['amount'] as int?) ?? 0));
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -2000,77 +2021,82 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                 final bool isExpense = item['type'] == 'expense';
                 final isEven = i % 2 == 0;
 
-                return Container(
+                return Material(
                   color: isEven ? Colors.white : const Color(0xFFF8FAFC),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 70,
-                        child: Text(
-                          item['time'] ?? '--:--',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: StyleConstants.textMuted),
-                        ),
-                      ),
-                      _vDivider(),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          item['title'] ?? '-',
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading),
-                        ),
-                      ),
-                      _vDivider(),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          item['category'] ?? '-',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isExpense ? StyleConstants.dangerColor : _getLedgerCategoryColor(item['category'] ?? ''),
+                  child: InkWell(
+                    onTap: item['order_obj'] != null ? () => _showOrderDetailsDialog(item['order_obj'] as Order) : null,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 70,
+                            child: Text(
+                              item['time'] ?? '--:--',
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: StyleConstants.textMuted),
+                            ),
                           ),
-                        ),
-                      ),
-                      _vDivider(),
-                      SizedBox(
-                        width: 90,
-                        child: Text(
-                          item['payment_method'] ?? 'TUNAI',
-                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: StyleConstants.textBody),
-                        ),
-                      ),
-                      _vDivider(),
-                      SizedBox(
-                        width: 110,
-                        child: Text(
-                          item['status'] ?? '-',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: isExpense ? StyleConstants.dangerColor : StyleConstants.successColor,
+                          _vDivider(),
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              item['title'] ?? '-',
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading),
+                            ),
                           ),
-                        ),
+                          _vDivider(),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              item['category'] ?? '-',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isExpense ? StyleConstants.dangerColor : _getLedgerCategoryColor(item['category'] ?? ''),
+                              ),
+                            ),
+                          ),
+                          _vDivider(),
+                          SizedBox(
+                            width: 90,
+                            child: Text(
+                              item['payment_method'] ?? 'TUNAI',
+                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: StyleConstants.textBody),
+                            ),
+                          ),
+                          _vDivider(),
+                          SizedBox(
+                            width: 110,
+                            child: Text(
+                              item['status'] ?? '-',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: isExpense ? StyleConstants.dangerColor : StyleConstants.successColor,
+                              ),
+                            ),
+                          ),
+                          _vDivider(),
+                          SizedBox(
+                            width: 120,
+                            child: Text(
+                              isExpense ? '-' : formatRp(item['income_amount'] ?? 0),
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.successColor),
+                            ),
+                          ),
+                          _vDivider(),
+                          SizedBox(
+                            width: 120,
+                            child: Text(
+                              isExpense ? formatRp(item['amount'] ?? 0) : '-',
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.dangerColor),
+                            ),
+                          ),
+                        ],
                       ),
-                      _vDivider(),
-                      SizedBox(
-                        width: 120,
-                        child: Text(
-                          isExpense ? '-' : formatRp(item['income_amount'] ?? 0),
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.successColor),
-                        ),
-                      ),
-                      _vDivider(),
-                      SizedBox(
-                        width: 120,
-                        child: Text(
-                          isExpense ? formatRp(item['amount'] ?? 0) : '-',
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.dangerColor),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 );
               },
@@ -2092,12 +2118,12 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                 ),
                 const Spacer(),
                 Text(
-                  'Kas Masuk: ${formatRp(totalIn)}',
+                  'Kas Masuk: ${formatRp(itemsIn)}',
                   style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5, color: StyleConstants.successColor),
                 ),
                 const SizedBox(width: 20),
                 Text(
-                  'Kas Keluar: ${formatRp(totalOut)}',
+                  'Kas Keluar: ${formatRp(itemsOut)}',
                   style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5, color: StyleConstants.dangerColor),
                 ),
               ],
