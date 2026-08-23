@@ -30,6 +30,7 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
   bool _isMachinesLoading = false;
   List<Map<String, dynamic>> _scannedThinqDevices = [];
   bool _isScanningThinq = false;
+  String _selectedCategoryFilter = 'all'; // 'all', 'cuci', 'pengering'
 
   final Color primaryColor = const Color(0xFF4E80EE);
   final Color lgeColor = const Color(0xFFC62828); // Magenta/Red LGE
@@ -466,7 +467,7 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
 
   void _showAddMachineDialog() {
     final nameCtrl = TextEditingController();
-    String key = 'cuci';
+    String key = _selectedCategoryFilter == 'pengering' ? 'pengering' : 'cuci';
     String source = 'manual'; // 'manual' or 'thinq'
     String? selectedThinqId;
 
@@ -1028,7 +1029,53 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
     );
   }
 
+  Widget _buildCategoryTab({
+    required String label,
+    required int count,
+    required String keyName,
+    required IconData icon,
+    required Color activeColor,
+  }) {
+    final bool isSelected = _selectedCategoryFilter == keyName;
+    return InkWell(
+      onTap: () => setState(() => _selectedCategoryFilter = keyName),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor.withValues(alpha: 0.1) : Colors.grey[100],
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? activeColor : Colors.grey[300]!,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: isSelected ? activeColor : Colors.grey[600]),
+            const SizedBox(width: 6),
+            Text(
+              '$label ($count)',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected ? activeColor : Colors.grey[700],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMachineMappingTab() {
+    final filteredMachines = _machinesList.where((m) {
+      if (_selectedCategoryFilter == 'cuci') return m['key'] != 'pengering';
+      if (_selectedCategoryFilter == 'pengering') return m['key'] == 'pengering';
+      return true;
+    }).toList();
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -1052,7 +1099,7 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Tarik dan lepas (drag-and-drop) baris mesin di bawah untuk menyusun urutan tampilan di Dashboard Kasir.',
+                    'Kelola unit mesin cuci dan mesin pengering secara terpisah dan atur urutan tampilannya.',
                     style: TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                 ],
@@ -1080,9 +1127,38 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
             ],
           ),
           const SizedBox(height: 16),
+          // Category filter tabs
+          Row(
+            children: [
+              _buildCategoryTab(
+                label: 'Semua Mesin',
+                count: _machinesList.length,
+                keyName: 'all',
+                icon: Icons.dashboard_customize_rounded,
+                activeColor: primaryColor,
+              ),
+              const SizedBox(width: 8),
+              _buildCategoryTab(
+                label: 'Mesin Cuci',
+                count: _machinesList.where((m) => m['key'] != 'pengering').length,
+                keyName: 'cuci',
+                icon: Icons.local_laundry_service_rounded,
+                activeColor: const Color(0xFF2563EB),
+              ),
+              const SizedBox(width: 8),
+              _buildCategoryTab(
+                label: 'Mesin Pengering',
+                count: _machinesList.where((m) => m['key'] == 'pengering').length,
+                keyName: 'pengering',
+                icon: Icons.wb_sunny_rounded,
+                activeColor: const Color(0xFFEA580C),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           const Divider(height: 1),
           const SizedBox(height: 16),
-          
+
           // Table header row (fixed)
           Container(
             color: Colors.grey[50],
@@ -1099,38 +1175,44 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          
+
           Expanded(
             child: _isMachinesLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _machinesList.isEmpty
-                    ? const Center(
+                : filteredMachines.isEmpty
+                    ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.local_laundry_service_outlined, size: 64, color: Colors.grey),
-                            SizedBox(height: 16),
+                            const Icon(Icons.local_laundry_service_outlined, size: 64, color: Colors.grey),
+                            const SizedBox(height: 16),
                             Text(
-                              'Belum ada mesin terdaftar.',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
+                              _selectedCategoryFilter == 'cuci'
+                                  ? 'Belum ada Mesin Cuci terdaftar.'
+                                  : (_selectedCategoryFilter == 'pengering'
+                                      ? 'Belum ada Mesin Pengering terdaftar.'
+                                      : 'Belum ada mesin terdaftar.'),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
                             ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Klik tombol "Tambah Mesin" untuk mendaftarkan mesin pertama Anda.',
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Klik tombol "Tambah Mesin" untuk mendaftarkan unit mesin.',
                               style: TextStyle(fontSize: 12, color: Colors.grey),
                             ),
                           ],
                         ),
                       )
                     : ListView.builder(
-                        itemCount: _machinesList.length,
+                        itemCount: filteredMachines.length,
                         itemBuilder: (context, index) {
-                          final m = _machinesList[index];
+                          final m = filteredMachines[index];
                           final id = m['id'] as int;
                           final name = m['name'].toString();
                           final url = m['url'].toString();
                           final key = m['key'].toString();
                           final isManual = url == '-';
+
+                          final origIndex = _machinesList.indexOf(m);
 
                           return Container(
                             key: ValueKey(id),
@@ -1148,8 +1230,8 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
                                       icon: const Icon(Icons.arrow_upward_rounded, size: 16, color: Colors.blueGrey),
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(),
-                                      onPressed: index > 0
-                                          ? () => _moveMachine(index, index - 1)
+                                      onPressed: origIndex > 0
+                                          ? () => _moveMachine(origIndex, origIndex - 1)
                                           : null,
                                       tooltip: 'Pindahkan ke atas',
                                     ),
@@ -1158,8 +1240,8 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
                                       icon: const Icon(Icons.arrow_downward_rounded, size: 16, color: Colors.blueGrey),
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(),
-                                      onPressed: index < _machinesList.length - 1
-                                          ? () => _moveMachine(index, index + 1)
+                                      onPressed: origIndex < _machinesList.length - 1
+                                          ? () => _moveMachine(origIndex, origIndex + 1)
                                           : null,
                                       tooltip: 'Pindahkan ke bawah',
                                     ),

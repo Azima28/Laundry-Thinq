@@ -67,9 +67,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _buildCardsGrid([
                   if (_isAdmin)
                     _SettingsItemData(
-                      title: 'LG ThinQ Smart Cloud',
-                      description: 'Sinkronisasi akun & monitoring status siklus mesin cuci',
-                      icon: Icons.cloud_sync_rounded,
+                      title: 'LG ThinQ & Mesin Cuci',
+                      description: 'Sinkronisasi akun PAT & pemetaan nomor mesin cuci toko',
+                      icon: Icons.local_laundry_service_rounded,
                       color: const Color(0xFFEF4444),
                       statusBadge: _machineStatus.thinqOk ? 'Cloud Terhubung' : 'Standby / Auth',
                       statusColor: _machineStatus.thinqOk ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
@@ -77,10 +77,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   if (_isAdmin)
                     _SettingsItemData(
-                      title: 'Bardi Tuya IoT Socket',
-                      description: 'Kontrol relay stopkontak pintar untuk mesin pengering',
-                      icon: Icons.settings_input_component_rounded,
-                      color: const Color(0xFF0284C7),
+                      title: 'Bardi Tuya & Mesin Pengering',
+                      description: 'Kontrol stopkontak pintar & pemetaan mesin pengering',
+                      icon: Icons.wb_sunny_rounded,
+                      color: const Color(0xFFEA580C),
                       statusBadge: _machineStatus.bardiOk ? 'Relay Aktif' : 'Standby',
                       statusColor: _machineStatus.bardiOk ? const Color(0xFF10B981) : const Color(0xFF64748B),
                       route: '/bardi_tuya_settings',
