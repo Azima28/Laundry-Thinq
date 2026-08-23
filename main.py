@@ -87,24 +87,44 @@ def machines_json():
         url = m.get("url", "-")
         key = m.get("key", "cuci")
         is_manual = (url == "-")
-        
+
         raw = sse_manager.latest_state.get(sensor, f"{sensor}|Ready|Idle|--:--|-|-|0")
         parts = raw.split('|')
         while len(parts) < 7: parts.append('-')
-        
+
         status_ready = machine_manager.get_machine_status(sensor)
         customer = machine_manager.get_customer_info(sensor)
-        
+
         is_offline = "offline" in parts[2].lower() or parts[1].upper() == "OFFLINE"
+        is_relay_on = False
+        remain_time_display = parts[3]
+        run_state_display = parts[2]
+        state_display = parts[1]
+
+        if key == "pengering" and not customer.get("name") and status_ready == "ready":
+            try:
+                tuya_stat = tuya_manager.get_dryer_status(m.get("name"))
+                if tuya_stat and tuya_stat.get("success"):
+                    is_relay_on = bool(tuya_stat.get("switch", False))
+                    cd = tuya_stat.get("countdown", 0)
+                    if is_relay_on:
+                        if cd > 0:
+                            m_cd = cd // 60
+                            s_cd = cd % 60
+                            remain_time_display = f"{m_cd}:{s_cd:02d}"
+                        run_state_display = "Relay ON"
+                        state_display = "RELAY ON"
+            except Exception:
+                pass
 
         result[sensor] = {
             "name": m.get("name"),
             "url": url,
             "key": key,
             "is_manual": is_manual,
-            "state": parts[1],
-            "run_state": parts[2],
-            "remain_time": parts[3],
+            "state": state_display,
+            "run_state": run_state_display,
+            "remain_time": remain_time_display,
             "current_course": parts[4],
             "error_message": parts[5] if len(parts) > 5 else "-",
             "is_completed": parts[6] == "1" if len(parts) > 6 else False,
@@ -115,6 +135,7 @@ def machines_json():
             "other_machines": machine_manager.get_other_active_machines(sensor),
             "is_last_machine": machine_manager.is_last_machine_for_customer(sensor),
             "is_offline": is_offline,
+            "is_relay_on": is_relay_on,
         }
     return Response(json.dumps(result, indent=2, ensure_ascii=False), mimetype='application/json')
 

@@ -687,22 +687,47 @@ class _CuciContentState extends State<CuciContent> {
       badgeText = isDetecting ? "MENIMBANG" : "RUNNING$timeText";
       canClick = true;
     } else if (customerName.isEmpty) {
-      // READY (Green Emerald Full Gradient)
-      cardGradient = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)],
-      );
-      border = const Color(0xFF86EFAC);
-      iconBg = const Color(0xFF10B981);
-      iconColor = Colors.white;
-      machineIcon = Icons.local_laundry_service_rounded;
-      badgeBg = const Color(0xFF059669);
-      badgeTextColor = Colors.white;
-      titleColor = const Color(0xFF065F46);
-      subColor = const Color(0xFF047857);
-      badgeText = "READY";
-      canClick = true;
+      final bool isStandby = runState.toLowerCase().contains('standby') ||
+          runState.toLowerCase().contains('initial') ||
+          state.contains('STANDBY');
+
+      if (isStandby) {
+        // STANDBY (Amber / Warm Orange Full Gradient)
+        cardGradient = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+        );
+        border = const Color(0xFFF59E0B);
+        iconBg = const Color(0xFFD97706);
+        iconColor = Colors.white;
+        machineIcon = Icons.power_rounded;
+        badgeBg = const Color(0xFFD97706);
+        badgeTextColor = Colors.white;
+        titleColor = const Color(0xFF78350F);
+        subColor = const Color(0xFFB45309);
+        final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
+        badgeText = "STANDBY$timeText";
+        canClick = true;
+      } else {
+        // READY (Green Emerald Full Gradient)
+        cardGradient = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)],
+        );
+        border = const Color(0xFF86EFAC);
+        iconBg = const Color(0xFF10B981);
+        iconColor = Colors.white;
+        machineIcon = Icons.local_laundry_service_rounded;
+        badgeBg = const Color(0xFF059669);
+        badgeTextColor = Colors.white;
+        titleColor = const Color(0xFF065F46);
+        subColor = const Color(0xFF047857);
+        final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
+        badgeText = "READY$timeText";
+        canClick = true;
+      }
     } else {
       // We have a customer name but not running
       if (machineStatus == 'unready') {
@@ -889,11 +914,15 @@ class _CuciContentState extends State<CuciContent> {
                               ? (remain.isNotEmpty && remain != '--:--'
                                   ? '$remain ($runState)'
                                   : runState)
-                              : ((runState == 'Idle' || runState == 'Standby' || runState == 'Initial')
-                                  ? (customerName.isNotEmpty
-                                      ? (waSent ? 'Selesai (Sudah di-WA)' : 'Selesai (Menunggu Tindakan)')
-                                      : 'Siap Digunakan (Idle)')
-                                  : runState))),
+                              : (customerName.isEmpty && (runState.toLowerCase().contains('standby') || runState.toLowerCase().contains('initial') || state.contains('STANDBY'))
+                                  ? (remain.isNotEmpty && remain != '--:--'
+                                      ? 'Mesin Menyala ($remain tersisa)'
+                                      : 'Mesin Menyala (Standby LG)')
+                                  : ((runState == 'Idle' || runState == 'Standby' || runState == 'Initial')
+                                      ? (customerName.isNotEmpty
+                                          ? (waSent ? 'Selesai (Sudah di-WA)' : 'Selesai (Menunggu Tindakan)')
+                                          : 'Siap Digunakan (Idle)')
+                                      : runState)))),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
