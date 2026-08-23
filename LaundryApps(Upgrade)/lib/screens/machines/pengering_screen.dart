@@ -574,7 +574,6 @@ class _PengeringContentState extends State<PengeringContent> {
       customerName = (entry['customer_name'] ?? '').toString();
     }
 
-    final int minutes = _parseRemainMinutes(remain);
     final bool waSent = entry != null && entry['wa_sent'] == true;
     final bool isError = state == 'ERROR' || state == 'OFFLINE';
 
@@ -593,6 +592,13 @@ class _PengeringContentState extends State<PengeringContent> {
       runState.toLowerCase().contains('offline') ||
       (entry != null && entry['is_offline'] == true)
     );
+
+    final bool isBooking = !isRunning &&
+        !isDetecting &&
+        customerName.isNotEmpty &&
+        (machineStatus == 'unready' ||
+            state.toUpperCase().contains('BOOKING') ||
+            runState.toLowerCase().contains('booking'));
 
     Color iconColor;
     Color iconBg;
@@ -842,16 +848,20 @@ class _PengeringContentState extends State<PengeringContent> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    runState == 'Detecting'
+                    isDetecting
                         ? 'Menimbang Beban (Detecting)...'
-                        : (machineStatus == 'unready'
+                        : (isBooking
                             ? (remain.isNotEmpty && remain != '--:--'
                                 ? 'Booking ($remain tersisa)'
                                 : 'Booking (5:00)')
-                            : (minutes > 0
-                                ? '$remain ($runState)'
+                            : (isRunning
+                                ? (remain.isNotEmpty && remain != '--:--'
+                                    ? '$remain ($runState)'
+                                    : runState)
                                 : ((runState == 'Idle' || runState == 'Standby' || runState == 'Initial')
-                                    ? 'Siap Digunakan ($runState)'
+                                    ? (customerName.isNotEmpty
+                                        ? (waSent ? 'Selesai (Sudah di-WA)' : 'Selesai (Menunggu Tindakan)')
+                                        : 'Siap Digunakan (Idle)')
                                     : runState))),
                     style: TextStyle(
                       fontSize: 13,
@@ -910,9 +920,27 @@ class _PengeringContentState extends State<PengeringContent> {
     dynamic entry,
   ) async {
     final String customerName = (entry?['customer_name'] ?? '').toString();
-    final bool isBooking = machineStatus == 'unready' ||
-        state.toUpperCase().contains('BOOKING') ||
-        state.toLowerCase().contains('booking');
+    final String runState = (entry?['run_state'] ?? 'Idle').toString();
+
+    final bool isRunning = state == 'RUNNING' ||
+        state == 'RUN' ||
+        (runState.isNotEmpty &&
+            runState != 'Idle' &&
+            runState != 'Completed' &&
+            runState != 'Ready' &&
+            runState != 'Standby' &&
+            runState != 'Initial' &&
+            runState != '-' &&
+            runState != 'unknown');
+
+    final bool isDetecting = runState.toLowerCase() == 'detecting';
+
+    final bool isBooking = !isRunning &&
+        !isDetecting &&
+        customerName.isNotEmpty &&
+        (machineStatus == 'unready' ||
+            state.toUpperCase().contains('BOOKING') ||
+            runState.toLowerCase().contains('booking'));
 
     // 1. If machine is ready and empty (Green)
     if (machineStatus == 'ready' && customerName.isEmpty) {
@@ -922,7 +950,7 @@ class _PengeringContentState extends State<PengeringContent> {
       return;
     }
 
-    // 2. If machine is in 5-minute BOOKING window -> LOCKED (cannot be managed/replaced during booking)
+    // 2. If machine is in 5-minute BOOKING window (before physical start) -> LOCKED
     if (isBooking) {
       final remainStr = (entry?['remain_time'] ?? '').toString();
       final String timeInfo = remainStr.isNotEmpty && remainStr != '--:--' ? ' ($remainStr tersisa)' : '';
@@ -932,7 +960,7 @@ class _PengeringContentState extends State<PengeringContent> {
       return;
     }
 
-    // 3. Otherwise (Machine is RUNNING or COMPLETED or OCCUPIED) -> trigger action dialog
+    // 3. Otherwise (Machine is RUNNING, DETECTING, COMPLETED, or OCCUPIED) -> trigger action dialog
     _showActionDialog(machine, displayName, machineStatus, state, entry);
   }
 

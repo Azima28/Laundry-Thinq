@@ -351,23 +351,31 @@ def on_thinq_state_change(entity_id, new_run_state, remain_time_str, is_complete
     customer_phone = info.get("phone")
     
     # Transition: Idle -> Running (machine started washing)
-    is_running = new_run_state not in ("Idle", "-", "")
+    is_running = new_run_state not in ("Idle", "-", "", "Ready", "Standby")
+    if is_running:
+        # Cancel any 5-minute booking countdown thread because machine has physically started running
+        with machine_status_lock:
+            if active_countdown_threads.get(entity_id, False):
+                active_countdown_threads[entity_id] = False
+                countdown_generation[entity_id] = countdown_generation.get(entity_id, 0) + 1
+                print(f"[Countdown] Cancelled booking countdown for {entity_id} as physical cycle started ({new_run_state}).")
+
     if is_running and not wa_start_sent and customer_phone:
         print(f"[WA] Detected machine {entity_id} started running, sending WA to {customer_phone}")
-        
+
         # Send WA "cucian mulai" in background thread to not block polling
         threading.Thread(
             target=wa_bridge.send_wa_cucian_mulai,
             args=(customer_phone, customer_name or "Pelanggan", entity_id, remain_time_str),
             daemon=True
         ).start()
-        
+
         with state_transitions_lock:
             if entity_id in state_transitions:
                 state_transitions[entity_id]["wa_start_sent"] = True
                 state_transitions[entity_id]["last_state"] = new_run_state
-        
-        # Set target end time to exactly 40 minutes from now as a backup run timer
+
+        # Set target end time to 40 minutes from now as a backup run timer
         end_time = datetime.now() + timedelta(minutes=40)
         with machine_status_lock:
             machine_status[entity_id] = end_time
@@ -381,7 +389,8 @@ def on_thinq_state_change(entity_id, new_run_state, remain_time_str, is_complete
 
         database.save_active_timer(
             entity_id, end_time, source=source, duration_minutes=40,
-            customer_name=customer_name, customer_phone=customer_phone
+            customer_name=customer_name, customer_phone=customer_phone,
+            is_running=1, run_state=new_run_state
         )
     
     # Check remaining time for early WA trigger (≤4 minutes)
