@@ -143,12 +143,80 @@ def get_switch_code(cloud_client, device_id):
         pass
     return "switch_1"
 
+import threading
+import time
+
+_tuya_state_cache = {}
+_tuya_cache_lock = threading.Lock()
+_tuya_thread_running = False
+
+def _is_private_ip(ip):
+    """Check if the provided IP is a local private LAN IP address."""
+    if not ip:
+        return False
+    return str(ip).startswith((
+        "192.168.", "10.", "172.16.", "172.17.", "172.18.", "172.19.",
+        "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
+        "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
+        "127."
+    ))
+
+def get_cached_dryer_status(entity_id):
+    """Retrieve cached dryer status in 0ms without blocking network calls."""
+    with _tuya_cache_lock:
+        norm = str(entity_id).lower().replace("_", " ").strip()
+        return _tuya_state_cache.get(norm, {})
+
+def start_tuya_thread():
+    """Background worker to continuously poll Tuya smartplugs and broadcast live SSE states."""
+    global _tuya_thread_running
+    if _tuya_thread_running:
+        return
+    _tuya_thread_running = True
+
+    def _worker():
+        import sse_manager
+        print("[Tuya] Starting Tuya smartplug background polling worker...")
+        while _tuya_thread_running:
+            try:
+                cz_devs = get_cz_devices()
+                for dev in cz_devs:
+                    name = dev.get("name")
+                    if not name:
+                        continue
+                    stat = get_dryer_status(name)
+                    with _tuya_cache_lock:
+                        _tuya_state_cache[name.lower().replace("_", " ").strip()] = stat
+
+                    # If device has no active customer order in software, broadcast its live hardware state
+                    import machine_manager
+                    sensor = name.replace(" ", "_")
+                    cust_info = machine_manager.get_customer_info(sensor)
+                    if not cust_info.get("name") and machine_manager.get_machine_status(sensor) == "ready":
+                        is_on = stat.get("switch", False)
+                        cd = stat.get("countdown", 0)
+                        if is_on:
+                            rem_str = f"{cd//60}:{cd%60:02d}" if cd > 0 else "--:--"
+                            st = f"{sensor}|Ready|Relay ON|{rem_str}|-|-|0|-"
+                        else:
+                            st = f"{sensor}|Ready|Idle|--:--|-|-|0|-"
+                        sse_manager.latest_state[sensor] = st
+                        sse_manager.broadcast(st)
+            except Exception as e:
+                print(f"[Tuya Background] Error: {e}")
+            time.sleep(3)
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+
 def get_local_outlet(dev):
     """Instantiate a local tinytuya OutletDevice configured for offline LAN socket control."""
     if not dev or not dev.get("id") or not dev.get("local_key"):
         return None
     try:
         ip = dev.get("ip") or dev.get("local_ip")
+        if not _is_private_ip(ip):
+            return None  # Skip LAN socket attempt if IP is a public WAN address
         version = float(dev.get("version", 3.3))
         d = tinytuya.OutletDevice(
             dev_id=dev["id"],
@@ -157,7 +225,7 @@ def get_local_outlet(dev):
             version=version
         )
         d.set_socketPersistent(False)
-        d.set_socketTimeout(2.0)
+        d.set_socketTimeout(0.8)
         return d
     except Exception as e:
         print(f"[Tuya Local] Error initializing local outlet device: {e}")

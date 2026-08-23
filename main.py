@@ -103,7 +103,9 @@ def machines_json():
 
         if key == "pengering" and not customer.get("name") and status_ready == "ready":
             try:
-                tuya_stat = tuya_manager.get_dryer_status(m.get("name"))
+                tuya_stat = tuya_manager.get_cached_dryer_status(m.get("name"))
+                if not tuya_stat:
+                    tuya_stat = tuya_manager.get_dryer_status(m.get("name"))
                 if tuya_stat and tuya_stat.get("success"):
                     is_relay_on = bool(tuya_stat.get("switch", False))
                     cd = tuya_stat.get("countdown", 0)
@@ -1970,7 +1972,10 @@ if __name__ == "__main__":
     
     # Start LG ThinQ polling
     lg_manager.start_lg_thread()
-    
+
+    # Start Tuya Smartplug polling
+    tuya_manager.start_tuya_thread()
+
     # Resume active timers from database
     machine_manager.resume_active_timers()
     
