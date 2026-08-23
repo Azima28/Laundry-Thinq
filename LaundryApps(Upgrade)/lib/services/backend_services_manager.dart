@@ -32,36 +32,56 @@ class BackendServicesManager {
     }
 
     // 1. Resolve working directories relative to executable or current project root
-    // In dev: CWD is c:\Work\project laundry\laundry\LaundryApps(Upgrade)
-    // Parent directory contains main.py and wa_service/
-    String workingDir = Directory.current.path;
+    String appDir = File(Platform.resolvedExecutable).parent.path;
     String parentDir = Directory.current.parent.path;
 
-    debugPrint('[ServicesManager] Working Directory: $workingDir');
-    debugPrint('[ServicesManager] Parent Directory: $parentDir');
+    debugPrint('[ServicesManager] Executable Directory: $appDir');
+    debugPrint('[ServicesManager] Working Directory: ${Directory.current.path}');
+
+    // Find Python backend executable/script in multiple candidate locations
+    File? pythonFile;
+    String pythonWorkingDir = appDir;
+
+    final candidatePythonPaths = [
+      '$appDir\\main.exe',
+      '$appDir\\main.py',
+      '$parentDir\\main.exe',
+      '$parentDir\\main.py',
+      '${Directory.current.path}\\main.exe',
+      '${Directory.current.path}\\main.py',
+    ];
+
+    for (final path in candidatePythonPaths) {
+      final f = File(path);
+      if (f.existsSync()) {
+        pythonFile = f;
+        pythonWorkingDir = f.parent.path;
+        break;
+      }
+    }
 
     // 2. Start Python server: main.exe (compiled) or main.py (dev)
     try {
-      final pythonExe = File('$parentDir\\main.exe');
-      final pythonScript = File('$parentDir\\main.py');
-      
-      if (await pythonExe.exists()) {
-        debugPrint('[ServicesManager] Starting compiled Python server (main.exe)...');
-        _pythonProcess = await Process.start(
-          pythonExe.path,
-          ['--parent-pid', '$parentPid'],
-          workingDirectory: parentDir,
-          environment: {'PYTHONUNBUFFERED': '1'},
-        );
-      } else if (await pythonScript.exists()) {
-        debugPrint('[ServicesManager] Starting Python server (main.py)...');
-        _pythonProcess = await Process.start(
-          'python',
-          ['-u', pythonScript.path, '--parent-pid', '$parentPid'],
-          workingDirectory: parentDir,
-        );
+      if (pythonFile != null) {
+        final isExe = pythonFile.path.toLowerCase().endsWith('.exe');
+        if (isExe) {
+          debugPrint('[ServicesManager] Starting compiled Python server: ${pythonFile.path}...');
+          _pythonProcess = await Process.start(
+            pythonFile.path,
+            ['--parent-pid', '$parentPid'],
+            workingDirectory: pythonWorkingDir,
+            environment: {'PYTHONUNBUFFERED': '1'},
+          );
+        } else {
+          debugPrint('[ServicesManager] Starting Python script: ${pythonFile.path}...');
+          _pythonProcess = await Process.start(
+            'python',
+            ['-u', pythonFile.path, '--parent-pid', '$parentPid'],
+            workingDirectory: pythonWorkingDir,
+          );
+        }
       } else {
-        debugPrint('[ServicesManager] Warning: Neither main.exe nor main.py found at $parentDir');
+        debugPrint('[ServicesManager] Warning: Python backend (main.exe / main.py) not found in candidate paths.');
       }
 
       if (_pythonProcess != null) {
@@ -78,27 +98,48 @@ class BackendServicesManager {
       debugPrint('[ServicesManager] Error starting Python server: $e');
     }
 
-    // 3. Start Node.js WhatsApp microservice: wa_service.exe (compiled) or wa_service/index.js (dev)
+    // 3. Start Node.js WhatsApp microservice
     try {
-      final nodeExe = File('$parentDir\\wa_service\\wa_service.exe');
-      final nodeScript = File('$parentDir\\wa_service\\index.js');
-      
-      if (await nodeExe.exists()) {
-        debugPrint('[ServicesManager] Starting compiled Node.js WA microservice (wa_service.exe)...');
-        _nodeProcess = await Process.start(
-          nodeExe.path,
-          ['--parent-pid=$parentPid'],
-          workingDirectory: '$parentDir\\wa_service',
-        );
-      } else if (await nodeScript.exists()) {
-        debugPrint('[ServicesManager] Starting Node.js WA microservice (index.js)...');
-        _nodeProcess = await Process.start(
-          'node',
-          [nodeScript.path, '--parent-pid=$parentPid'],
-          workingDirectory: '$parentDir\\wa_service',
-        );
+      File? nodeFile;
+      String nodeWorkingDir = '$appDir\\wa_service';
+
+      final candidateNodePaths = [
+        '$appDir\\wa_service\\wa_service.exe',
+        '$appDir\\wa_service\\index.js',
+        '$parentDir\\wa_service\\wa_service.exe',
+        '$parentDir\\wa_service\\index.js',
+        '${Directory.current.path}\\wa_service\\wa_service.exe',
+        '${Directory.current.path}\\wa_service\\index.js',
+      ];
+
+      for (final path in candidateNodePaths) {
+        final f = File(path);
+        if (f.existsSync()) {
+          nodeFile = f;
+          nodeWorkingDir = f.parent.path;
+          break;
+        }
+      }
+
+      if (nodeFile != null) {
+        final isExe = nodeFile.path.toLowerCase().endsWith('.exe');
+        if (isExe) {
+          debugPrint('[ServicesManager] Starting compiled Node.js WA microservice: ${nodeFile.path}...');
+          _nodeProcess = await Process.start(
+            nodeFile.path,
+            ['--parent-pid=$parentPid'],
+            workingDirectory: nodeWorkingDir,
+          );
+        } else {
+          debugPrint('[ServicesManager] Starting Node.js WA microservice: ${nodeFile.path}...');
+          _nodeProcess = await Process.start(
+            'node',
+            [nodeFile.path, '--parent-pid=$parentPid'],
+            workingDirectory: nodeWorkingDir,
+          );
+        }
       } else {
-        debugPrint('[ServicesManager] Warning: Neither wa_service.exe nor index.js found at $parentDir\\wa_service');
+        debugPrint('[ServicesManager] Warning: WhatsApp microservice not found.');
       }
 
       if (_nodeProcess != null) {
