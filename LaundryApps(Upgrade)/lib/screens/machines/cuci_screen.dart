@@ -611,16 +611,17 @@ class _CuciContentState extends State<CuciContent> {
     final bool isPause = runState.toLowerCase().contains('pause') ||
         state.toLowerCase().contains('pause');
 
-    final bool isRunning = (state == 'RUNNING' ||
-                           state == 'RUN' ||
-                           (runState.isNotEmpty &&
-                            runState != 'Idle' &&
-                            runState != 'Completed' &&
-                            runState != 'Ready' &&
-                            runState != 'Standby' &&
-                            runState != 'Initial' &&
-                            runState != '-' &&
-                            runState != 'unknown')) && !isPause;
+    final bool isRunning = customerName.isNotEmpty &&
+                           ((state == 'RUNNING' ||
+                            state == 'RUN' ||
+                            (runState.isNotEmpty &&
+                             runState != 'Idle' &&
+                             runState != 'Completed' &&
+                             runState != 'Ready' &&
+                             runState != 'Standby' &&
+                             runState != 'Initial' &&
+                             runState != '-' &&
+                             runState != 'unknown')) && !isPause);
 
     final bool isDetecting = runState.toLowerCase() == 'detecting';
 
@@ -1043,8 +1044,8 @@ class _CuciContentState extends State<CuciContent> {
             state.toUpperCase().contains('BOOKING') ||
             runState.toLowerCase().contains('booking'));
 
-    // 1. If machine is ready and empty (Green)
-    if (machineStatus == 'ready' && customerName.isEmpty) {
+    // 1. If machine is empty (no customer assigned)
+    if (customerName.isEmpty) {
       if (_selectedOrderItem != null) {
         _confirmAndAssign(_selectedOrderItem!, machine.id ?? 0, displayName);
       }

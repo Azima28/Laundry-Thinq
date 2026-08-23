@@ -1024,29 +1024,51 @@ def replace_customer(entity_id, new_customer_name, new_customer_phone=None,
 
 
 def resolve_entity(machine_name):
-    """Resolve a machine name to an identifier in discovered devices (LG ThinQ + Manual).
+    """Resolve a machine name to an identifier in discovered devices (LG ThinQ + Tuya + Database + Manual).
     Handles underscores and case-insensitivity.
     """
-    # Normalisasi input: ubah spasi jadi underscore dan lowercase
-    clean_input = machine_name.replace(' ', '_').lower().strip()
-    
-    # Gabungkan semua mesin (LG + Manual) untuk resolusi nama
-    all_machines = lg_manager.get_discovered_devices() + lg_manager.get_manual_dryers()
-    
-    for m in all_machines:
-        # Bandingkan dengan versi normalisasi dari daftar devices
-        if m.replace(' ', '_').lower().strip() == clean_input:
-            return m
-            
-    # If in bypass/simulation mode, dynamically accept and add the machine!
+    if not machine_name:
+        return None
+
+    clean_input = str(machine_name).replace(' ', '_').lower().strip()
+
+    # 1. Kumpulkan semua kandidat mesin yang terdaftar
+    candidates = []
+
+    # Dari database machines
     try:
-        config = lg_manager.load_lg_config()
-        if config.get("monitoring_mode") == "bypass":
-            with lg_manager.discovered_devices_lock:
-                if machine_name not in lg_manager.discovered_devices:
-                    lg_manager.discovered_devices.append(machine_name)
-            return machine_name
-    except Exception as e:
-        print(f"[Resolve] Bypass dynamic resolve error: {e}")
-        
-    return None
+        db_machines = database.get_all_machines()
+        for m in db_machines:
+            name = m.get("name", "")
+            url = m.get("url", "")
+            if name:
+                candidates.append(name)
+            if url and url != "-":
+                candidates.append(url)
+    except Exception:
+        pass
+
+    # Dari Tuya/Bardi smartplugs
+    try:
+        cz_devs = tuya_manager.get_cz_devices()
+        for d in cz_devs:
+            d_name = d.get("name")
+            if d_name:
+                candidates.append(d_name)
+    except Exception:
+        pass
+
+    # Dari LG manager
+    try:
+        candidates.extend(lg_manager.get_discovered_devices())
+        candidates.extend(lg_manager.get_manual_dryers())
+    except Exception:
+        pass
+
+    # Cocokkan nama mesin (case-insensitive & underscore-insensitive)
+    for m in candidates:
+        if m.replace(' ', '_').lower().strip() == clean_input:
+            return m.replace(' ', '_')
+
+    # Fallback
+    return str(machine_name).replace(' ', '_')

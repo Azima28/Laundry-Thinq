@@ -580,14 +580,22 @@ class _PengeringContentState extends State<PengeringContent> {
     final bool isPause = runState.toLowerCase().contains('pause') ||
         state.toLowerCase().contains('pause');
 
-    final bool isRunning = (state == 'RUNNING' ||
-                           state == 'RUN' ||
-                           (runState.isNotEmpty &&
-                            runState != 'Idle' &&
-                            runState != 'Completed' &&
-                            runState != 'Ready' &&
-                            runState != '-' &&
-                            runState != 'unknown')) && !isPause;
+    final bool isRelayOn = runState.toLowerCase().contains('relay on') ||
+        runState.toLowerCase().contains('on') ||
+        runState.toLowerCase().contains('standby') ||
+        state.contains('ON') ||
+        (entry != null && entry['is_relay_on'] == true);
+
+    final bool isRunning = customerName.isNotEmpty &&
+                           ((state == 'RUNNING' ||
+                            state == 'RUN' ||
+                            (runState.isNotEmpty &&
+                             runState != 'Idle' &&
+                             runState != 'Completed' &&
+                             runState != 'Ready' &&
+                             runState != 'Relay ON' &&
+                             runState != '-' &&
+                             runState != 'unknown')) && !isPause);
 
     final bool isDetecting = runState.toLowerCase() == 'detecting';
 
@@ -688,11 +696,6 @@ class _PengeringContentState extends State<PengeringContent> {
       badgeText = isDetecting ? "MENIMBANG" : "RUNNING$timeText";
       canClick = true;
     } else if (customerName.isEmpty) {
-      final bool isRelayOn = runState.toLowerCase().contains('on') ||
-          runState.toLowerCase().contains('standby') ||
-          state.contains('ON') ||
-          (entry != null && entry['is_relay_on'] == true);
-
       if (isRelayOn) {
         // RELAY ON STANDBY (Amber / Warm Orange Full Gradient)
         cardGradient = const LinearGradient(
@@ -1012,8 +1015,8 @@ class _PengeringContentState extends State<PengeringContent> {
             state.toUpperCase().contains('BOOKING') ||
             runState.toLowerCase().contains('booking'));
 
-    // 1. If machine is ready and empty (Green)
-    if (machineStatus == 'ready' && customerName.isEmpty) {
+    // 1. If machine is empty (no customer assigned)
+    if (customerName.isEmpty) {
       if (_selectedOrderItem != null) {
         _confirmAndAssign(_selectedOrderItem!, machine.id ?? 0, displayName);
       }
