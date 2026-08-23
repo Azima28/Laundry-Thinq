@@ -35,7 +35,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   late String _mainCategory; // 'buku_besar', 'order', 'cuci', 'pengering', 'gosok'
 
   // --- Sub-filters for Buku Besar ---
-  String _bukuBesarSubTab = 'semua'; // 'semua', 'cuci', 'gosok', 'pengeluaran'
+  String _bukuBesarSubTab = 'semua'; // 'semua', 'cuci', 'pengering', 'toko', 'gosok', 'pengeluaran'
 
   // --- Search & Status Filters ---
   String _statusFilter = 'Semua'; // 'Semua', 'Pending', 'Proses', 'Selesai'
@@ -48,7 +48,9 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   _CategoryData _laundry = _CategoryData();
   _CategoryData _gosokData = _CategoryData();
 
-  List<Map<String, dynamic>> _laundryList = [];
+  List<Map<String, dynamic>> _cuciLedgerList = [];
+  List<Map<String, dynamic>> _keringLedgerList = [];
+  List<Map<String, dynamic>> _tokoLedgerList = [];
   List<Map<String, dynamic>> _gosokList = [];
   List<Map<String, dynamic>> _pengeluaranList = [];
   List<Map<String, dynamic>> _combinedLedgerEntries = [];
@@ -201,19 +203,21 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
 
       _CategoryData laundry = _CategoryData();
       _CategoryData gosok = _CategoryData();
-      List<Map<String, dynamic>> laundryList = [];
+      List<Map<String, dynamic>> cuciLedgerList = [];
+      List<Map<String, dynamic>> keringLedgerList = [];
+      List<Map<String, dynamic>> tokoLedgerList = [];
       List<Map<String, dynamic>> gosokList = [];
+      List<Map<String, dynamic>> allOrdersList = [];
 
       List<Order> cuciOrders = [];
       List<Order> pengeringOrders = [];
       List<Order> ironOrders = [];
 
       for (var order in orders) {
-        final bool hasCuci = order.items.any((it) => _isCuciItem(it)) ||
-            (!order.items.any((it) => _isGosokItem(it, ironItemIds)) &&
-                !order.items.any((it) => _isPengeringItem(it)));
+        final bool hasCuci = order.items.any((it) => _isCuciItem(it));
         final bool hasPengering = order.items.any((it) => _isPengeringItem(it));
         final bool hasGosok = order.items.any((it) => _isGosokItem(it, ironItemIds));
+        final bool hasToko = order.items.any((it) => !_isCuciItem(it) && !_isPengeringItem(it) && !_isGosokItem(it, ironItemIds));
 
         if (hasCuci) cuciOrders.add(order);
         if (hasPengering) pengeringOrders.add(order);
@@ -221,6 +225,19 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
 
         bool isPureGosok = order.items.isNotEmpty &&
             order.items.every((item) => ironItemIds.contains(item.itemId));
+
+        String categoryName = 'Layanan Cuci';
+        if (hasCuci && hasPengering) {
+          categoryName = 'Cuci & Pengering';
+        } else if (hasCuci) {
+          categoryName = 'Layanan Cuci';
+        } else if (hasPengering) {
+          categoryName = 'Layanan Pengering';
+        } else if (isPureGosok || hasGosok) {
+          categoryName = 'Setrika / Gosok';
+        } else if (hasToko) {
+          categoryName = 'Produk Toko';
+        }
 
         int unpaid = (order.totalAmount - order.paidAmount).clamp(0, order.totalAmount);
 
@@ -234,7 +251,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         Map<String, dynamic> itemData = {
           'id': order.id,
           'title': order.customerName,
-          'category': isPureGosok ? 'Setrika / Gosok' : 'Cuci & Kering',
+          'category': categoryName,
           'status': paymentStatus,
           'payment_method': order.paymentMethod.toUpperCase(),
           'income_amount': order.paidAmount,
@@ -243,6 +260,10 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           'time': DateFormat('HH:mm').format(order.orderDate),
           'timestamp': order.orderDate,
           'items_count': order.items.fold<int>(0, (s, it) => s + it.quantity),
+          'has_cuci': hasCuci,
+          'has_pengering': hasPengering,
+          'has_gosok': hasGosok,
+          'has_toko': hasToko,
         };
 
         _CategoryData target = isPureGosok ? gosok : laundry;
@@ -269,17 +290,25 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           }
         }
 
-        if (isPureGosok) {
+        allOrdersList.add(itemData);
+
+        if (hasCuci) {
+          cuciLedgerList.add(itemData);
+        }
+        if (hasPengering) {
+          keringLedgerList.add(itemData);
+        }
+        if (hasToko && !hasCuci && !hasPengering && !hasGosok) {
+          tokoLedgerList.add(itemData);
+        }
+        if (isPureGosok || hasGosok) {
           gosokList.add(itemData);
-        } else {
-          laundryList.add(itemData);
         }
       }
 
       // Combine and sort ledger entries by timestamp descending
       final combined = <Map<String, dynamic>>[
-        ...laundryList,
-        ...gosokList,
+        ...allOrdersList,
         ...pengeluaranList,
       ];
       combined.sort((a, b) => (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime));
@@ -290,7 +319,9 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           _laundry = laundry;
           _gosokData = gosok;
           _pengeluaranList = pengeluaranList;
-          _laundryList = laundryList;
+          _cuciLedgerList = cuciLedgerList;
+          _keringLedgerList = keringLedgerList;
+          _tokoLedgerList = tokoLedgerList;
           _gosokList = gosokList;
           _combinedLedgerEntries = combined;
 
@@ -1685,7 +1716,13 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     List<Map<String, dynamic>> filteredList = [];
     switch (_bukuBesarSubTab) {
       case 'cuci':
-        filteredList = _laundryList;
+        filteredList = _cuciLedgerList;
+        break;
+      case 'pengering':
+        filteredList = _keringLedgerList;
+        break;
+      case 'toko':
+        filteredList = _tokoLedgerList;
         break;
       case 'gosok':
         filteredList = _gosokList;
@@ -1712,16 +1749,25 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         const SizedBox(height: 12),
 
         // Sub-filter Tabs for Buku Besar
-        Row(
-          children: [
-            _ledgerSubTab('semua', 'Semua Mutasi (${_combinedLedgerEntries.length})'),
-            const SizedBox(width: 8),
-            _ledgerSubTab('cuci', 'Cuci & Kering (${_laundryList.length})'),
-            const SizedBox(width: 8),
-            _ledgerSubTab('gosok', 'Setrika (${_gosokList.length})'),
-            const SizedBox(width: 8),
-            _ledgerSubTab('pengeluaran', 'Pengeluaran Kas (${_pengeluaranList.length})'),
-          ],
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _ledgerSubTab('semua', 'Semua Mutasi (${_combinedLedgerEntries.length})'),
+              const SizedBox(width: 8),
+              _ledgerSubTab('cuci', 'Layanan Cuci (${_cuciLedgerList.length})'),
+              const SizedBox(width: 8),
+              _ledgerSubTab('pengering', 'Layanan Pengering (${_keringLedgerList.length})'),
+              if (_tokoLedgerList.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                _ledgerSubTab('toko', 'Produk Toko (${_tokoLedgerList.length})'),
+              ],
+              const SizedBox(width: 8),
+              _ledgerSubTab('gosok', 'Setrika (${_gosokList.length})'),
+              const SizedBox(width: 8),
+              _ledgerSubTab('pengeluaran', 'Pengeluaran Kas (${_pengeluaranList.length})'),
+            ],
+          ),
         ),
         const SizedBox(height: 10),
 
@@ -1889,6 +1935,17 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     );
   }
 
+  Color _getLedgerCategoryColor(String category) {
+    final c = category.toLowerCase();
+    if (c.contains('pengeluaran')) return StyleConstants.dangerColor;
+    if (c.contains('pengering') && !c.contains('cuci')) return const Color(0xFFD97706); // Amber for Dryer
+    if (c.contains('cuci') && !c.contains('pengering')) return const Color(0xFF2563EB); // Blue for Washer
+    if (c.contains('cuci') && c.contains('pengering')) return const Color(0xFF0284C7); // Cyan / Combo
+    if (c.contains('setrika') || c.contains('gosok')) return const Color(0xFF7C3AED); // Purple
+    if (c.contains('toko') || c.contains('sabun') || c.contains('produk')) return const Color(0xFF059669); // Emerald
+    return StyleConstants.primaryColor;
+  }
+
   Widget _buildLedgerTable(List<Map<String, dynamic>> items, int totalIn, int totalOut) {
     return Container(
       decoration: BoxDecoration(
@@ -1971,7 +2028,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: isExpense ? StyleConstants.dangerColor : StyleConstants.primaryColor,
+                            color: isExpense ? StyleConstants.dangerColor : _getLedgerCategoryColor(item['category'] ?? ''),
                           ),
                         ),
                       ),
