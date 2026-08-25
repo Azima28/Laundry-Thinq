@@ -12,6 +12,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../database/models/order_model.dart';
 import '../database/models/database_helper.dart';
 import '../utils/currency_format.dart';
+import '../utils/tub_note_helper.dart';
 
 class ReceiptLayoutConfig {
   final double pageWidthMm;
@@ -418,9 +419,9 @@ class PrinterService {
                         '${item.quantity} x $priceFormatted',
                         style: pw.TextStyle(fontSize: config.smallTextSize, color: PdfColors.grey800),
                       ),
-                      if (item.note != null && item.note!.isNotEmpty)
+                      if (TubNoteHelper.cleanCustomerNote(item.note).isNotEmpty)
                         pw.Text(
-                          'Catatan: ${item.note}',
+                          'Catatan: ${TubNoteHelper.cleanCustomerNote(item.note)}',
                           style: pw.TextStyle(fontSize: config.smallTextSize - 0.5, color: PdfColors.grey700),
                         ),
                     ],

@@ -13,6 +13,7 @@ import '../../services/midtrans_service.dart';
 import '../../services/machine_status_service.dart';
 import '../../utils/currency_format.dart';
 import '../../utils/style_constants.dart';
+import '../../utils/tub_note_helper.dart';
 import 'receipt_screen.dart';
 
 class PesanPage extends StatefulWidget {
@@ -31,9 +32,25 @@ class _PesanPageState extends State<PesanPage> {
   List<TransactionModel> _filteredItems = [];
   Map<int, int> _quantities = {};
   final Map<int, String> _notes = {};
+  final Map<String, String> _tubNotes = {}; // Key: "${itemId}_$cycleIndex" -> weight note (e.g. "8kg")
   String _selectedCategory = 'semua'; // 'semua', 'cuci', 'pengering', 'toko', 'gosok'
   bool _isLoading = true;
   bool _isSubmitting = false;
+
+  String _getTubNote(int itemId, int cycleIndex) {
+    return _tubNotes['${itemId}_$cycleIndex'] ?? '';
+  }
+
+  void _setTubNote(int itemId, int cycleIndex, String note) {
+    setState(() {
+      final key = '${itemId}_$cycleIndex';
+      if (note.trim().isEmpty) {
+        _tubNotes.remove(key);
+      } else {
+        _tubNotes[key] = note.trim();
+      }
+    });
+  }
 
   int get _cuciCount => _allItems.where((it) {
         final mType = (it.machineType ?? '').toLowerCase();
@@ -295,6 +312,7 @@ class _PesanPageState extends State<PesanPage> {
     setState(() {
       _quantities = {for (var item in _allItems) item.id ?? 0: 0};
       _notes.clear();
+      _tubNotes.clear();
       _cashController.clear();
       _dpController.clear();
       _qrisUrl = null;
@@ -631,36 +649,68 @@ class _PesanPageState extends State<PesanPage> {
         final m = (it.machineType ?? '').toLowerCase();
         final n = it.nama.toLowerCase();
         final isWash = m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah');
+        final isDry = m == 'pengering' || n.contains('kering') || n.contains('dry');
+        final isMachine = isWash || isDry;
+
+        // Collect per-tub notes for this item
+        final List<String> itemTubNotes = [];
+        for (int i = 0; i < qty; i++) {
+          itemTubNotes.add(_getTubNote(it.id ?? 0, i));
+        }
 
         if (_claimFreeWash && isWash && !freeApplied) {
           freeApplied = true;
           // Item pertama cuci digratiskan (Rp 0)
+          final firstTubWeight = itemTubNotes.isNotEmpty ? itemTubNotes[0] : '';
+          final freeNote = TubNoteHelper.formatTubNotes(
+            weights: [firstTubWeight],
+            startIndex: 1,
+            generalNote: _notes[it.id ?? 0]?.isNotEmpty == true
+                ? 'Cuci Gratis (Kupon) • ${_notes[it.id ?? 0]}'
+                : 'Cuci Gratis (Kupon)',
+          );
+
           orderItems.add(OrderItem(
             itemName: '${it.nama} (Gratis)',
             quantity: 1,
             price: 0,
-            note: (_notes[it.id ?? 0]?.isNotEmpty == true) ? '${_notes[it.id ?? 0]} • Cuci Gratis (Kupon)' : 'Cuci Gratis (Kupon)',
+            note: freeNote,
             machineType: 'cuci',
             itemId: it.id ?? 1,
           ));
 
           if (qty > 1) {
+            final remainingWeights = itemTubNotes.sublist(1);
+            final remainingNote = TubNoteHelper.formatTubNotes(
+              weights: remainingWeights,
+              startIndex: 2,
+              generalNote: _notes[it.id ?? 0],
+            );
+
             orderItems.add(OrderItem(
               itemName: it.nama,
               quantity: qty - 1,
               price: it.harga,
-              note: _notes[it.id ?? 0] ?? '',
+              note: remainingNote,
               machineType: it.machineType ?? 'cuci',
               itemId: it.id ?? 1,
             ));
           }
         } else {
+          final itemNote = isMachine
+              ? TubNoteHelper.formatTubNotes(
+                  weights: itemTubNotes,
+                  startIndex: 1,
+                  generalNote: _notes[it.id ?? 0],
+                )
+              : (_notes[it.id ?? 0] ?? '');
+
           orderItems.add(OrderItem(
             itemName: it.nama,
             quantity: qty,
             price: it.harga,
-            note: _notes[it.id ?? 0] ?? '',
-            machineType: it.machineType ?? 'cuci',
+            note: itemNote,
+            machineType: it.machineType ?? (isWash ? 'cuci' : (isDry ? 'pengering' : 'toko')),
             itemId: it.id ?? 1,
           ));
         }
@@ -834,8 +884,9 @@ class _PesanPageState extends State<PesanPage> {
       } else {
         buffer.writeln("- *${item.itemName}* -> *${item.quantity} x ${formatRp(item.price)}* = *${formatRp(item.price * item.quantity)}*");
       }
-      if (item.note != null && item.note!.trim().isNotEmpty) {
-        buffer.writeln("  _Catatan: ${item.note!.trim()}_");
+      final cleanNote = TubNoteHelper.cleanCustomerNote(item.note);
+      if (cleanNote.isNotEmpty) {
+        buffer.writeln("  _Catatan: ${cleanNote}_");
       }
     }
 
@@ -1684,6 +1735,9 @@ class _PesanPageState extends State<PesanPage> {
         final n = item.nama.toLowerCase();
         final isWash = m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah');
 
+        final isDry = m == 'pengering' || n.contains('kering') || n.contains('dry');
+        final isMachine = isWash || isDry;
+
         if (_claimFreeWash && isWash && item.id == firstWash?.id && !freeRendered) {
           freeRendered = true;
           final int normalQty = qty - 1;
@@ -1735,6 +1789,13 @@ class _PesanPageState extends State<PesanPage> {
                   ),
                 ],
               ),
+              // Tub note for Free wash (Tabung 1)
+              _buildTubWeightRow(
+                itemId: item.id ?? 0,
+                cycleIndex: 0,
+                cycleLabel: 'Cuci 1 (Gratis)',
+                isFree: true,
+              ),
 
               // 2. Extra normal items if qty > 1
               if (normalQty > 0) ...[
@@ -1777,60 +1838,181 @@ class _PesanPageState extends State<PesanPage> {
                     const SizedBox(width: 26),
                   ],
                 ),
+                for (int i = 1; i < qty; i++)
+                  _buildTubWeightRow(
+                    itemId: item.id ?? 0,
+                    cycleIndex: i,
+                    cycleLabel: 'Cuci ${i + 1}',
+                  ),
               ],
             ],
           );
         }
 
         final subtotal = item.harga * qty;
-        return Row(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: StyleConstants.primaryColor,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                '${qty}x',
-                style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 12.5),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.nama,
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: StyleConstants.textHeading),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: StyleConstants.primaryColor,
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  Text(
-                    '@ ${formatRp(item.harga)}',
-                    style: const TextStyle(fontSize: 11.5, color: StyleConstants.textMuted),
+                  child: Text(
+                    '${qty}x',
+                    style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 12.5),
                   ),
-                  if (note != null && note.trim().isNotEmpty)
-                    Text(
-                      'Catatan: $note',
-                      style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: StyleConstants.primaryColor),
-                    ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.nama,
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: StyleConstants.textHeading),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '@ ${formatRp(item.harga)}',
+                        style: const TextStyle(fontSize: 11.5, color: StyleConstants.textMuted),
+                      ),
+                      if (note != null && note.trim().isNotEmpty)
+                        Text(
+                          'Catatan: $note',
+                          style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: StyleConstants.primaryColor),
+                        ),
+                    ],
+                  ),
+                ),
+                Text(
+                  formatRp(subtotal),
+                  style: StyleConstants.tabularNumbers(fontSize: 14.5, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => setState(() => _quantities[item.id ?? 0] = 0),
+                  child: const Icon(Icons.close_rounded, size: 18, color: StyleConstants.dangerColor),
+                ),
+              ],
             ),
-            Text(
-              formatRp(subtotal),
-              style: StyleConstants.tabularNumbers(fontSize: 14.5, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
-            ),
-            const SizedBox(width: 8),
-            InkWell(
-              onTap: () => setState(() => _quantities[item.id ?? 0] = 0),
-              child: const Icon(Icons.close_rounded, size: 18, color: StyleConstants.dangerColor),
-            ),
+            if (isMachine)
+              for (int i = 0; i < qty; i++)
+                _buildTubWeightRow(
+                  itemId: item.id ?? 0,
+                  cycleIndex: i,
+                  cycleLabel: '${isWash ? "Cuci" : "Kering"} ${i + 1}',
+                ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildTubWeightRow({
+    required int itemId,
+    required int cycleIndex,
+    required String cycleLabel,
+    bool isFree = false,
+  }) {
+    final currentNote = _getTubNote(itemId, cycleIndex);
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 8, top: 4, bottom: 2),
+      child: Row(
+        children: [
+          Icon(
+            Icons.scale_rounded,
+            size: 13,
+            color: isFree ? const Color(0xFFD97706) : StyleConstants.primaryColor,
+          ),
+          const SizedBox(width: 5),
+          SizedBox(
+            width: 80,
+            child: Text(
+              cycleLabel,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                color: isFree ? const Color(0xFFB45309) : const Color(0xFF334155),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Presets: 5k, 7k, 8k, 10k
+          ...['5', '7', '8', '10'].map((w) {
+            final isSel = currentNote.toLowerCase() == '${w}kg' || currentNote.toLowerCase() == '$w kg' || currentNote == w;
+            return Padding(
+              padding: const EdgeInsets.only(right: 3),
+              child: InkWell(
+                onTap: () {
+                  if (isSel) {
+                    _setTubNote(itemId, cycleIndex, '');
+                  } else {
+                    _setTubNote(itemId, cycleIndex, '${w}kg');
+                  }
+                },
+                borderRadius: BorderRadius.circular(5),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isSel
+                        ? (isFree ? const Color(0xFFD97706) : StyleConstants.primaryColor)
+                        : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(
+                      color: isSel
+                          ? (isFree ? const Color(0xFFD97706) : StyleConstants.primaryColor)
+                          : StyleConstants.borderLight,
+                    ),
+                  ),
+                  child: Text(
+                    '${w}k',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isSel ? FontWeight.w900 : FontWeight.w700,
+                      color: isSel ? Colors.white : StyleConstants.textHeading,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+          const SizedBox(width: 3),
+          // Custom weight text input
+          Expanded(
+            child: Container(
+              height: 25,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: StyleConstants.borderLight),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: TextFormField(
+                key: ValueKey('tub_${itemId}_${cycleIndex}_$currentNote'),
+                initialValue: currentNote,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: StyleConstants.textHeading),
+                decoration: const InputDecoration(
+                  hintText: 'kg...',
+                  hintStyle: TextStyle(fontSize: 10, color: StyleConstants.textMuted),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(vertical: 5),
+                ),
+                onChanged: (val) {
+                  _tubNotes['${itemId}_$cycleIndex'] = val.trim();
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

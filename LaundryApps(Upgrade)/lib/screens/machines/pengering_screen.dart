@@ -9,6 +9,7 @@ import '../../database/models/database_helper.dart';
 import '../../database/models/machine_model.dart';
 import '../../services/notification_service.dart';
 import '../../utils/style_constants.dart';
+import '../../utils/tub_note_helper.dart';
 
 class PengeringScreen extends StatelessWidget {
   final int items;
@@ -142,13 +143,19 @@ class _PengeringContentState extends State<PengeringContent> {
         }).toList();
 
         if (dryItems.isEmpty) {
-          expanded.add({'order': order, 'key': 'dry_order_${order.id}_0'});
+          expanded.add({
+            'order': order,
+            'key': 'dry_order_${order.id}_0',
+            'cycle_index': 0,
+            'total_cycles': 1,
+            'tub_note': '',
+          });
         } else {
           final totalQty = dryItems.fold<int>(0, (s, it) => s + it.quantity);
           final usageResult = await db.rawQuery(
             '''
-            SELECT COUNT(*) as cnt 
-            FROM machine_usage_history muh 
+            SELECT COUNT(*) as cnt
+            FROM machine_usage_history muh
             LEFT JOIN machines m ON muh.machine_id = m.id
             WHERE muh.order_id = ? AND muh.status = 'Success' AND (m.machine_type = 'pengering' OR m.machine_type = 'kering' OR muh.machine_name LIKE '%kering%' OR muh.machine_name LIKE '%pengering%' OR muh.machine_name LIKE '%dry%')
             ''',
@@ -159,8 +166,19 @@ class _PengeringContentState extends State<PengeringContent> {
               : 0;
           final remainingQty = (totalQty - usedQty).clamp(0, 999999);
 
+          // Extract per-tub notes using TubNoteHelper
+          final allDryNotes = TubNoteHelper.getOrderTubNotes(order, machineType: 'pengering');
+
           for (int i = 0; i < remainingQty; i++) {
-            expanded.add({'order': order, 'key': 'dry_order_${order.id}_$i'});
+            final currentCycleIdx = usedQty + i;
+            final tubNote = currentCycleIdx < allDryNotes.length ? allDryNotes[currentCycleIdx] : '';
+            expanded.add({
+              'order': order,
+              'key': 'dry_order_${order.id}_$i',
+              'cycle_index': currentCycleIdx,
+              'total_cycles': totalQty,
+              'tub_note': tubNote,
+            });
           }
         }
       }
@@ -271,21 +289,32 @@ class _PengeringContentState extends State<PengeringContent> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: primaryColor.withOpacity(0.1),
+                          color: primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: primaryColor.withOpacity(0.2),
+                            color: primaryColor.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Row(
                           children: [
-                            Text(
-                              'Pilih mesin untuk: ${_selectedOrderItem!['order'].customerName}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: primaryColor,
-                              ),
+                            Builder(
+                              builder: (_) {
+                                final int selCycleIdx = (_selectedOrderItem!['cycle_index'] as int?) ?? 0;
+                                final int selTotalCycles = (_selectedOrderItem!['total_cycles'] as int?) ?? 1;
+                                final String selTubNote = (_selectedOrderItem!['tub_note'] ?? '').toString();
+                                final String cycleInfo = selTotalCycles > 1
+                                    ? ' (Pengering ${selCycleIdx + 1}/$selTotalCycles${selTubNote.isNotEmpty ? " • ⚖️ $selTubNote" : ""})'
+                                    : (selTubNote.isNotEmpty ? ' (⚖️ $selTubNote)' : '');
+
+                                return Text(
+                                  'Pilih mesin untuk: ${_selectedOrderItem!['order'].customerName}$cycleInfo',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryColor,
+                                  ),
+                                );
+                              },
                             ),
                             const SizedBox(width: 8),
                             InkWell(
@@ -350,6 +379,9 @@ class _PengeringContentState extends State<PengeringContent> {
   Widget _buildOrderCard(Map<String, dynamic> item, bool isSelected) {
     final Order order = item['order'];
     final String orderKey = item['key'];
+    final int cycleIdx = (item['cycle_index'] as int?) ?? 0;
+    final int totalCycles = (item['total_cycles'] as int?) ?? 1;
+    final String tubNote = (item['tub_note'] ?? '').toString();
     final date = _parseOrderDate(order.orderDate);
 
     final bool isProcessing = MachineStatusService.instance.isOrderProcessing(
@@ -433,13 +465,45 @@ class _PengeringContentState extends State<PengeringContent> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            'Nota #${order.id}',
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF475569),
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                totalCycles > 1
+                                    ? 'Nota #${order.id} • Pengering ${cycleIdx + 1}/$totalCycles'
+                                    : 'Nota #${order.id}',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                              if (tubNote.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFFBEB),
+                                    borderRadius: BorderRadius.circular(5),
+                                    border: Border.all(color: const Color(0xFFFDE68A)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.scale_rounded, size: 11, color: Color(0xFFD97706)),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        tubNote,
+                                        style: const TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFFB45309),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ],
                       ),
@@ -2138,6 +2202,13 @@ class _PengeringContentState extends State<PengeringContent> {
       ),
     );
 
+    final int selCycleIdx = (item['cycle_index'] as int?) ?? 0;
+    final int selTotalCycles = (item['total_cycles'] as int?) ?? 1;
+    final String selTubNote = (item['tub_note'] ?? '').toString();
+    final String cycleInfo = selTotalCycles > 1
+        ? ' (Pengering ${selCycleIdx + 1}/$selTotalCycles${selTubNote.isNotEmpty ? " • ⚖️ $selTubNote" : ""})'
+        : (selTubNote.isNotEmpty ? ' (⚖️ $selTubNote)' : '');
+
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) {
@@ -2150,7 +2221,7 @@ class _PengeringContentState extends State<PengeringContent> {
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           content: Text(
-            'Apakah Anda yakin memulai $machineName untuk "${order.customerName}"?',
+            'Apakah Anda yakin memulai $machineName untuk "${order.customerName}$cycleInfo"?',
             style: const TextStyle(fontSize: 14),
           ),
           actions: [

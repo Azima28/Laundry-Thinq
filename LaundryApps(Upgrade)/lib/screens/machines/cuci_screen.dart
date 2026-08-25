@@ -9,6 +9,7 @@ import '../../database/models/database_helper.dart';
 import '../../database/models/machine_model.dart';
 import '../../services/notification_service.dart';
 import '../../utils/style_constants.dart';
+import '../../utils/tub_note_helper.dart';
 
 class CuciScreen extends StatelessWidget {
   final int items;
@@ -157,7 +158,13 @@ class _CuciContentState extends State<CuciContent> {
         }).toList();
 
         if (washingItems.isEmpty) {
-          expanded.add({'order': order, 'key': 'order_${order.id}_0'});
+          expanded.add({
+            'order': order,
+            'key': 'order_${order.id}_0',
+            'cycle_index': 0,
+            'total_cycles': 1,
+            'tub_note': '',
+          });
         } else {
           final totalQty = washingItems.fold<int>(
             0,
@@ -165,8 +172,8 @@ class _CuciContentState extends State<CuciContent> {
           );
           final usageResult = await db.rawQuery(
             '''
-            SELECT COUNT(*) as cnt 
-            FROM machine_usage_history muh 
+            SELECT COUNT(*) as cnt
+            FROM machine_usage_history muh
             LEFT JOIN machines m ON muh.machine_id = m.id
             WHERE muh.order_id = ? AND muh.status = 'Success' AND (m.machine_type = 'cuci' OR muh.machine_name LIKE '%cuci%' OR muh.machine_name LIKE '%wash%')
             ''',
@@ -177,8 +184,19 @@ class _CuciContentState extends State<CuciContent> {
               : 0;
           final remainingQty = (totalQty - usedQty).clamp(0, 999999);
 
+          // Extract per-tub notes using TubNoteHelper
+          final allWashNotes = TubNoteHelper.getOrderTubNotes(order, machineType: 'cuci');
+
           for (int i = 0; i < remainingQty; i++) {
-            expanded.add({'order': order, 'key': 'order_${order.id}_$i'});
+            final currentCycleIdx = usedQty + i;
+            final tubNote = currentCycleIdx < allWashNotes.length ? allWashNotes[currentCycleIdx] : '';
+            expanded.add({
+              'order': order,
+              'key': 'order_${order.id}_$i',
+              'cycle_index': currentCycleIdx,
+              'total_cycles': totalQty,
+              'tub_note': tubNote,
+            });
           }
         }
       }
@@ -298,13 +316,24 @@ class _CuciContentState extends State<CuciContent> {
                         ),
                         child: Row(
                           children: [
-                            Text(
-                              'Pilih mesin untuk: ${_selectedOrderItem!['order'].customerName}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: primaryColor,
-                              ),
+                            Builder(
+                              builder: (_) {
+                                final int selCycleIdx = (_selectedOrderItem!['cycle_index'] as int?) ?? 0;
+                                final int selTotalCycles = (_selectedOrderItem!['total_cycles'] as int?) ?? 1;
+                                final String selTubNote = (_selectedOrderItem!['tub_note'] ?? '').toString();
+                                final String cycleInfo = selTotalCycles > 1
+                                    ? ' (Tabung ${selCycleIdx + 1}/$selTotalCycles${selTubNote.isNotEmpty ? " • ⚖️ $selTubNote" : ""})'
+                                    : (selTubNote.isNotEmpty ? ' (⚖️ $selTubNote)' : '');
+
+                                return Text(
+                                  'Pilih mesin untuk: ${_selectedOrderItem!['order'].customerName}$cycleInfo',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryColor,
+                                  ),
+                                );
+                              },
                             ),
                             const SizedBox(width: 8),
                             InkWell(
@@ -369,6 +398,9 @@ class _CuciContentState extends State<CuciContent> {
   Widget _buildOrderCard(Map<String, dynamic> item, bool isSelected) {
     final Order order = item['order'];
     final String orderKey = item['key'];
+    final int cycleIdx = (item['cycle_index'] as int?) ?? 0;
+    final int totalCycles = (item['total_cycles'] as int?) ?? 1;
+    final String tubNote = (item['tub_note'] ?? '').toString();
     final date = _parseOrderDate(order.orderDate);
 
     final bool isProcessing = MachineStatusService.instance.isOrderProcessing(
@@ -452,13 +484,45 @@ class _CuciContentState extends State<CuciContent> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            'Nota #${order.id}',
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF475569),
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                totalCycles > 1
+                                    ? 'Nota #${order.id} • Tabung ${cycleIdx + 1}/$totalCycles'
+                                    : 'Nota #${order.id}',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                              if (tubNote.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(5),
+                                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.scale_rounded, size: 11, color: Color(0xFF1D4ED8)),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        tubNote,
+                                        style: const TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF1E40AF),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ],
                       ),
@@ -2167,6 +2231,13 @@ class _CuciContentState extends State<CuciContent> {
       ),
     );
 
+    final int selCycleIdx = (item['cycle_index'] as int?) ?? 0;
+    final int selTotalCycles = (item['total_cycles'] as int?) ?? 1;
+    final String selTubNote = (item['tub_note'] ?? '').toString();
+    final String cycleInfo = selTotalCycles > 1
+        ? ' (Tabung ${selCycleIdx + 1}/$selTotalCycles${selTubNote.isNotEmpty ? " • ⚖️ $selTubNote" : ""})'
+        : (selTubNote.isNotEmpty ? ' (⚖️ $selTubNote)' : '');
+
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) {
@@ -2179,7 +2250,7 @@ class _CuciContentState extends State<CuciContent> {
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           content: Text(
-            'Apakah Anda yakin memulai $machineName untuk "${order.customerName}"?',
+            'Apakah Anda yakin memulai $machineName untuk "${order.customerName}$cycleInfo"?',
             style: const TextStyle(fontSize: 14),
           ),
           actions: [

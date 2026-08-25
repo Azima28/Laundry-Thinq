@@ -10,6 +10,7 @@ import '../../services/machine_status_service.dart';
 import '../../utils/currency_format.dart';
 import '../../utils/style_constants.dart';
 import '../../utils/globals.dart';
+import '../../utils/tub_note_helper.dart';
 
 class ReceiptScreen extends StatefulWidget {
   final Order order;
@@ -183,8 +184,9 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         } else {
           buffer.writeln("- *${item.itemName}* -> *${item.quantity} x ${formatRp(item.price)}* = *${formatRp(item.price * item.quantity)}*");
         }
-        if (item.note != null && item.note!.trim().isNotEmpty) {
-          buffer.writeln("  _Catatan: ${item.note!.trim()}_");
+        final cleanNote = TubNoteHelper.cleanCustomerNote(item.note);
+        if (cleanNote.isNotEmpty) {
+          buffer.writeln("  _Catatan: ${cleanNote}_");
         }
       }
 
