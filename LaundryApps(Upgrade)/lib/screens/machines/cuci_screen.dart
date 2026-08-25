@@ -322,7 +322,7 @@ class _CuciContentState extends State<CuciContent> {
                                 final int selTotalCycles = (_selectedOrderItem!['total_cycles'] as int?) ?? 1;
                                 final String selTubNote = (_selectedOrderItem!['tub_note'] ?? '').toString();
                                 final String cycleInfo = selTotalCycles > 1
-                                    ? ' (Tabung ${selCycleIdx + 1}/$selTotalCycles${selTubNote.isNotEmpty ? " • ⚖️ $selTubNote" : ""})'
+                                    ? ' (Cuci ${selCycleIdx + 1}/$selTotalCycles${selTubNote.isNotEmpty ? " • ⚖️ $selTubNote" : ""})'
                                     : (selTubNote.isNotEmpty ? ' (⚖️ $selTubNote)' : '');
 
                                 return Text(
@@ -488,7 +488,7 @@ class _CuciContentState extends State<CuciContent> {
                             children: [
                               Text(
                                 totalCycles > 1
-                                    ? 'Nota #${order.id} • Tabung ${cycleIdx + 1}/$totalCycles'
+                                    ? 'Nota #${order.id} • Cuci ${cycleIdx + 1}/$totalCycles'
                                     : 'Nota #${order.id}',
                                 style: const TextStyle(
                                   fontSize: 11.5,

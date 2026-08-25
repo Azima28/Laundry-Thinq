@@ -303,7 +303,7 @@ class _PengeringContentState extends State<PengeringContent> {
                                 final int selTotalCycles = (_selectedOrderItem!['total_cycles'] as int?) ?? 1;
                                 final String selTubNote = (_selectedOrderItem!['tub_note'] ?? '').toString();
                                 final String cycleInfo = selTotalCycles > 1
-                                    ? ' (Pengering ${selCycleIdx + 1}/$selTotalCycles${selTubNote.isNotEmpty ? " • ⚖️ $selTubNote" : ""})'
+                                    ? ' (Kering ${selCycleIdx + 1}/$selTotalCycles${selTubNote.isNotEmpty ? " • ⚖️ $selTubNote" : ""})'
                                     : (selTubNote.isNotEmpty ? ' (⚖️ $selTubNote)' : '');
 
                                 return Text(
@@ -469,7 +469,7 @@ class _PengeringContentState extends State<PengeringContent> {
                             children: [
                               Text(
                                 totalCycles > 1
-                                    ? 'Nota #${order.id} • Pengering ${cycleIdx + 1}/$totalCycles'
+                                    ? 'Nota #${order.id} • Kering ${cycleIdx + 1}/$totalCycles'
                                     : 'Nota #${order.id}',
                                 style: const TextStyle(
                                   fontSize: 11.5,

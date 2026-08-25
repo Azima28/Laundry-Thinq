@@ -672,6 +672,7 @@ class _PesanPageState extends State<PesanPage> {
             generalNote: _notes[it.id ?? 0]?.isNotEmpty == true
                 ? 'Cuci Gratis (Kupon) • ${_notes[it.id ?? 0]}'
                 : 'Cuci Gratis (Kupon)',
+            prefix: 'Cuci',
           );
 
           orderItems.add(OrderItem(
@@ -689,6 +690,7 @@ class _PesanPageState extends State<PesanPage> {
               weights: remainingWeights,
               startIndex: 2,
               generalNote: _notes[it.id ?? 0],
+              prefix: 'Cuci',
             );
 
             orderItems.add(OrderItem(
@@ -701,11 +703,13 @@ class _PesanPageState extends State<PesanPage> {
             ));
           }
         } else {
+          final String prefix = isWash ? 'Cuci' : (isDry ? 'Kering' : 'Item');
           final itemNote = isMachine
               ? TubNoteHelper.formatTubNotes(
                   weights: itemTubNotes,
                   startIndex: 1,
                   generalNote: _notes[it.id ?? 0],
+                  prefix: prefix,
                 )
               : (_notes[it.id ?? 0] ?? '');
 

@@ -19,19 +19,20 @@ class TubNoteHelper {
     return '$cleaned kg';
   }
 
-  /// Formats a list of weights for tubs into a standard string:
-  /// e.g. "Tabung 1: 8 kg | Tabung 2: 7 kg | Tabung 3: 6.5 kg"
+  /// Formats a list of weights into a standard string:
+  /// e.g. "Cuci 1: 8 kg | Cuci 2: 7 kg | Cuci 3: 6.5 kg" (or "Kering 1: 8 kg")
   static String formatTubNotes({
     required List<String> weights,
     int startIndex = 1,
     String? generalNote,
+    String prefix = 'Cuci',
   }) {
     final List<String> segments = [];
     for (int i = 0; i < weights.length; i++) {
       final w = normalizeWeight(weights[i]);
       final tubNum = startIndex + i;
       if (w.isNotEmpty) {
-        segments.add('Tabung $tubNum: $w');
+        segments.add('$prefix $tubNum: $w');
       }
     }
 
