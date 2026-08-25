@@ -31,6 +31,7 @@ class _PesanPageState extends State<PesanPage> {
   List<TransactionModel> _allItems = [];
   List<TransactionModel> _filteredItems = [];
   Map<int, int> _quantities = {};
+  final List<int> _cartItemOrder = []; // Maintains chronological addition order in cart
   final Map<int, String> _notes = {};
   final Map<String, String> _tubNotes = {}; // Key: "${itemId}_$cycleIndex" -> weight note (e.g. "8kg")
   String _selectedCategory = 'semua'; // 'semua', 'cuci', 'pengering', 'toko', 'gosok'
@@ -39,17 +40,6 @@ class _PesanPageState extends State<PesanPage> {
 
   String _getTubNote(int itemId, int cycleIndex) {
     return _tubNotes['${itemId}_$cycleIndex'] ?? '';
-  }
-
-  void _setTubNote(int itemId, int cycleIndex, String note) {
-    setState(() {
-      final key = '${itemId}_$cycleIndex';
-      if (note.trim().isEmpty) {
-        _tubNotes.remove(key);
-      } else {
-        _tubNotes[key] = note.trim();
-      }
-    });
   }
 
   int get _cuciCount => _allItems.where((it) {
@@ -301,9 +291,17 @@ class _PesanPageState extends State<PesanPage> {
           );
           return;
         }
+        if (current == 0 && !_cartItemOrder.contains(id)) {
+          _cartItemOrder.add(id);
+        }
         _quantities[id] = current + 1;
       } else {
-        if (current > 0) _quantities[id] = current - 1;
+        if (current > 1) {
+          _quantities[id] = current - 1;
+        } else if (current == 1) {
+          _quantities[id] = 0;
+          _cartItemOrder.remove(id);
+        }
       }
     });
   }
@@ -311,6 +309,7 @@ class _PesanPageState extends State<PesanPage> {
   void _clearCart() {
     setState(() {
       _quantities = {for (var item in _allItems) item.id ?? 0: 0};
+      _cartItemOrder.clear();
       _notes.clear();
       _tubNotes.clear();
       _cashController.clear();
@@ -642,7 +641,12 @@ class _PesanPageState extends State<PesanPage> {
       bool freeApplied = false;
       final List<OrderItem> orderItems = [];
 
-      for (var it in _allItems) {
+      final cartItemsList = _cartItemOrder
+          .map((id) => _allItems.firstWhere((it) => it.id == id, orElse: () => _allItems.first))
+          .where((it) => (_quantities[it.id ?? 0] ?? 0) > 0)
+          .toList();
+
+      for (var it in cartItemsList) {
         final qty = _quantities[it.id ?? 0] ?? 0;
         if (qty <= 0) continue;
 
@@ -1689,7 +1693,10 @@ class _PesanPageState extends State<PesanPage> {
 
   // --- CART ITEMS SLIP LIST ---
   Widget _buildCartItemsList() {
-    final cartItems = _allItems.where((it) => (_quantities[it.id ?? 0] ?? 0) > 0).toList();
+    final cartItems = _cartItemOrder
+        .map((id) => _allItems.firstWhere((it) => it.id == id, orElse: () => _allItems.first))
+        .where((it) => (_quantities[it.id ?? 0] ?? 0) > 0)
+        .toList();
 
     if (cartItems.isEmpty) {
       return Center(
@@ -1784,7 +1791,10 @@ class _PesanPageState extends State<PesanPage> {
                   ),
                   const SizedBox(width: 8),
                   InkWell(
-                    onTap: () => setState(() => _quantities[item.id ?? 0] = 0),
+                    onTap: () => setState(() {
+                      _quantities[item.id ?? 0] = 0;
+                      _cartItemOrder.remove(item.id);
+                    }),
                     child: const Icon(Icons.close_rounded, size: 18, color: StyleConstants.dangerColor),
                   ),
                 ],
@@ -1895,7 +1905,10 @@ class _PesanPageState extends State<PesanPage> {
                 ),
                 const SizedBox(width: 8),
                 InkWell(
-                  onTap: () => setState(() => _quantities[item.id ?? 0] = 0),
+                  onTap: () => setState(() {
+                    _quantities[item.id ?? 0] = 0;
+                    _cartItemOrder.remove(item.id);
+                  }),
                   child: const Icon(Icons.close_rounded, size: 18, color: StyleConstants.dangerColor),
                 ),
               ],
@@ -1922,88 +1935,47 @@ class _PesanPageState extends State<PesanPage> {
     final currentNote = _getTubNote(itemId, cycleIndex);
 
     return Padding(
-      padding: const EdgeInsets.only(left: 8, top: 4, bottom: 2),
+      padding: const EdgeInsets.only(left: 8, top: 5, bottom: 2),
       child: Row(
         children: [
           Icon(
             Icons.scale_rounded,
-            size: 13,
+            size: 14,
             color: isFree ? const Color(0xFFD97706) : StyleConstants.primaryColor,
           ),
-          const SizedBox(width: 5),
+          const SizedBox(width: 6),
           SizedBox(
-            width: 80,
+            width: 85,
             child: Text(
               cycleLabel,
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 12,
                 fontWeight: FontWeight.w800,
                 color: isFree ? const Color(0xFFB45309) : const Color(0xFF334155),
               ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          const SizedBox(width: 4),
-          // Presets: 5k, 7k, 8k, 10k
-          ...['5', '7', '8', '10'].map((w) {
-            final isSel = currentNote.toLowerCase() == '${w}kg' || currentNote.toLowerCase() == '$w kg' || currentNote == w;
-            return Padding(
-              padding: const EdgeInsets.only(right: 3),
-              child: InkWell(
-                onTap: () {
-                  if (isSel) {
-                    _setTubNote(itemId, cycleIndex, '');
-                  } else {
-                    _setTubNote(itemId, cycleIndex, '${w}kg');
-                  }
-                },
-                borderRadius: BorderRadius.circular(5),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: isSel
-                        ? (isFree ? const Color(0xFFD97706) : StyleConstants.primaryColor)
-                        : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(5),
-                    border: Border.all(
-                      color: isSel
-                          ? (isFree ? const Color(0xFFD97706) : StyleConstants.primaryColor)
-                          : StyleConstants.borderLight,
-                    ),
-                  ),
-                  child: Text(
-                    '${w}k',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: isSel ? FontWeight.w900 : FontWeight.w700,
-                      color: isSel ? Colors.white : StyleConstants.textHeading,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
-          const SizedBox(width: 3),
-          // Custom weight text input
+          const SizedBox(width: 8),
           Expanded(
             child: Container(
-              height: 25,
+              height: 32,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(5),
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: StyleConstants.borderLight),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               child: TextFormField(
                 key: ValueKey('tub_${itemId}_${cycleIndex}_$currentNote'),
                 initialValue: currentNote,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: StyleConstants.textHeading),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: StyleConstants.textHeading),
                 decoration: const InputDecoration(
-                  hintText: 'kg...',
-                  hintStyle: TextStyle(fontSize: 10, color: StyleConstants.textMuted),
+                  hintText: 'Misal: 8 kg...',
+                  hintStyle: TextStyle(fontSize: 11, color: StyleConstants.textMuted),
                   border: InputBorder.none,
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 5),
+                  contentPadding: EdgeInsets.symmetric(vertical: 7),
                 ),
                 onChanged: (val) {
                   _tubNotes['${itemId}_$cycleIndex'] = val.trim();

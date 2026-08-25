@@ -2161,30 +2161,6 @@ class _PengeringContentState extends State<PengeringContent> {
     });
   }
 
-  Future<void> _stopMonitoring(MachineModel machine) async {
-    final service = MachineStatusService.instance;
-    final int machineId = machine.id ?? 0;
-
-    service.setActivating(machineId, true);
-    try {
-      final res = await service.stopMachineMonitoring(entityId: machine.name);
-      if (res['success'] == true) {
-        Globals.showSuccessSnackBar(
-          'Pemantauan mesin ${machine.name} berhasil dihentikan!',
-        );
-      } else {
-        Globals.showErrorSnackBar(
-          'Gagal menghentikan pemantauan: ${res['error']}',
-        );
-      }
-    } catch (e) {
-      Globals.showErrorSnackBar('Koneksi error: $e');
-    } finally {
-      service.setActivating(machineId, false);
-      if (mounted) setState(() {});
-    }
-  }
-
   Future<void> _confirmAndAssign(
     Map<String, dynamic> item,
     int machineId,
@@ -2332,19 +2308,6 @@ class _PengeringContentState extends State<PengeringContent> {
     } catch (e) {
       Globals.showErrorSnackBar('Gagal menyelesaikan proses mesin: $e');
     }
-  }
-
-  int _parseRemainMinutes(String remain) {
-    if (remain.isEmpty) return 0;
-    try {
-      final parts = remain.split(':');
-      if (parts.length >= 2) {
-        final h = int.tryParse(parts[0]) ?? 0;
-        final m = int.tryParse(parts[1]) ?? 0;
-        return h * 60 + m;
-      }
-    } catch (_) {}
-    return 0;
   }
 
   DateTime _parseOrderDate(dynamic val) {
