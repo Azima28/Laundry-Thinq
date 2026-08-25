@@ -1083,19 +1083,7 @@ class _CuciContentState extends State<CuciContent> {
     final String currentMachineName = machine.name.trim().toLowerCase();
     final Set<String> otherMachinesSet = {};
 
-    // 1. Add other machines from entry['other_machines'] if any
-    if (entry?['other_machines'] != null) {
-      for (final m in entry['other_machines']) {
-        final mStr = m.toString().trim();
-        if (mStr.isNotEmpty &&
-            mStr.toLowerCase() != currentCleanName &&
-            mStr.toLowerCase() != currentMachineName) {
-          otherMachinesSet.add(mStr);
-        }
-      }
-    }
-
-    // 2. Cross-check active machines across all live IoT statuses (washers & dryers)
+    // 1. Cross-check active machines across all live in-memory IoT statuses (washers & dryers)
     final allStatuses = MachineStatusService.instance.states;
     allStatuses.forEach((key, val) {
       if (val is Map<String, dynamic>) {
@@ -1121,7 +1109,7 @@ class _CuciContentState extends State<CuciContent> {
       }
     });
 
-    // 3. Query active orders & pending cycles in SQLite database
+    // 2. Query active orders & pending cycles in SQLite database
     int pendingOrderCycles = 0;
     final List<String> pendingBreakdowns = [];
 

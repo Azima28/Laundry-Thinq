@@ -99,15 +99,22 @@ class MachineStatusService {
     String? state,
     String? runState,
   }) {
-    final entry = _states[machineName] ?? {};
+    final underscoreName = machineName.replaceAll(' ', '_');
+    final spaceName = machineName.replaceAll('_', ' ');
+    final entry = _states[underscoreName] ?? _states[spaceName] ?? _states[machineName] ?? {};
     final newEntry = Map<String, dynamic>.from(entry is Map ? entry : {});
     newEntry['status'] = status;
     if (customerName != null) newEntry['customer_name'] = customerName;
     if (customerPhone != null) newEntry['customer_phone'] = customerPhone;
     if (state != null) newEntry['state'] = state;
     if (runState != null) newEntry['run_state'] = runState;
+
     _states[machineName] = newEntry;
-    _states['sensor.' + machineName] = newEntry;
+    _states[underscoreName] = newEntry;
+    _states[spaceName] = newEntry;
+    _states['sensor.$machineName'] = newEntry;
+    _states['sensor.$underscoreName'] = newEntry;
+    _states['sensor.$spaceName'] = newEntry;
     _notifier.value++;
   }
 
