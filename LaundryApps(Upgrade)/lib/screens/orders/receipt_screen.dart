@@ -38,6 +38,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   String _bizName = 'SMART LAUNDRY PRO';
   String _bizAddress = 'Layanan Cuci & Setrika Profesional';
   String _bizPhone = '';
+  String _customerKuponStr = '';
   TextEditingController _phoneCtrl = TextEditingController();
   List<Map<String, dynamic>> _orderUsages = [];
 
@@ -82,11 +83,25 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
 
   Future<void> _loadBizProfile() async {
     final prefs = await SharedPreferences.getInstance();
+    String kuponStr = '';
+    try {
+      final stats = await DatabaseHelper.instance.getCustomerFullStats(
+        name: widget.order.customerName,
+        phone: widget.order.customerPhone,
+      );
+      if (stats['loyalty_enabled'] == true && widget.order.customerName.isNotEmpty) {
+        final activeKupon = stats['wash_count_active'] ?? 0;
+        final threshold = stats['loyalty_threshold'] ?? 5;
+        kuponStr = '$activeKupon / $threshold';
+      }
+    } catch (_) {}
+
     if (mounted) {
       setState(() {
         _bizName = prefs.getString('biz_name') ?? 'SMART LAUNDRY PRO';
         _bizAddress = prefs.getString('biz_address') ?? 'Layanan Cuci & Setrika Profesional';
         _bizPhone = prefs.getString('biz_phone') ?? '';
+        _customerKuponStr = kuponStr;
       });
     }
   }
@@ -138,29 +153,56 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
 
     setState(() => _isSendingWa = true);
     try {
-      final String itemsText = widget.order.items
-          .map((it) => '• ${it.quantity}x ${it.itemName} (${formatRp(it.price * it.quantity)})')
-          .join('\n');
+      final String phone = targetPhone;
+      final String name = widget.order.customerName;
+      final orderId = widget.order.id;
+      final d = widget.order.orderDate;
+      final dateStr = '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
-      final String sisaText = (widget.order.totalAmount > widget.paidAmount)
-          ? '\n*Sisa Tagihan:* ${formatRp(widget.order.totalAmount - widget.paidAmount)}'
-          : '\n*Status Pembayaran:* LUNAS / TERBAYAR ✅';
+      String statusBayar = 'BELUM LUNAS';
+      if (widget.order.isPaid || widget.paidAmount >= widget.order.totalAmount) {
+        statusBayar = 'LUNAS';
+      } else if (widget.paidAmount > 0) {
+        statusBayar = 'BELUM LUNAS (Telah Dibayar DP: ${formatRp(widget.paidAmount)})';
+      }
 
-      final String msg =
-          'Halo Kak *${widget.order.customerName}*,\n'
-          'Terima kasih telah mencuci di *$_bizName*.\n\n'
-          '📄 *BUKTI NOTA PEMBAYARAN:*\n'
-          '*No. Nota:* #TRX-${widget.order.id}\n'
-          '*Tanggal:* ${DateFormat('dd/MM/yyyy HH:mm').format(widget.order.orderDate)}\n'
-          '*Metode Bayar:* ${widget.paymentMethod.toUpperCase()}\n\n'
-          '*Rincian Layanan:*\n$itemsText\n\n'
-          '*Total Biaya:* ${formatRp(widget.order.totalAmount)}\n'
-          '*Telah Dibayar:* ${formatRp(widget.paidAmount)}$sisaText\n\n'
-          'Kami akan segera memberitahu Anda kembali jika cucian telah selesai dan siap diambil. Terima kasih! 😊';
+      final buffer = StringBuffer();
+      buffer.writeln("=========================");
+      buffer.writeln("   *$_bizName*");
+      buffer.writeln("=========================");
+      buffer.writeln("Halo Kak *$name*, berikut adalah rincian pesanan cuci Kakak:\n");
+      buffer.writeln("*Nota #$orderId* - _($dateStr)_");
+      buffer.writeln("---------------------------------");
+      buffer.writeln("*DETAIL LAYANAN:*");
+
+      for (var item in widget.order.items) {
+        if (item.price == 0) {
+          buffer.writeln("- *${item.itemName}* -> *Rp 0 (Gratis)*");
+        } else if (item.quantity == 1) {
+          buffer.writeln("- *${item.itemName}* -> *${formatRp(item.price)}*");
+        } else {
+          buffer.writeln("- *${item.itemName}* -> *${item.quantity} x ${formatRp(item.price)}* = *${formatRp(item.price * item.quantity)}*");
+        }
+        if (item.note != null && item.note!.trim().isNotEmpty) {
+          buffer.writeln("  _Catatan: ${item.note!.trim()}_");
+        }
+      }
+
+      buffer.writeln("---------------------------------");
+      buffer.writeln("*TOTAL TAGIHAN:* *${formatRp(widget.order.totalAmount)}*");
+      buffer.writeln("*STATUS PEMBAYARAN:* *$statusBayar*");
+      if (_customerKuponStr.isNotEmpty) {
+        buffer.writeln("---------------------------------");
+        buffer.writeln("*Kupon Cuci:* *$_customerKuponStr*");
+      }
+      buffer.writeln("---------------------------------");
+      buffer.writeln("*INFORMASI:* Kakak akan menerima pesan WhatsApp otomatis ketika proses pencucian dimulai dan setelah selesai/siap diambil.");
+      buffer.writeln("=========================");
+      buffer.writeln("Terima kasih telah mempercayakan pakaian Kakak kepada kami.");
 
       final res = await MachineStatusService.instance.sendCustomWa(
-        phone: targetPhone,
-        message: msg,
+        phone: phone,
+        message: buffer.toString(),
       );
 
       if (mounted) {
@@ -545,6 +587,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
 
                 // Itemized Rows
                 ...widget.order.items.map((item) {
+                  final bool isGratis = item.price == 0;
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 5),
                     child: Row(
@@ -555,13 +598,38 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                item.itemName,
-                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      item.itemName,
+                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading),
+                                    ),
+                                  ),
+                                  if (isGratis) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEF3C7),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: const Color(0xFFFDE68A)),
+                                      ),
+                                      child: const Text(
+                                        'Gratis',
+                                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: Color(0xFFB45309)),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                               Text(
-                                '@ ${formatRp(item.price)}',
-                                style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
+                                isGratis ? '@ Rp 0 (Gratis)' : '@ ${formatRp(item.price)}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isGratis ? const Color(0xFFD97706) : StyleConstants.textMuted,
+                                  fontWeight: isGratis ? FontWeight.w700 : FontWeight.normal,
+                                ),
                               ),
                             ],
                           ),
@@ -577,9 +645,13 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                         Expanded(
                           flex: 3,
                           child: Text(
-                            formatRp(item.price * item.quantity),
+                            isGratis ? 'Rp 0' : formatRp(item.price * item.quantity),
                             textAlign: TextAlign.right,
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              color: isGratis ? const Color(0xFFD97706) : StyleConstants.textHeading,
+                            ),
                           ),
                         ),
                       ],
@@ -616,6 +688,37 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                     isBold: true,
                     fontSize: 13,
                     valueColor: StyleConstants.dangerColor,
+                  ),
+                ],
+
+                if (_customerKuponStr.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.card_giftcard_rounded, size: 16, color: Color(0xFFD97706)),
+                            SizedBox(width: 6),
+                            Text(
+                              'Kupon Cuci',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF92400E)),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          _customerKuponStr,
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Color(0xFFB45309)),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
 
