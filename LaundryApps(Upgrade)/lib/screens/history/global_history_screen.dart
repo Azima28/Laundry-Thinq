@@ -12,6 +12,7 @@ import '../../utils/currency_format.dart';
 import '../../utils/pdf_export_helper.dart';
 import '../../utils/style_constants.dart';
 import '../../utils/globals.dart';
+import '../../utils/tub_note_helper.dart';
 
 class GlobalHistoryScreen extends StatefulWidget {
   final String initialCategoryTab; // 'buku_besar', 'order', 'cuci', 'pengering', 'gosok'
@@ -321,7 +322,11 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
               itemPaid = ((itemSubtotal / order.totalAmount) * order.paidAmount).round();
             }
 
-            final String rawNote = (item.note ?? '').trim();
+            final String rawNote = TubNoteHelper.formatForDisplay(
+              item.note,
+              itemName: item.itemName,
+              machineType: item.machineType,
+            );
             final itemData = {
               'id': order.id,
               'title': rawNote.isNotEmpty
@@ -1341,7 +1346,11 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                             ),
                             const SizedBox(height: 8),
                             ...order.items.map((item) {
-                              final rawNote = (item.note ?? '').trim();
+                              final rawNote = TubNoteHelper.formatForDisplay(
+                                item.note,
+                                itemName: item.itemName,
+                                machineType: item.machineType,
+                              );
                               return Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 5),
                                 child: Column(
@@ -2876,7 +2885,11 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                                 Builder(
                                   builder: (_) {
                                     final notes = order.items
-                                        .map((it) => (it.note ?? '').trim())
+                                        .map((it) => TubNoteHelper.formatForDisplay(
+                                              it.note,
+                                              itemName: it.itemName,
+                                              machineType: it.machineType,
+                                            ))
                                         .where((n) => n.isNotEmpty)
                                         .join(' • ');
                                     if (notes.isEmpty) return const SizedBox.shrink();

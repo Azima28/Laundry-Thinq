@@ -121,6 +121,24 @@ class TubNoteHelper {
     return allTubWeights;
   }
 
+  /// Formats note for UI display by converting legacy "Tabung X:" into "Cuci X:" or "Kering X:".
+  static String formatForDisplay(String? note, {String? itemName, String? machineType}) {
+    if (note == null || note.trim().isEmpty) return '';
+    String text = note.trim();
+
+    final n = (itemName ?? '').toLowerCase();
+    final m = (machineType ?? '').toLowerCase();
+    final bool isKering = m == 'pengering' || m == 'kering' || n.contains('kering') || n.contains('dry') || n.contains('pengering');
+    final String prefix = isKering ? 'Kering' : 'Cuci';
+
+    text = text.replaceAllMapped(
+      RegExp(r'(?:Tabung|tabung)\s*(\d+)\s*:', caseSensitive: false),
+      (match) => '$prefix ${match.group(1)}:',
+    );
+
+    return text;
+  }
+
   /// Strips internal tub notes and kupon markers from a note string so only public customer instructions remain.
   static String cleanCustomerNote(String? note) {
     if (note == null || note.trim().isEmpty) return '';

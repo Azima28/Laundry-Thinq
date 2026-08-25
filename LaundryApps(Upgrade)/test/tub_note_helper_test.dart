@@ -112,5 +112,20 @@ void main() {
         'Parfum lavender ekstra',
       );
     });
+
+    test('formatForDisplay converts legacy Tabung to Cuci or Kering dynamically', () {
+      expect(
+        TubNoteHelper.formatForDisplay('Tabung 1: 6.4 kg', itemName: 'kering'),
+        'Kering 1: 6.4 kg',
+      );
+      expect(
+        TubNoteHelper.formatForDisplay('Tabung 1: 1.1 kg', itemName: 'cuci'),
+        'Cuci 1: 1.1 kg',
+      );
+      expect(
+        TubNoteHelper.formatForDisplay('Tabung 1: 8 kg | Tabung 2: 7 kg', itemName: 'cuci'),
+        'Cuci 1: 8 kg | Cuci 2: 7 kg',
+      );
+    });
   });
 }
