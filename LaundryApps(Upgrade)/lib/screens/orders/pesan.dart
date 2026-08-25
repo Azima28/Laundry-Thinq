@@ -925,7 +925,7 @@ class _PesanPageState extends State<PesanPage> {
                                   children: [
                                     // Catalog Header Ribbon
                                     Container(
-                                      padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
+                                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
                                       decoration: const BoxDecoration(
                                         color: Color(0xFFF8FAFC),
                                         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -937,56 +937,57 @@ class _PesanPageState extends State<PesanPage> {
                                           Row(
                                             children: [
                                               Container(
-                                                padding: const EdgeInsets.all(6),
+                                                padding: const EdgeInsets.all(8),
                                                 decoration: BoxDecoration(
                                                   color: StyleConstants.primaryColor.withValues(alpha: 0.1),
-                                                  borderRadius: BorderRadius.circular(8),
+                                                  borderRadius: BorderRadius.circular(10),
                                                 ),
-                                                child: const Icon(Icons.grid_view_rounded, size: 16, color: StyleConstants.primaryColor),
+                                                child: const Icon(Icons.grid_view_rounded, size: 20, color: StyleConstants.primaryColor),
                                               ),
-                                              const SizedBox(width: 10),
+                                              const SizedBox(width: 12),
                                               const Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
                                                     'Katalog Layanan & Produk Laundry',
-                                                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
+                                                    style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
                                                   ),
+                                                  SizedBox(height: 2),
                                                   Text(
                                                     'Pilih paket cuci, pengering, dan produk toko untuk nota transaksi',
-                                                    style: TextStyle(fontSize: 10.5, color: StyleConstants.textMuted),
+                                                    style: TextStyle(fontSize: 12, color: StyleConstants.textMuted),
                                                   ),
                                                 ],
                                               ),
                                               const Spacer(),
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                                                 decoration: BoxDecoration(
                                                   color: const Color(0xFFE2E8F0),
                                                   borderRadius: BorderRadius.circular(20),
                                                 ),
                                                 child: Text(
                                                   '${_filteredItems.length} Item',
-                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
+                                                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
                                                 ),
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 10),
+                                          const SizedBox(height: 14),
                                           // Segment Filter Chips
                                           SingleChildScrollView(
                                             scrollDirection: Axis.horizontal,
                                             child: Row(
                                               children: [
                                                 _buildCategoryChip('semua', 'Semua (${_allItems.length})', Icons.dashboard_outlined),
-                                                const SizedBox(width: 6),
+                                                const SizedBox(width: 8),
                                                 _buildCategoryChip('cuci', 'Cuci ($_cuciCount)', Icons.local_laundry_service_outlined),
-                                                const SizedBox(width: 6),
+                                                const SizedBox(width: 8),
                                                 _buildCategoryChip('pengering', 'Pengering ($_pengeringCount)', Icons.wb_sunny_outlined),
-                                                const SizedBox(width: 6),
+                                                const SizedBox(width: 8),
                                                 _buildCategoryChip('toko', 'Produk Toko ($_tokoCount)', Icons.shopping_bag_outlined),
                                                 if (_gosokCount > 0) ...[
-                                                  const SizedBox(width: 6),
+                                                  const SizedBox(width: 8),
                                                   _buildCategoryChip('gosok', 'Setrika ($_gosokCount)', Icons.iron_outlined),
                                                 ],
                                               ],
@@ -1020,12 +1021,12 @@ class _PesanPageState extends State<PesanPage> {
                                               ),
                                             )
                                           : GridView.builder(
-                                              padding: const EdgeInsets.all(14),
+                                              padding: const EdgeInsets.all(16),
                                               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                                                maxCrossAxisExtent: 220,
-                                                crossAxisSpacing: 12,
-                                                mainAxisSpacing: 12,
-                                                childAspectRatio: 1.48,
+                                                maxCrossAxisExtent: 280,
+                                                crossAxisSpacing: 14,
+                                                mainAxisSpacing: 14,
+                                                childAspectRatio: 1.35,
                                               ),
                                               itemCount: _filteredItems.length,
                                               itemBuilder: (context, index) {
@@ -1093,8 +1094,8 @@ class _PesanPageState extends State<PesanPage> {
   // --- TOP POS HEADER BAR ---
   Widget _buildPosHeader() {
     return Container(
-      height: StyleConstants.topBarHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      height: StyleConstants.topBarHeight + 6,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: StyleConstants.borderLight)),
@@ -1102,11 +1103,11 @@ class _PesanPageState extends State<PesanPage> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: StyleConstants.textHeading),
+            icon: const Icon(Icons.arrow_back_rounded, color: StyleConstants.textHeading, size: 22),
             tooltip: 'Kembali ke Dashboard (Esc)',
             onPressed: () => Navigator.pop(context),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           const Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1114,43 +1115,45 @@ class _PesanPageState extends State<PesanPage> {
               Text(
                 'KASIR POS: PESAN LAUNDRY & PEMBAYARAN',
                 style: TextStyle(
-                  fontSize: 14.5,
+                  fontSize: 16,
                   fontWeight: FontWeight.w900,
                   color: StyleConstants.textHeading,
                   letterSpacing: -0.3,
                 ),
               ),
+              SizedBox(height: 1),
               Text(
                 'Workstation Kasir Terpadu (Katalog, Nota Tiket & Pelunasan Kasir)',
-                style: TextStyle(fontSize: 10.5, color: StyleConstants.textMuted),
+                style: TextStyle(fontSize: 11.5, color: StyleConstants.textMuted),
               ),
             ],
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: 28),
 
           // Search Field
           Expanded(
             child: Container(
-              height: 38,
+              height: 42,
               decoration: BoxDecoration(
                 color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: StyleConstants.borderLight),
               ),
               child: TextField(
                 controller: _searchProductController,
+                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: StyleConstants.textHeading),
                 decoration: InputDecoration(
                   hintText: 'Cari nama paket cucian...',
-                  hintStyle: const TextStyle(fontSize: 12.5, color: StyleConstants.textMuted),
-                  prefixIcon: const Icon(Icons.search_rounded, size: 18, color: StyleConstants.textMuted),
+                  hintStyle: const TextStyle(fontSize: 13, color: StyleConstants.textMuted),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20, color: StyleConstants.textMuted),
                   suffixIcon: _searchProductController.text.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear_rounded, size: 16),
+                          icon: const Icon(Icons.clear_rounded, size: 18),
                           onPressed: () => _searchProductController.clear(),
                         )
                       : null,
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
             ),
@@ -1161,12 +1164,12 @@ class _PesanPageState extends State<PesanPage> {
           if (_calculateTotalItems() > 0)
             OutlinedButton.icon(
               onPressed: _clearCart,
-              icon: const Icon(Icons.delete_sweep_rounded, size: 16, color: StyleConstants.dangerColor),
-              label: const Text('Reset Nota', style: TextStyle(color: StyleConstants.dangerColor, fontSize: 12, fontWeight: FontWeight.bold)),
+              icon: const Icon(Icons.delete_sweep_rounded, size: 18, color: StyleConstants.dangerColor),
+              label: const Text('Reset Nota', style: TextStyle(color: StyleConstants.dangerColor, fontSize: 13, fontWeight: FontWeight.w800)),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: StyleConstants.dangerColor.withValues(alpha: 0.3)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
         ],
@@ -1183,21 +1186,22 @@ class _PesanPageState extends State<PesanPage> {
         });
         _filterProducts();
       },
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? StyleConstants.primaryColor : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? StyleConstants.primaryColor : StyleConstants.borderLight,
+            width: isSelected ? 1.5 : 1.0,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
                     color: StyleConstants.primaryColor.withValues(alpha: 0.25),
-                    blurRadius: 4,
+                    blurRadius: 6,
                     offset: const Offset(0, 2),
                   )
                 ]
@@ -1208,15 +1212,15 @@ class _PesanPageState extends State<PesanPage> {
           children: [
             Icon(
               icon,
-              size: 13,
+              size: 16,
               color: isSelected ? Colors.white : StyleConstants.textMuted,
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 7),
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
                 color: isSelected ? Colors.white : StyleConstants.textHeading,
               ),
             ),
@@ -1282,7 +1286,7 @@ class _PesanPageState extends State<PesanPage> {
         color: isOutOfStock
             ? Colors.grey[100]
             : (isSelected ? accentColor.withValues(alpha: 0.06) : Colors.white),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isOutOfStock
               ? Colors.grey[300]!
@@ -1293,9 +1297,9 @@ class _PesanPageState extends State<PesanPage> {
           BoxShadow(
             color: isSelected
                 ? accentColor.withValues(alpha: 0.16)
-                : const Color(0xFF0F172A).withValues(alpha: 0.03),
-            blurRadius: isSelected ? 8 : 4,
-            offset: const Offset(0, 2),
+                : const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: isSelected ? 10 : 4,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -1303,9 +1307,9 @@ class _PesanPageState extends State<PesanPage> {
         color: Colors.transparent,
         child: InkWell(
           onTap: isOutOfStock ? null : () => _updateQuantity(item.id, true),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           child: Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1314,23 +1318,23 @@ class _PesanPageState extends State<PesanPage> {
                 Row(
                   children: [
                     Container(
-                      width: 28,
-                      height: 28,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
                         color: isOutOfStock
                             ? Colors.grey[300]
                             : (isSelected
                                 ? accentColor
                                 : accentColor.withValues(alpha: 0.12)),
-                        borderRadius: BorderRadius.circular(7),
+                        borderRadius: BorderRadius.circular(9),
                       ),
                       child: Icon(
                         categoryIcon,
                         color: isOutOfStock ? Colors.grey[600] : (isSelected ? Colors.white : accentColor),
-                        size: 16,
+                        size: 20,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1338,15 +1342,15 @@ class _PesanPageState extends State<PesanPage> {
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: accentColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(4),
+                                  color: accentColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(5),
                                 ),
                                 child: Text(
                                   categoryBadge,
                                   style: TextStyle(
-                                    fontSize: 8.5,
+                                    fontSize: 9.5,
                                     fontWeight: FontWeight.w900,
                                     color: accentColor,
                                     letterSpacing: 0.4,
@@ -1354,19 +1358,19 @@ class _PesanPageState extends State<PesanPage> {
                                 ),
                               ),
                               if (hasStockLimit) ...[
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 5),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                   decoration: BoxDecoration(
                                     color: isOutOfStock
                                         ? StyleConstants.dangerColor.withValues(alpha: 0.1)
                                         : StyleConstants.successColor.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(4),
+                                    borderRadius: BorderRadius.circular(5),
                                   ),
                                   child: Text(
                                     isOutOfStock ? 'Habis' : '${item.stock} unit',
                                     style: TextStyle(
-                                      fontSize: 8.5,
+                                      fontSize: 9.5,
                                       fontWeight: FontWeight.w800,
                                       color: isOutOfStock ? StyleConstants.dangerColor : StyleConstants.successColor,
                                     ),
@@ -1375,17 +1379,17 @@ class _PesanPageState extends State<PesanPage> {
                               ],
                             ],
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 3),
                           Text(
                             item.nama,
                             style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12.5,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
                               color: isOutOfStock ? StyleConstants.textMuted : StyleConstants.textHeading,
                               letterSpacing: -0.2,
-                              height: 1.1,
+                              height: 1.15,
                             ),
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
@@ -1393,10 +1397,13 @@ class _PesanPageState extends State<PesanPage> {
                     ),
                     InkWell(
                       onTap: () => _showNoteDialog(item.id ?? 0, item.nama),
-                      child: Icon(
-                        _notes[item.id]?.isNotEmpty == true ? Icons.sticky_note_2_rounded : Icons.note_add_outlined,
-                        size: 15,
-                        color: _notes[item.id]?.isNotEmpty == true ? StyleConstants.warningColor : StyleConstants.textMuted,
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          _notes[item.id]?.isNotEmpty == true ? Icons.sticky_note_2_rounded : Icons.note_add_outlined,
+                          size: 18,
+                          color: _notes[item.id]?.isNotEmpty == true ? StyleConstants.warningColor : StyleConstants.textMuted,
+                        ),
                       ),
                     ),
                   ],
@@ -1409,7 +1416,7 @@ class _PesanPageState extends State<PesanPage> {
                     Text(
                       formatRp(item.harga),
                       style: StyleConstants.tabularNumbers(
-                        fontSize: 14.5,
+                        fontSize: 16.5,
                         fontWeight: FontWeight.w900,
                         color: isOutOfStock
                             ? StyleConstants.textMuted
@@ -1421,36 +1428,36 @@ class _PesanPageState extends State<PesanPage> {
                     Container(
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: StyleConstants.borderLight),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.remove_rounded, size: 14),
-                            padding: const EdgeInsets.all(2),
-                            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                            icon: const Icon(Icons.remove_rounded, size: 16),
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                             color: quantity > 0 ? StyleConstants.dangerColor : Colors.grey[400],
                             onPressed: quantity > 0 ? () => _updateQuantity(item.id, false) : null,
                             tooltip: 'Kurangi',
                           ),
                           Container(
-                            constraints: const BoxConstraints(minWidth: 20),
+                            constraints: const BoxConstraints(minWidth: 24),
                             alignment: Alignment.center,
                             child: Text(
                               '$quantity',
                               style: TextStyle(
                                 fontWeight: FontWeight.w900,
-                                fontSize: 12.5,
+                                fontSize: 13.5,
                                 color: isSelected ? accentColor : StyleConstants.textHeading,
                               ),
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.add_rounded, size: 14),
-                            padding: const EdgeInsets.all(2),
-                            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                            icon: const Icon(Icons.add_rounded, size: 16),
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                             color: (isOutOfStock || (hasStockLimit && quantity >= (item.stock ?? 0))) ? Colors.grey[400] : accentColor,
                             onPressed: (isOutOfStock || (hasStockLimit && quantity >= (item.stock ?? 0)))
                                 ? null
@@ -1476,7 +1483,7 @@ class _PesanPageState extends State<PesanPage> {
     final bool hasLoyaltyBadge = _customerNameController.text.isNotEmpty && _loyaltyEnabled;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: const BoxDecoration(
         color: Color(0xFFF8FAFC),
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -1487,14 +1494,14 @@ class _PesanPageState extends State<PesanPage> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   gradient: StyleConstants.primaryGradient,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.person_rounded, size: 16, color: Colors.white),
+                child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1503,34 +1510,34 @@ class _PesanPageState extends State<PesanPage> {
                       children: [
                         const Text(
                           'PELANGGAN: ',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: StyleConstants.textMuted, letterSpacing: 0.5),
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: StyleConstants.textMuted, letterSpacing: 0.5),
                         ),
                         if (_customerNameController.text.isNotEmpty) ...[
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: StyleConstants.successColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(5),
                             ),
                             child: const Text(
                               'TERDAFTAR',
-                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: StyleConstants.successColor),
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: StyleConstants.successColor),
                             ),
                           ),
                           if (hasLoyaltyBadge) ...[
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 5),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: _canClaimCuciGratis
                                     ? const Color(0xFFD97706).withValues(alpha: 0.15)
                                     : const Color(0xFF0284C7).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(4),
+                                borderRadius: BorderRadius.circular(5),
                               ),
                               child: Text(
                                 'Kupon: $activeStamps/$_loyaltyThreshold',
                                 style: TextStyle(
-                                  fontSize: 9,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w900,
                                   color: _canClaimCuciGratis ? const Color(0xFFD97706) : const Color(0xFF0284C7),
                                 ),
@@ -1540,14 +1547,14 @@ class _PesanPageState extends State<PesanPage> {
                         ],
                       ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       _customerNameController.text.isEmpty
                           ? 'Pilih Data Pelanggan...'
                           : _customerNameController.text,
                       style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
                         color: _customerNameController.text.isEmpty ? StyleConstants.textMuted : StyleConstants.textHeading,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -1555,14 +1562,14 @@ class _PesanPageState extends State<PesanPage> {
                     if (_customerPhoneController.text.isNotEmpty)
                       Text(
                         _customerPhoneController.text,
-                        style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
+                        style: const TextStyle(fontSize: 12, color: StyleConstants.textMuted, fontWeight: FontWeight.w600),
                       ),
                   ],
                 ),
               ),
               if (_customerNameController.text.isNotEmpty) ...[
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 16, color: StyleConstants.dangerColor),
+                  icon: const Icon(Icons.close_rounded, size: 18, color: StyleConstants.dangerColor),
                   onPressed: _clearCustomer,
                   tooltip: 'Hapus Pelanggan',
                   padding: EdgeInsets.zero,
@@ -1576,12 +1583,12 @@ class _PesanPageState extends State<PesanPage> {
                   backgroundColor: StyleConstants.primaryColor,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 child: Text(
                   _customerNameController.text.isEmpty ? 'Pilih (+)' : 'Ganti',
-                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -1589,12 +1596,12 @@ class _PesanPageState extends State<PesanPage> {
 
           // Loyalty Claim Option Card (Super clean & prominent when eligible)
           if (_customerNameController.text.isNotEmpty && _canClaimCuciGratis) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: _claimFreeWash ? const Color(0xFFFFFBEB) : Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: _claimFreeWash ? const Color(0xFFF59E0B) : const Color(0xFFCBD5E1),
                   width: _claimFreeWash ? 1.5 : 1,
@@ -1602,14 +1609,14 @@ class _PesanPageState extends State<PesanPage> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.card_giftcard_rounded, size: 16, color: Color(0xFFD97706)),
-                  const SizedBox(width: 8),
+                  const Icon(Icons.card_giftcard_rounded, size: 18, color: Color(0xFFD97706)),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       _cartHasWashItem
                           ? 'Pakai 1x Cuci Gratis (Tersedia Kupon $activeStamps/$_loyaltyThreshold)'
                           : 'Tersedia 1x Cuci Gratis ($activeStamps/$_loyaltyThreshold) — Tambah paket cuci untuk klaim!',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF78350F)),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF78350F)),
                     ),
                   ),
                   if (_cartHasWashItem)
@@ -1639,22 +1646,22 @@ class _PesanPageState extends State<PesanPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: const BoxDecoration(
                 color: Color(0xFFF8FAFC),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.receipt_long_rounded, size: 36, color: Colors.grey[300]),
+              child: Icon(Icons.receipt_long_rounded, size: 48, color: Colors.grey[300]),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             const Text(
               'Nota Pesanan Masih Kosong',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: StyleConstants.textHeading),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             const Text(
               'Klik kartu paket di sebelah kiri untuk menambahkan.',
-              style: TextStyle(fontSize: 11, color: StyleConstants.textMuted),
+              style: TextStyle(fontSize: 12.5, color: StyleConstants.textMuted),
             ),
           ],
         ),
@@ -1665,9 +1672,9 @@ class _PesanPageState extends State<PesanPage> {
     bool freeRendered = false;
 
     return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       itemCount: cartItems.length,
-      separatorBuilder: (_, __) => const Divider(height: 12, color: StyleConstants.borderLight),
+      separatorBuilder: (_, __) => const Divider(height: 14, color: StyleConstants.borderLight),
       itemBuilder: (context, index) {
         final item = cartItems[index];
         final qty = _quantities[item.id ?? 0] ?? 0;
@@ -1689,85 +1696,85 @@ class _PesanPageState extends State<PesanPage> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: const Color(0xFFD97706),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text(
                       '1x',
-                      style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 11.5),
+                      style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 12.5),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           '${item.nama} (Gratis)',
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: Color(0xFFD97706)),
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: Color(0xFFD97706)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const Text(
                           '@ Rp 0 (Klaim Kupon)',
-                          style: TextStyle(fontSize: 11, color: Color(0xFFD97706), fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFFD97706), fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                   ),
                   const Text(
                     'Rp 0',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFFD97706)),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFFD97706)),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   InkWell(
                     onTap: () => setState(() => _quantities[item.id ?? 0] = 0),
-                    child: const Icon(Icons.close_rounded, size: 16, color: StyleConstants.dangerColor),
+                    child: const Icon(Icons.close_rounded, size: 18, color: StyleConstants.dangerColor),
                   ),
                 ],
               ),
 
               // 2. Extra normal items if qty > 1
               if (normalQty > 0) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: StyleConstants.primaryColor,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         '${normalQty}x',
-                        style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 11.5),
+                        style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 12.5),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             item.nama,
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: StyleConstants.textHeading),
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: StyleConstants.textHeading),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
                             '@ ${formatRp(item.harga)}',
-                            style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
+                            style: const TextStyle(fontSize: 11.5, color: StyleConstants.textMuted),
                           ),
                         ],
                       ),
                     ),
                     Text(
                       formatRp(subtotalNormal),
-                      style: StyleConstants.tabularNumbers(fontSize: 13, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
+                      style: StyleConstants.tabularNumbers(fontSize: 14.5, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
                     ),
-                    const SizedBox(width: 22),
+                    const SizedBox(width: 26),
                   ],
                 ),
               ],
@@ -1779,47 +1786,47 @@ class _PesanPageState extends State<PesanPage> {
         return Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: StyleConstants.primaryColor,
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
                 '${qty}x',
-                style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 11.5),
+                style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 12.5),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     item.nama,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: StyleConstants.textHeading),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: StyleConstants.textHeading),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     '@ ${formatRp(item.harga)}',
-                    style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
+                    style: const TextStyle(fontSize: 11.5, color: StyleConstants.textMuted),
                   ),
                   if (note != null && note.trim().isNotEmpty)
                     Text(
                       'Catatan: $note',
-                      style: const TextStyle(fontSize: 10.5, fontStyle: FontStyle.italic, color: StyleConstants.primaryColor),
+                      style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: StyleConstants.primaryColor),
                     ),
                 ],
               ),
             ),
             Text(
               formatRp(subtotal),
-              style: StyleConstants.tabularNumbers(fontSize: 13, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
+              style: StyleConstants.tabularNumbers(fontSize: 14.5, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             InkWell(
               onTap: () => setState(() => _quantities[item.id ?? 0] = 0),
-              child: const Icon(Icons.close_rounded, size: 16, color: StyleConstants.dangerColor),
+              child: const Icon(Icons.close_rounded, size: 18, color: StyleConstants.dangerColor),
             ),
           ],
         );
@@ -1834,7 +1841,7 @@ class _PesanPageState extends State<PesanPage> {
     final isDpValid = total > 0 && _dpAmount > 0 && _dpAmount < total;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
         color: Color(0xFFF8FAFC),
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
@@ -1844,26 +1851,26 @@ class _PesanPageState extends State<PesanPage> {
         children: [
           // 1. High-Contrast Grand Total Banner (Slate 900 ground with bright Emerald text)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: StyleConstants.sidebarBackground, // Slate 900
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.account_balance_wallet_rounded, color: StyleConstants.accentCyan, size: 18),
-                    const SizedBox(width: 8),
+                    const Icon(Icons.account_balance_wallet_rounded, color: StyleConstants.accentCyan, size: 22),
+                    const SizedBox(width: 10),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
                           'TOTAL TAGIHAN',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: StyleConstants.accentCyan, letterSpacing: 0.8),
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.accentCyan, letterSpacing: 0.8),
                         ),
-                        Text('$totalItems Layanan Terpilih', style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8))),
+                        Text('$totalItems Layanan Terpilih', style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8))),
                       ],
                     ),
                   ],
@@ -1871,7 +1878,7 @@ class _PesanPageState extends State<PesanPage> {
                 Text(
                   formatRp(total),
                   style: StyleConstants.tabularNumbers(
-                    fontSize: 21,
+                    fontSize: 26,
                     fontWeight: FontWeight.w900,
                     color: StyleConstants.successColor, // Emerald 500 Bright
                   ),
@@ -1879,7 +1886,7 @@ class _PesanPageState extends State<PesanPage> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           // 2. Payment Method Selector (3-Pills)
           Row(
@@ -1887,37 +1894,37 @@ class _PesanPageState extends State<PesanPage> {
               Expanded(
                 child: _methodTab(key: 'cash', label: 'Tunai', icon: Icons.payments_rounded, color: StyleConstants.successColor),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Expanded(
                 child: _methodTab(key: 'qris', label: 'QRIS', icon: Icons.qr_code_scanner_rounded, color: StyleConstants.primaryColor),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Expanded(
                 child: _methodTab(key: 'tempo', label: 'Tempo/DP', icon: Icons.schedule_rounded, color: StyleConstants.warningColor),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           // --- CASH WORKBENCH ---
           if (_selectedPaymentTab == 'cash') ...[
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: isCashValid ? StyleConstants.successColor : StyleConstants.borderFocus, width: 1.5),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               child: Row(
                 children: [
-                  const Text('Rp', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)),
-                  const SizedBox(width: 8),
+                  const Text('Rp', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
                       controller: _cashController,
                       keyboardType: TextInputType.number,
                       inputFormatters: [ThousandsSeparatorInputFormatter()],
-                      style: StyleConstants.tabularNumbers(fontSize: 19, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
+                      style: StyleConstants.tabularNumbers(fontSize: 22, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
                       decoration: const InputDecoration(hintText: '0', border: InputBorder.none),
                       onSubmitted: (_) {
                         if (isCashValid && !_isSubmitting) _processAllInOneCheckout();
@@ -1927,17 +1934,17 @@ class _PesanPageState extends State<PesanPage> {
                   if (_cashReceived > 0)
                     InkWell(
                       onTap: () => _cashController.clear(),
-                      child: const Icon(Icons.clear_rounded, size: 16, color: StyleConstants.textMuted),
+                      child: const Icon(Icons.clear_rounded, size: 18, color: StyleConstants.textMuted),
                     ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
             // Quick Cash Denomination Chips
             Wrap(
-              spacing: 6,
-              runSpacing: 4,
+              spacing: 8,
+              runSpacing: 6,
               children: [
                 _quickCashChip(total, 'Uang Pas', isExact: true),
                 _quickCashChip(10000, '10k'),
@@ -1947,14 +1954,14 @@ class _PesanPageState extends State<PesanPage> {
                 _quickCashChip(200000, '200k'),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
             // Kembalian Banner
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: (change >= 0) ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: (change >= 0) ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A)),
               ),
               child: Row(
@@ -1964,15 +1971,15 @@ class _PesanPageState extends State<PesanPage> {
                     children: [
                       Icon(
                         (change >= 0) ? Icons.price_check_rounded : Icons.warning_amber_rounded,
-                        size: 20,
+                        size: 22,
                         color: (change >= 0) ? StyleConstants.successColor : StyleConstants.warningColor,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         (change >= 0) ? 'KEMBALIAN TUNAI:' : 'UANG KURANG:',
                         style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
                           color: (change >= 0) ? const Color(0xFF047857) : const Color(0xFFB45309),
                         ),
                       ),
@@ -1981,7 +1988,7 @@ class _PesanPageState extends State<PesanPage> {
                   Text(
                     formatRp((change >= 0) ? change : change.abs()),
                     style: StyleConstants.tabularNumbers(
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: FontWeight.w900,
                       color: (change >= 0) ? const Color(0xFF047857) : const Color(0xFFB45309),
                     ),
@@ -1989,25 +1996,25 @@ class _PesanPageState extends State<PesanPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
 
             ElevatedButton(
               onPressed: (isCashValid && !_isSubmitting) ? _processAllInOneCheckout : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: StyleConstants.successColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
               ),
               child: _isSubmitting
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.check_circle_rounded, size: 18),
+                        Icon(Icons.check_circle_rounded, size: 20),
                         SizedBox(width: 8),
-                        Text('BAYAR LUNAS & CETAK STRUK (ENTER)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.3)),
+                        Text('BAYAR LUNAS & CETAK STRUK (ENTER)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, letterSpacing: 0.3)),
                       ],
                     ),
             ),
@@ -2017,20 +2024,20 @@ class _PesanPageState extends State<PesanPage> {
           if (_selectedPaymentTab == 'qris') ...[
             if (_qrisUrl == null) ...[
               if (_qrisError != null) ...[
-                Text('Error: $_qrisError', style: const TextStyle(color: StyleConstants.dangerColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
+                Text('Error: $_qrisError', style: const TextStyle(color: StyleConstants.dangerColor, fontSize: 11.5, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
               ],
               ElevatedButton.icon(
                 onPressed: _isGeneratingQris ? null : _generateQrisBarcode,
                 icon: _isGeneratingQris
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.qr_code_scanner_rounded, size: 16),
-                label: const Text('BUAT QRIS MIDTRANS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                label: const Text('BUAT QRIS MIDTRANS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: StyleConstants.primaryColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ] else ...[
@@ -2071,36 +2078,36 @@ class _PesanPageState extends State<PesanPage> {
                   child: InkWell(
                     onTap: () => setState(() => _tempoSubMode = 'piutang'),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
                         color: _tempoSubMode == 'piutang' ? const Color(0xFFFEF2F2) : Colors.white,
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: _tempoSubMode == 'piutang' ? StyleConstants.dangerColor : StyleConstants.borderLight),
                       ),
                       child: Center(
                         child: Text(
                           '100% Piutang (Tempo)',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _tempoSubMode == 'piutang' ? StyleConstants.dangerColor : StyleConstants.textMuted),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: _tempoSubMode == 'piutang' ? StyleConstants.dangerColor : StyleConstants.textMuted),
                         ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 Expanded(
                   child: InkWell(
                     onTap: () => setState(() => _tempoSubMode = 'dp'),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
                         color: _tempoSubMode == 'dp' ? const Color(0xFFFFFBEB) : Colors.white,
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: _tempoSubMode == 'dp' ? StyleConstants.warningColor : StyleConstants.borderLight),
                       ),
                       child: Center(
                         child: Text(
                           'Bayar DP Sebagian',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _tempoSubMode == 'dp' ? StyleConstants.warningColor : StyleConstants.textMuted),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: _tempoSubMode == 'dp' ? StyleConstants.warningColor : StyleConstants.textMuted),
                         ),
                       ),
                     ),
@@ -2108,34 +2115,34 @@ class _PesanPageState extends State<PesanPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
             if (_tempoSubMode == 'dp') ...[
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: StyleConstants.warningColor),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 child: TextField(
                   controller: _dpController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [ThousandsSeparatorInputFormatter()],
-                  style: StyleConstants.tabularNumbers(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: StyleConstants.tabularNumbers(fontSize: 18, fontWeight: FontWeight.w900),
                   decoration: const InputDecoration(hintText: 'Nominal DP...', border: InputBorder.none),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               ElevatedButton(
                 onPressed: (isDpValid && !_isSubmitting) ? _processAllInOneCheckout : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: StyleConstants.warningColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('KONFIRMASI BAYAR DP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                child: const Text('KONFIRMASI BAYAR DP', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5)),
               ),
             ] else ...[
               ElevatedButton(
@@ -2143,10 +2150,10 @@ class _PesanPageState extends State<PesanPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: StyleConstants.dangerColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('SIMPAN NOTA PIUTANG (TEMPO)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                child: const Text('SIMPAN NOTA PIUTANG (TEMPO)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5)),
               ),
             ],
           ],
@@ -2159,24 +2166,24 @@ class _PesanPageState extends State<PesanPage> {
     final isSelected = _selectedPaymentTab == key;
     return InkWell(
       onTap: () => setState(() => _selectedPaymentTab = key),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? color : Colors.white,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: isSelected ? color : StyleConstants.borderLight),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 14, color: isSelected ? Colors.white : color),
-            const SizedBox(width: 4),
+            Icon(icon, size: 16, color: isSelected ? Colors.white : color),
+            const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w900,
                 color: isSelected ? Colors.white : StyleConstants.textHeading,
               ),
             ),
@@ -2190,23 +2197,25 @@ class _PesanPageState extends State<PesanPage> {
     final isSelected = _cashReceived == amount;
     return InkWell(
       onTap: () => _setQuickCash(amount),
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
           color: isExact
-              ? (isSelected ? StyleConstants.primaryColor : StyleConstants.primaryColor.withValues(alpha: 0.1))
+              ? (isSelected ? StyleConstants.primaryColor : StyleConstants.primaryColor.withValues(alpha: 0.12))
               : (isSelected ? StyleConstants.textHeading : Colors.white),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isExact ? StyleConstants.primaryColor : (isSelected ? StyleConstants.textHeading : StyleConstants.borderLight),
+            color: isExact
+                ? StyleConstants.primaryColor
+                : (isSelected ? StyleConstants.textHeading : StyleConstants.borderLight),
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w900,
             color: isExact
                 ? (isSelected ? Colors.white : StyleConstants.primaryColor)
                 : (isSelected ? Colors.white : StyleConstants.textHeading),
