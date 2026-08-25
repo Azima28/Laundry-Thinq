@@ -321,9 +321,12 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
               itemPaid = ((itemSubtotal / order.totalAmount) * order.paidAmount).round();
             }
 
+            final String rawNote = (item.note ?? '').trim();
             final itemData = {
               'id': order.id,
-              'title': '${order.customerName} • ${item.quantity}x ${item.itemName}',
+              'title': rawNote.isNotEmpty
+                  ? '${order.customerName} • ${item.quantity}x ${item.itemName} ($rawNote)'
+                  : '${order.customerName} • ${item.quantity}x ${item.itemName}',
               'category': catName,
               'status': isGratis ? 'Gratis' : paymentStatus,
               'payment_method': order.paymentMethod.toUpperCase(),
@@ -1337,44 +1340,81 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted, letterSpacing: 0.5),
                             ),
                             const SizedBox(height: 8),
-                            ...order.items.map((item) => Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Row(
-                                    children: [
+                            ...order.items.map((item) {
+                              final rawNote = (item.note ?? '').trim();
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 5),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: StyleConstants.primaryColor.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            '${item.quantity}x',
+                                            style: const TextStyle(fontWeight: FontWeight.w900, color: StyleConstants.primaryColor, fontSize: 12),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                item.itemName,
+                                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading),
+                                              ),
+                                              Text(
+                                                '@ ${formatRp(item.price)}',
+                                                style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(
+                                          formatRp(item.price * item.quantity),
+                                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: StyleConstants.textHeading),
+                                        ),
+                                      ],
+                                    ),
+                                    if (rawNote.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        margin: const EdgeInsets.only(left: 28),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                                         decoration: BoxDecoration(
-                                          color: StyleConstants.primaryColor.withValues(alpha: 0.1),
+                                          color: const Color(0xFFF1F5F9),
                                           borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: const Color(0xFFE2E8F0)),
                                         ),
-                                        child: Text(
-                                          '${item.quantity}x',
-                                          style: const TextStyle(fontWeight: FontWeight.w900, color: StyleConstants.primaryColor, fontSize: 12),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Text(
-                                              item.itemName,
-                                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading),
-                                            ),
-                                            Text(
-                                              '@ ${formatRp(item.price)}',
-                                              style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
+                                            const Icon(Icons.scale_rounded, size: 12, color: Color(0xFF475569)),
+                                            const SizedBox(width: 5),
+                                            Flexible(
+                                              child: Text(
+                                                rawNote,
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFF334155),
+                                                ),
+                                              ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                      Text(
-                                        formatRp(item.price * item.quantity),
-                                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: StyleConstants.textHeading),
-                                      ),
                                     ],
-                                  ),
-                                )),
+                                  ],
+                                ),
+                              );
+                            }),
                             const SizedBox(height: 10),
                             const Divider(height: 1, color: StyleConstants.borderLight),
                             const SizedBox(height: 10),
