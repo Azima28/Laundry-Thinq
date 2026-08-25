@@ -86,29 +86,42 @@ def has_pending_items_in_orders(phone, name):
                 WHERE oi.order_id = ?
             """, (order_id,))
             items = cursor.fetchall()
-            
-            total_qty = 0
+
+            total_wash = 0
+            total_dry = 0
             for item_name, quantity, machine_type in items:
-                # If transaction explicitly has a machine type, use it
-                if machine_type in ('cuci', 'pengering'):
-                    total_qty += quantity
-                else:
-                    # Fallback to string matching on item_name
-                    n = item_name.lower()
-                    if any(x in n for x in ('cuci', 'wash', 'kering', 'pengering', 'dry', 'jemur', 'basah')):
-                        total_qty += quantity
-                    
-            if total_qty == 0:
+                m_type = str(machine_type or '').lower()
+                n = str(item_name or '').lower()
+                qty = int(quantity or 1)
+                if m_type == 'cuci' or 'cuci' in n or 'wash' in n:
+                    total_wash += qty
+                elif m_type == 'pengering' or 'kering' in n or 'pengering' in n or 'dry' in n:
+                    total_dry += qty
+
+            if (total_wash + total_dry) == 0:
                 continue
-                
-            # Count successful usages in history
-            cursor.execute("SELECT COUNT(*) FROM machine_usage_history WHERE order_id = ? AND status = 'Success'", (order_id,))
-            used_qty = cursor.fetchone()[0]
-            
-            remaining = total_qty - used_qty
-            if remaining > 0:
-                total_remaining += remaining
-                
+
+            # Count successful usages in history separated by cuci and dry
+            cursor.execute("""
+                SELECT COUNT(*) FROM machine_usage_history muh
+                LEFT JOIN machines m ON muh.machine_id = m.id
+                WHERE muh.order_id = ? AND muh.status = 'Success'
+                AND (m.machine_type = 'cuci' OR muh.machine_name LIKE '%cuci%' OR muh.machine_name LIKE '%wash%')
+            """, (order_id,))
+            used_wash = cursor.fetchone()[0] or 0
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM machine_usage_history muh
+                LEFT JOIN machines m ON muh.machine_id = m.id
+                WHERE muh.order_id = ? AND muh.status = 'Success'
+                AND (m.machine_type = 'pengering' OR muh.machine_name LIKE '%kering%' OR muh.machine_name LIKE '%pengering%' OR muh.machine_name LIKE '%dry%')
+            """, (order_id,))
+            used_dry = cursor.fetchone()[0] or 0
+
+            rem_wash = max(0, total_wash - used_wash)
+            rem_dry = max(0, total_dry - used_dry)
+            total_remaining += (rem_wash + rem_dry)
+
         conn.close()
         return total_remaining > 0
     except Exception as e:
@@ -118,25 +131,25 @@ def has_pending_items_in_orders(phone, name):
 
 def is_last_machine_for_customer(entity_id):
     """Check if this is the last active machine for the customer.
-    
+
     Returns True if there are no OTHER machines for this customer that are
-    currently running or booking (i.e. not completed, idle, ready, or offline),
+    currently occupied/active (i.e. not yet released by kasir or still running/booking),
     and there are no other pending laundry/drying runs in active orders.
     """
     info = get_customer_info(entity_id)
     if not info:
         return True
-    
+
     name = info.get("name", "").strip().lower()
     phone = info.get("phone")
-    
+
     # If customer still has pending laundry items in queue/active orders,
     # it is not the last machine run for this customer.
     if has_pending_items_in_orders(phone, name):
         return False
-        
+
     normalized_phone = wa_bridge._normalize_phone(phone) if phone else None
-    
+
     with customer_info_lock:
         for eid, cinfo in customer_info.items():
             if eid != entity_id:
@@ -149,27 +162,16 @@ def is_last_machine_for_customer(entity_id):
                     n = cinfo.get("name", "").strip().lower()
                     if n and name and n == name and name not in ("pelanggan", "guest", "", "-"):
                         match = True
-                        
+
                 if match:
-                    # Check if this other machine is booking (timer active) or ThinQ is running
-                    is_booking = get_machine_status(eid) == "unready"
-                    
-                    existing_state = lg_manager.latest_state.get(eid, "")
-                    parts = existing_state.split("|")
-                    state_val = parts[1].upper() if len(parts) > 1 else ""
-                    run_state_val = parts[2].lower() if len(parts) > 2 else ""
-                    
-                    is_running = state_val in ("RUNNING", "RUN") or (
-                        run_state_val not in ("", "-", "idle", "ready", "completed", "unknown")
-                    )
-                    
-                    if is_booking or is_running:
-                        return False
+                    # As long as this other machine is still holding the customer info
+                    # (running, booking, or finished waiting for action), it's not the last machine
+                    return False
     return True
 
 
 def get_other_active_machines(entity_id):
-    """Return a list of display names of other genuinely active (running/booking) machines for this customer."""
+    """Return a list of display names of other machines currently occupied/active for this customer."""
     info = get_customer_info(entity_id)
     if not info:
         return []
@@ -194,21 +196,8 @@ def get_other_active_machines(entity_id):
                         match = True
 
                 if match:
-                    # Check if this other machine is currently booking or running
-                    is_booking = get_machine_status(eid) == "unready"
-
-                    existing_state = lg_manager.latest_state.get(eid, "")
-                    parts = existing_state.split("|")
-                    state_val = parts[1].upper() if len(parts) > 1 else ""
-                    run_state_val = parts[2].lower() if len(parts) > 2 else ""
-
-                    is_running = state_val in ("RUNNING", "RUN") or (
-                        run_state_val not in ("", "-", "idle", "ready", "completed", "unknown", "standby")
-                    )
-
-                    if is_booking or is_running:
-                        display_name = eid.replace("_", " ")
-                        other_machines.append(display_name)
+                    display_name = eid.replace("_", " ")
+                    other_machines.append(display_name)
 
     return other_machines
 

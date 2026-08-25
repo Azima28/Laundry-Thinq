@@ -1084,21 +1084,7 @@ class _PengeringContentState extends State<PengeringContent> {
           final mDisp = (val['name'] ?? key).toString().replaceAll('_', ' ').trim();
           if (mDisp.toLowerCase() != currentCleanName &&
               mDisp.toLowerCase() != currentMachineName) {
-            final st = (val['status'] ?? '').toString().toLowerCase();
-            final runSt = (val['run_state'] ?? '').toString().toLowerCase();
-            final stateVal = (val['state'] ?? '').toString().toUpperCase();
-            final isBooking = st == 'unready';
-            final isRunning = stateVal == 'RUNNING' ||
-                stateVal == 'RUN' ||
-                (runSt.isNotEmpty &&
-                    runSt != 'idle' &&
-                    runSt != 'ready' &&
-                    runSt != 'completed' &&
-                    runSt != 'standby' &&
-                    runSt != '-' &&
-                    runSt != 'unknown');
-
-            if (isBooking || isRunning) {
+            if (cName.isNotEmpty && cName != '-' && cName != 'null') {
               otherMachinesSet.add(mDisp);
             }
           }
@@ -1130,7 +1116,6 @@ class _PengeringContentState extends State<PengeringContent> {
             [orderId],
           );
 
-          int totalOrderCycles = 0;
           int orderWashCount = 0;
           int orderDryCount = 0;
 
@@ -1139,30 +1124,47 @@ class _PengeringContentState extends State<PengeringContent> {
             final mType = (it['machine_type'] as String?)?.toLowerCase();
             final iName = (it['item_name'] as String?)?.toLowerCase() ?? '';
             if (mType == 'cuci' || iName.contains('cuci') || iName.contains('wash')) {
-              totalOrderCycles += qty;
               orderWashCount += qty;
             } else if (mType == 'pengering' || iName.contains('kering') || iName.contains('pengering') || iName.contains('dry')) {
-              totalOrderCycles += qty;
               orderDryCount += qty;
             }
           }
 
-          if (totalOrderCycles == 0) continue;
+          if ((orderWashCount + orderDryCount) == 0) continue;
 
-          final usedRows = await db.rawQuery(
-            'SELECT COUNT(*) as cnt FROM machine_usage_history WHERE order_id = ? AND status = "Success"',
+          final usedWashRows = await db.rawQuery(
+            '''
+            SELECT COUNT(*) as cnt
+            FROM machine_usage_history muh
+            LEFT JOIN machines m ON muh.machine_id = m.id
+            WHERE muh.order_id = ? AND muh.status = 'Success' AND (m.machine_type = 'cuci' OR muh.machine_name LIKE '%cuci%' OR muh.machine_name LIKE '%wash%')
+            ''',
             [orderId],
           );
-          final usedCycles = usedRows.isNotEmpty ? (usedRows.first['cnt'] as int? ?? 0) : 0;
+          final usedWashCycles = usedWashRows.isNotEmpty ? (usedWashRows.first['cnt'] as int? ?? 0) : 0;
 
-          final int remaining = (totalOrderCycles - usedCycles).clamp(0, 999999);
-          if (remaining > 0) {
-            pendingOrderCycles += remaining;
-            if (orderDryCount > 0) {
-              pendingBreakdowns.add('$orderDryCount Pengeringan');
+          final usedDryRows = await db.rawQuery(
+            '''
+            SELECT COUNT(*) as cnt
+            FROM machine_usage_history muh
+            LEFT JOIN machines m ON muh.machine_id = m.id
+            WHERE muh.order_id = ? AND muh.status = 'Success' AND (m.machine_type = 'pengering' OR muh.machine_name LIKE '%kering%' OR muh.machine_name LIKE '%pengering%' OR muh.machine_name LIKE '%dry%')
+            ''',
+            [orderId],
+          );
+          final usedDryCycles = usedDryRows.isNotEmpty ? (usedDryRows.first['cnt'] as int? ?? 0) : 0;
+
+          final remainingWash = (orderWashCount - usedWashCycles).clamp(0, 999999);
+          final remainingDry = (orderDryCount - usedDryCycles).clamp(0, 999999);
+          final totalRemaining = remainingWash + remainingDry;
+
+          if (totalRemaining > 0) {
+            pendingOrderCycles += totalRemaining;
+            if (remainingDry > 0) {
+              pendingBreakdowns.add('$remainingDry Pengeringan');
             }
-            if (orderWashCount > usedCycles) {
-              pendingBreakdowns.add('${orderWashCount - usedCycles} Cuci');
+            if (remainingWash > 0) {
+              pendingBreakdowns.add('$remainingWash Cuci');
             }
           }
         }
