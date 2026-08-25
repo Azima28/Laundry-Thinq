@@ -2797,176 +2797,213 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                 final machineInfo = _getMachineInfoForOrder(order, defaultCategory: categoryKey);
                 final isEven = i % 2 == 0;
 
-                return Container(
+                return Material(
                   color: isEven ? Colors.white : const Color(0xFFF8FAFC),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 60,
-                        child: Text(
-                          '#${order.id}',
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5, color: StyleConstants.primaryColor),
-                        ),
-                      ),
-                      _vDivider(),
-                      SizedBox(
-                        width: 60,
-                        child: Text(
-                          DateFormat('HH:mm').format(order.orderDate),
-                          style: const TextStyle(fontSize: 12, color: StyleConstants.textMuted, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      if (categoryKey == 'cuci' || categoryKey == 'pengering') ...[
-                        _vDivider(),
-                        Expanded(
-                          flex: 3,
-                          child: Row(
-                            children: [
-                              Icon(
-                                categoryKey == 'cuci' ? Icons.local_laundry_service_rounded : Icons.wb_sunny_rounded,
-                                size: 15,
-                                color: accentColor,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  machineInfo,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 12.5,
-                                    color: machineInfo.contains('Antrian') ? StyleConstants.warningColor : StyleConstants.textHeading,
+                  child: InkWell(
+                    onTap: () => _showOrderDetailsDialog(order),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 60,
+                            child: Text(
+                              '#${order.id}',
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5, color: StyleConstants.primaryColor),
+                            ),
+                          ),
+                          _vDivider(),
+                          SizedBox(
+                            width: 60,
+                            child: Text(
+                              DateFormat('HH:mm').format(order.orderDate),
+                              style: const TextStyle(fontSize: 12, color: StyleConstants.textMuted, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          if (categoryKey == 'cuci' || categoryKey == 'pengering') ...[
+                            _vDivider(),
+                            Expanded(
+                              flex: 3,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    categoryKey == 'cuci' ? Icons.local_laundry_service_rounded : Icons.wb_sunny_rounded,
+                                    size: 15,
+                                    color: accentColor,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      machineInfo,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12.5,
+                                        color: machineInfo.contains('Antrian') ? StyleConstants.warningColor : StyleConstants.textHeading,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      _vDivider(),
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(order.customerName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading)),
-                            if (order.customerPhone != null && order.customerPhone!.isNotEmpty)
-                              Text(order.customerPhone!, style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted)),
+                            ),
                           ],
-                        ),
-                      ),
-                      _vDivider(),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          order.items.map((it) => '${it.quantity}x ${it.itemName}').join(', '),
-                          style: const TextStyle(fontSize: 12, color: StyleConstants.textBody),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      _vDivider(),
-                      SizedBox(
-                        width: 115,
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                            decoration: BoxDecoration(
-                              color: isDone ? StyleConstants.statusSuccessBg : (isProcessing ? StyleConstants.statusInfoBg : StyleConstants.statusWarningBg),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              isDone ? 'SELESAI / SUKSES' : (isProcessing ? 'SEDANG PROSES' : 'PENDING'),
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                color: isDone ? StyleConstants.statusSuccessText : (isProcessing ? StyleConstants.statusInfoText : StyleConstants.statusWarningText),
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ),
-                      _vDivider(),
-                      SizedBox(
-                        width: 105,
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                            decoration: BoxDecoration(
-                              color: order.isPaid ? StyleConstants.statusSuccessBg : StyleConstants.statusDangerBg,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              order.isPaid ? 'LUNAS' : (order.paidAmount > 0 ? 'CICILAN' : 'BELUM BAYAR'),
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                color: order.isPaid ? StyleConstants.statusSuccessText : StyleConstants.statusDangerText,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ),
-                      _vDivider(),
-                      SizedBox(
-                        width: 105,
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            formatRp(order.totalAmount),
-                            textAlign: TextAlign.right,
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: StyleConstants.textHeading),
-                          ),
-                        ),
-                      ),
-                      _vDivider(),
-                      SizedBox(
-                        width: 100,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.receipt_rounded, size: 17, color: StyleConstants.primaryColor),
-                              tooltip: 'Rincian Nota',
-                              constraints: const BoxConstraints(),
-                              padding: const EdgeInsets.all(6),
-                              onPressed: () => _showOrderDetailsDialog(order),
-                            ),
-                            if (!order.isPaid) ...[
-                              const SizedBox(width: 4),
-                              IconButton(
-                                icon: const Icon(Icons.payments_rounded, size: 17, color: StyleConstants.successColor),
-                                tooltip: 'Pelunasan',
-                                constraints: const BoxConstraints(),
-                                padding: const EdgeInsets.all(6),
-                                onPressed: () => _showOrderPaymentDialog(order),
-                              ),
-                            ],
-                            const SizedBox(width: 4),
-                            PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert_rounded, size: 16, color: StyleConstants.textMuted),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              tooltip: 'Ubah Status',
-                              onSelected: (newStatus) async {
-                                await _orderRepo.updateOrderStatus(order.id!, newStatus);
-                                _loadAllData();
-                                Globals.showSuccessSnackBar('Status pengerjaan diperbarui menjadi $newStatus');
-                              },
-                              itemBuilder: (ctx) => [
-                                const PopupMenuItem(value: 'Pending', child: Text('Set: Pending')),
-                                const PopupMenuItem(value: 'Proses', child: Text('Set: Proses')),
-                                const PopupMenuItem(value: 'Selesai', child: Text('Set: Selesai')),
+                          _vDivider(),
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(order.customerName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.textHeading)),
+                                if (order.customerPhone != null && order.customerPhone!.isNotEmpty)
+                                  Text(order.customerPhone!, style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted)),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                          _vDivider(),
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  order.items.map((it) => '${it.quantity}x ${it.itemName}').join(', '),
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: StyleConstants.textBody),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Builder(
+                                  builder: (_) {
+                                    final notes = order.items
+                                        .map((it) => (it.note ?? '').trim())
+                                        .where((n) => n.isNotEmpty)
+                                        .join(' • ');
+                                    if (notes.isEmpty) return const SizedBox.shrink();
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.scale_rounded, size: 11, color: StyleConstants.primaryColor),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              notes,
+                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: StyleConstants.primaryColor),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          _vDivider(),
+                          SizedBox(
+                            width: 115,
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                decoration: BoxDecoration(
+                                  color: isDone ? StyleConstants.statusSuccessBg : (isProcessing ? StyleConstants.statusInfoBg : StyleConstants.statusWarningBg),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  isDone ? 'SELESAI / SUKSES' : (isProcessing ? 'SEDANG PROSES' : 'PENDING'),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: isDone ? StyleConstants.statusSuccessText : (isProcessing ? StyleConstants.statusInfoText : StyleConstants.statusWarningText),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ),
+                          _vDivider(),
+                          SizedBox(
+                            width: 105,
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                decoration: BoxDecoration(
+                                  color: order.isPaid ? StyleConstants.statusSuccessBg : StyleConstants.statusDangerBg,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  order.isPaid ? 'LUNAS' : (order.paidAmount > 0 ? 'CICILAN' : 'BELUM BAYAR'),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: order.isPaid ? StyleConstants.statusSuccessText : StyleConstants.statusDangerText,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ),
+                          _vDivider(),
+                          SizedBox(
+                            width: 105,
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                formatRp(order.totalAmount),
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: StyleConstants.textHeading),
+                              ),
+                            ),
+                          ),
+                          _vDivider(),
+                          SizedBox(
+                            width: 100,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.receipt_rounded, size: 17, color: StyleConstants.primaryColor),
+                                  tooltip: 'Rincian Nota',
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(6),
+                                  onPressed: () => _showOrderDetailsDialog(order),
+                                ),
+                                if (!order.isPaid) ...[
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    icon: const Icon(Icons.payments_rounded, size: 17, color: StyleConstants.successColor),
+                                    tooltip: 'Pelunasan',
+                                    constraints: const BoxConstraints(),
+                                    padding: const EdgeInsets.all(6),
+                                    onPressed: () => _showOrderPaymentDialog(order),
+                                  ),
+                                ],
+                                const SizedBox(width: 4),
+                                PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert_rounded, size: 16, color: StyleConstants.textMuted),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  tooltip: 'Ubah Status',
+                                  onSelected: (newStatus) async {
+                                    await _orderRepo.updateOrderStatus(order.id!, newStatus);
+                                    _loadAllData();
+                                    Globals.showSuccessSnackBar('Status pengerjaan diperbarui menjadi $newStatus');
+                                  },
+                                  itemBuilder: (ctx) => [
+                                    const PopupMenuItem(value: 'Pending', child: Text('Set: Pending')),
+                                    const PopupMenuItem(value: 'Proses', child: Text('Set: Proses')),
+                                    const PopupMenuItem(value: 'Selesai', child: Text('Set: Selesai')),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 );
               },
