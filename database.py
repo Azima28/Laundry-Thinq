@@ -213,6 +213,37 @@ def init_db():
         conn.commit()
     except sqlite3.OperationalError:
         pass  # Column already exists
+
+    # Add loyalty columns to customers table if not present
+    customer_loyalty_cols = [
+        'wash_count_lifetime INTEGER DEFAULT 0',
+        'wash_count_active INTEGER DEFAULT 0',
+        'rewards_claimed_count INTEGER DEFAULT 0',
+        'dry_count_lifetime INTEGER DEFAULT 0',
+        'store_item_count_lifetime INTEGER DEFAULT 0',
+        'iron_count_lifetime INTEGER DEFAULT 0',
+        'total_spent_lifetime INTEGER DEFAULT 0'
+    ]
+    for col in customer_loyalty_cols:
+        try:
+            cursor.execute(f"ALTER TABLE customers ADD COLUMN {col}")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+
+    # Add loyalty columns to orders table if not present
+    order_loyalty_cols = [
+        'loyalty_claimed INTEGER DEFAULT 0',
+        'wash_sequence INTEGER DEFAULT 0',
+        'stamps_used INTEGER DEFAULT 0'
+    ]
+    for col in order_loyalty_cols:
+        try:
+            cursor.execute(f"ALTER TABLE orders ADD COLUMN {col}")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+
     # Add columns to active_timers if not present (automatic migration)
     timer_columns = [
         'customer_name TEXT',

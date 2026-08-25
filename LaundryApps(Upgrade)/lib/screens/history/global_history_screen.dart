@@ -35,7 +35,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   late String _mainCategory; // 'buku_besar', 'order', 'cuci', 'pengering', 'gosok'
 
   // --- Sub-filters for Buku Besar ---
-  String _bukuBesarSubTab = 'semua'; // 'semua', 'cuci', 'pengering', 'toko', 'gosok', 'pengeluaran'
+  String _bukuBesarSubTab = 'semua'; // 'semua', 'cuci', 'pengering', 'toko', 'gosok', 'gratis', 'pengeluaran'
 
   // --- Search & Status Filters ---
   String _statusFilter = 'Semua'; // 'Semua', 'Pending', 'Proses', 'Selesai'
@@ -52,6 +52,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   List<Map<String, dynamic>> _keringLedgerList = [];
   List<Map<String, dynamic>> _tokoLedgerList = [];
   List<Map<String, dynamic>> _gosokList = [];
+  List<Map<String, dynamic>> _gratisLedgerList = [];
   List<Map<String, dynamic>> _pengeluaranList = [];
   List<Map<String, dynamic>> _combinedLedgerEntries = [];
 
@@ -208,6 +209,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       List<Map<String, dynamic>> keringLedgerList = [];
       List<Map<String, dynamic>> tokoLedgerList = [];
       List<Map<String, dynamic>> gosokList = [];
+      List<Map<String, dynamic>> gratisLedgerList = [];
       List<Map<String, dynamic>> allOrdersList = [];
 
       List<Order> cuciOrders = [];
@@ -294,13 +296,16 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           cuciLedgerList.add(orderSummaryData);
         } else {
           for (var item in order.items) {
-            final bool isCuci = _isCuciItem(item);
+            final bool isGratis = item.price == 0 || item.itemName.toLowerCase().contains('gratis');
+            final bool isCuci = !isGratis && _isCuciItem(item);
             final bool isPengering = _isPengeringItem(item);
             final bool isGosok = _isGosokItem(item, ironItemIds);
-            final bool isToko = !isCuci && !isPengering && !isGosok;
+            final bool isToko = !isGratis && !isCuci && !isPengering && !isGosok;
 
             String catName = 'Layanan Cuci';
-            if (isCuci) {
+            if (isGratis) {
+              catName = 'Cuci Gratis';
+            } else if (isCuci) {
               catName = 'Layanan Cuci';
             } else if (isPengering) {
               catName = 'Layanan Pengering';
@@ -312,7 +317,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
 
             final int itemSubtotal = item.price * item.quantity;
             int itemPaid = 0;
-            if (order.totalAmount > 0) {
+            if (order.totalAmount > 0 && itemSubtotal > 0) {
               itemPaid = ((itemSubtotal / order.totalAmount) * order.paidAmount).round();
             }
 
@@ -320,7 +325,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
               'id': order.id,
               'title': '${order.customerName} • ${item.quantity}x ${item.itemName}',
               'category': catName,
-              'status': paymentStatus,
+              'status': isGratis ? 'Gratis' : paymentStatus,
               'payment_method': order.paymentMethod.toUpperCase(),
               'income_amount': itemPaid,
               'total_order': itemSubtotal,
@@ -331,6 +336,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
               'order_obj': order,
             };
 
+            if (isGratis) gratisLedgerList.add(itemData);
             if (isCuci) cuciLedgerList.add(itemData);
             if (isPengering) keringLedgerList.add(itemData);
             if (isGosok) gosokList.add(itemData);
@@ -356,6 +362,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
           _keringLedgerList = keringLedgerList;
           _tokoLedgerList = tokoLedgerList;
           _gosokList = gosokList;
+          _gratisLedgerList = gratisLedgerList;
           _combinedLedgerEntries = combined;
 
           _allOrders = orders;
@@ -1754,6 +1761,9 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
       case 'pengering':
         filteredList = _keringLedgerList;
         break;
+      case 'gratis':
+        filteredList = _gratisLedgerList;
+        break;
       case 'toko':
         filteredList = _tokoLedgerList;
         break;
@@ -1791,6 +1801,10 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
               _ledgerSubTab('cuci', 'Layanan Cuci (${_cuciLedgerList.length})'),
               const SizedBox(width: 8),
               _ledgerSubTab('pengering', 'Layanan Pengering (${_keringLedgerList.length})'),
+              if (_gratisLedgerList.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                _ledgerSubTab('gratis', 'Cuci Gratis (${_gratisLedgerList.length})'),
+              ],
               if (_tokoLedgerList.isNotEmpty) ...[
                 const SizedBox(width: 8),
                 _ledgerSubTab('toko', 'Produk Toko (${_tokoLedgerList.length})'),
@@ -1971,6 +1985,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
   Color _getLedgerCategoryColor(String category) {
     final c = category.toLowerCase();
     if (c.contains('pengeluaran')) return StyleConstants.dangerColor;
+    if (c.contains('gratis') || c.contains('kupon') || c.contains('reward')) return const Color(0xFFD97706); // Gold for Cuci Gratis
     if (c.contains('pengering') && !c.contains('cuci')) return const Color(0xFFD97706); // Amber for Dryer
     if (c.contains('cuci') && !c.contains('pengering')) return const Color(0xFF2563EB); // Blue for Washer
     if (c.contains('cuci') && c.contains('pengering')) return const Color(0xFF0284C7); // Cyan / Combo

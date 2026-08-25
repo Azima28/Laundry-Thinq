@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -67,6 +68,12 @@ class _PesanPageState extends State<PesanPage> {
   final TextEditingController _searchProductController = TextEditingController();
   List<Customer> _allCustomers = [];
 
+  // Loyalty Kupon State
+  Map<String, dynamic>? _selectedCustomerLoyalty;
+  bool _claimFreeWash = false;
+  int _loyaltyThreshold = 5;
+  bool _loyaltyEnabled = true;
+
   // Payment Studio State
   String _selectedPaymentTab = 'cash'; // 'cash', 'qris', 'tempo'
   String _tempoSubMode = 'piutang'; // 'piutang', 'dp'
@@ -91,6 +98,7 @@ class _PesanPageState extends State<PesanPage> {
     _loadItems();
     _loadCustomers();
     _loadPaymentCredentials();
+    _loadLoyaltySettings();
 
     _searchProductController.addListener(_filterProducts);
 
@@ -105,6 +113,18 @@ class _PesanPageState extends State<PesanPage> {
       final parsed = int.tryParse(text) ?? 0;
       setState(() => _dpAmount = parsed);
     });
+  }
+
+  Future<void> _loadLoyaltySettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _loyaltyEnabled = prefs.getBool('loyalty_program_enabled') ?? true;
+          _loyaltyThreshold = prefs.getInt('loyalty_wash_threshold') ?? 5;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -184,17 +204,67 @@ class _PesanPageState extends State<PesanPage> {
     });
   }
 
-  void _onCustomerSelected(Customer customer) {
+  bool get _cartHasWashItem {
+    for (var it in _allItems) {
+      if ((_quantities[it.id ?? 0] ?? 0) > 0) {
+        final m = (it.machineType ?? '').toLowerCase();
+        final n = it.nama.toLowerCase();
+        if (m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah')) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  TransactionModel? get _firstWashItemInCart {
+    for (var it in _allItems) {
+      if ((_quantities[it.id ?? 0] ?? 0) > 0) {
+        final m = (it.machineType ?? '').toLowerCase();
+        final n = it.nama.toLowerCase();
+        if (m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah')) {
+          return it;
+        }
+      }
+    }
+    return null;
+  }
+
+  bool get _canClaimCuciGratis {
+    if (!_loyaltyEnabled) return false;
+    final activeStamps = (_selectedCustomerLoyalty?['wash_count_active'] as num?)?.toInt() ?? 0;
+    return activeStamps >= _loyaltyThreshold && _loyaltyThreshold > 0;
+  }
+
+  Future<void> _onCustomerSelected(Customer customer) async {
     setState(() {
       _customerNameController.text = customer.name;
       _customerPhoneController.text = customer.phone;
+      _claimFreeWash = false;
     });
+
+    try {
+      final stats = await _databaseHelper.getCustomerFullStats(
+        customerId: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+      );
+      if (mounted) {
+        setState(() {
+          _selectedCustomerLoyalty = stats;
+          _loyaltyThreshold = stats['loyalty_threshold'] ?? 5;
+          _loyaltyEnabled = stats['loyalty_enabled'] ?? true;
+        });
+      }
+    } catch (_) {}
   }
 
   void _clearCustomer() {
     setState(() {
       _customerNameController.clear();
       _customerPhoneController.clear();
+      _selectedCustomerLoyalty = null;
+      _claimFreeWash = false;
     });
   }
 
@@ -229,6 +299,7 @@ class _PesanPageState extends State<PesanPage> {
       _dpController.clear();
       _qrisUrl = null;
       _qrisId = null;
+      _claimFreeWash = false;
     });
   }
 
@@ -238,7 +309,13 @@ class _PesanPageState extends State<PesanPage> {
       int qty = _quantities[item.id ?? 0] ?? 0;
       total += qty * item.harga;
     }
-    return total;
+    if (_claimFreeWash && _cartHasWashItem) {
+      final firstWash = _firstWashItemInCart;
+      if (firstWash != null) {
+        total -= firstWash.harga;
+      }
+    }
+    return max(0, total);
   }
 
   int _calculateTotalItems() {
@@ -544,17 +621,52 @@ class _PesanPageState extends State<PesanPage> {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('user_id');
 
-      final orderItems = _allItems
-          .where((it) => (_quantities[it.id ?? 0] ?? 0) > 0)
-          .map((it) => OrderItem(
-                itemName: it.nama,
-                quantity: _quantities[it.id ?? 0] ?? 0,
-                price: it.harga,
-                note: _notes[it.id ?? 0] ?? '',
-                machineType: it.machineType ?? 'cuci',
-                itemId: it.id ?? 1,
-              ))
-          .toList();
+      bool freeApplied = false;
+      final List<OrderItem> orderItems = [];
+
+      for (var it in _allItems) {
+        final qty = _quantities[it.id ?? 0] ?? 0;
+        if (qty <= 0) continue;
+
+        final m = (it.machineType ?? '').toLowerCase();
+        final n = it.nama.toLowerCase();
+        final isWash = m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah');
+
+        if (_claimFreeWash && isWash && !freeApplied) {
+          freeApplied = true;
+          // Item pertama cuci digratiskan (Rp 0)
+          orderItems.add(OrderItem(
+            itemName: '${it.nama} (Gratis)',
+            quantity: 1,
+            price: 0,
+            note: (_notes[it.id ?? 0]?.isNotEmpty == true) ? '${_notes[it.id ?? 0]} • Cuci Gratis (Kupon)' : 'Cuci Gratis (Kupon)',
+            machineType: 'cuci',
+            itemId: it.id ?? 1,
+          ));
+
+          if (qty > 1) {
+            orderItems.add(OrderItem(
+              itemName: it.nama,
+              quantity: qty - 1,
+              price: it.harga,
+              note: _notes[it.id ?? 0] ?? '',
+              machineType: it.machineType ?? 'cuci',
+              itemId: it.id ?? 1,
+            ));
+          }
+        } else {
+          orderItems.add(OrderItem(
+            itemName: it.nama,
+            quantity: qty,
+            price: it.harga,
+            note: _notes[it.id ?? 0] ?? '',
+            machineType: it.machineType ?? 'cuci',
+            itemId: it.id ?? 1,
+          ));
+        }
+      }
+
+      final int lifetimeWashCount = (_selectedCustomerLoyalty?['wash_count_lifetime'] as num?)?.toInt() ?? 0;
 
       final order = Order(
         customerName: _customerNameController.text.trim(),
@@ -570,6 +682,9 @@ class _PesanPageState extends State<PesanPage> {
         qrisUrl: _qrisUrl,
         qrisId: _qrisId,
         paymentTimestamp: DateTime.now(),
+        loyaltyClaimed: _claimFreeWash,
+        stampsUsed: _claimFreeWash ? _loyaltyThreshold : 0,
+        washSequence: lifetimeWashCount + 1,
       );
 
       final orderId = await _databaseHelper.insertOrder(order);
@@ -712,7 +827,9 @@ class _PesanPageState extends State<PesanPage> {
     buffer.writeln("*DETAIL LAYANAN:*");
 
     for (var item in finalOrder.items) {
-      if (item.quantity == 1) {
+      if (item.price == 0) {
+        buffer.writeln("- *${item.itemName}* -> *Rp 0 (Gratis)*");
+      } else if (item.quantity == 1) {
         buffer.writeln("- *${item.itemName}* -> *${formatRp(item.price)}*");
       } else {
         buffer.writeln("- *${item.itemName}* -> *${item.quantity} x ${formatRp(item.price)}* = *${formatRp(item.price * item.quantity)}*");
@@ -722,9 +839,25 @@ class _PesanPageState extends State<PesanPage> {
       }
     }
 
+    int activeKuponCalc = (_selectedCustomerLoyalty?['wash_count_active'] as num?)?.toInt() ?? 0;
+    if (finalOrder.loyaltyClaimed) {
+      activeKuponCalc = (activeKuponCalc - finalOrder.stampsUsed).clamp(0, 999999);
+    }
+    for (var it in finalOrder.items) {
+      final n = it.itemName.toLowerCase();
+      final m = (it.machineType ?? '').toLowerCase();
+      if (m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah')) {
+        activeKuponCalc += it.quantity;
+      }
+    }
+
     buffer.writeln("---------------------------------");
     buffer.writeln("*TOTAL TAGIHAN:* *${formatRp(finalOrder.totalAmount)}*");
     buffer.writeln("*STATUS PEMBAYARAN:* *$statusBayar*");
+    if (_loyaltyEnabled) {
+      buffer.writeln("---------------------------------");
+      buffer.writeln("*Kupon Cuci:* *$activeKuponCalc / $_loyaltyThreshold*");
+    }
     buffer.writeln("---------------------------------");
     buffer.writeln("*INFORMASI:* Kakak akan menerima pesan WhatsApp otomatis ketika proses pencucian dimulai dan setelah selesai/siap diambil.");
     buffer.writeln("=========================");
@@ -1339,91 +1472,158 @@ class _PesanPageState extends State<PesanPage> {
 
   // --- CUSTOMER VIP HEADER SECTION ---
   Widget _buildCustomerTicketSection() {
+    final int activeStamps = (_selectedCustomerLoyalty?['wash_count_active'] as num?)?.toInt() ?? 0;
+    final bool hasLoyaltyBadge = _customerNameController.text.isNotEmpty && _loyaltyEnabled;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: const BoxDecoration(
         color: Color(0xFFF8FAFC),
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              gradient: StyleConstants.primaryGradient,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.person_rounded, size: 16, color: Colors.white),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: StyleConstants.primaryGradient,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.person_rounded, size: 16, color: Colors.white),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'PELANGGAN: ',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: StyleConstants.textMuted, letterSpacing: 0.5),
+                    Row(
+                      children: [
+                        const Text(
+                          'PELANGGAN: ',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: StyleConstants.textMuted, letterSpacing: 0.5),
+                        ),
+                        if (_customerNameController.text.isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: StyleConstants.successColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'TERDAFTAR',
+                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: StyleConstants.successColor),
+                            ),
+                          ),
+                          if (hasLoyaltyBadge) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: _canClaimCuciGratis
+                                    ? const Color(0xFFD97706).withValues(alpha: 0.15)
+                                    : const Color(0xFF0284C7).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Kupon: $activeStamps/$_loyaltyThreshold',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                  color: _canClaimCuciGratis ? const Color(0xFFD97706) : const Color(0xFF0284C7),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ],
                     ),
-                    if (_customerNameController.text.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: StyleConstants.successColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'TERDAFTAR',
-                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: StyleConstants.successColor),
-                        ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _customerNameController.text.isEmpty
+                          ? 'Pilih Data Pelanggan...'
+                          : _customerNameController.text,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        color: _customerNameController.text.isEmpty ? StyleConstants.textMuted : StyleConstants.textHeading,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (_customerPhoneController.text.isNotEmpty)
+                      Text(
+                        _customerPhoneController.text,
+                        style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
                       ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  _customerNameController.text.isEmpty
-                      ? 'Pilih Data Pelanggan...'
-                      : _customerNameController.text,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                    color: _customerNameController.text.isEmpty ? StyleConstants.textMuted : StyleConstants.textHeading,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              ),
+              if (_customerNameController.text.isNotEmpty) ...[
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 16, color: StyleConstants.dangerColor),
+                  onPressed: _clearCustomer,
+                  tooltip: 'Hapus Pelanggan',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
-                if (_customerPhoneController.text.isNotEmpty)
-                  Text(
-                    _customerPhoneController.text,
-                    style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
-                  ),
+                const SizedBox(width: 8),
               ],
-            ),
+              ElevatedButton(
+                onPressed: _showCustomerPicker,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: StyleConstants.primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                child: Text(
+                  _customerNameController.text.isEmpty ? 'Pilih (+)' : 'Ganti',
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
-          if (_customerNameController.text.isNotEmpty) ...[
-            IconButton(
-              icon: const Icon(Icons.close_rounded, size: 16, color: StyleConstants.dangerColor),
-              onPressed: _clearCustomer,
-              tooltip: 'Hapus Pelanggan',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-            const SizedBox(width: 8),
-          ],
-          ElevatedButton(
-            onPressed: _showCustomerPicker,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: StyleConstants.primaryColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
+
+          // Loyalty Claim Option Card (Super clean & prominent when eligible)
+          if (_customerNameController.text.isNotEmpty && _canClaimCuciGratis) ...[
+            const SizedBox(height: 8),
+            Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              decoration: BoxDecoration(
+                color: _claimFreeWash ? const Color(0xFFFFFBEB) : Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _claimFreeWash ? const Color(0xFFF59E0B) : const Color(0xFFCBD5E1),
+                  width: _claimFreeWash ? 1.5 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.card_giftcard_rounded, size: 16, color: Color(0xFFD97706)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _cartHasWashItem
+                          ? 'Pakai 1x Cuci Gratis (Tersedia Kupon $activeStamps/$_loyaltyThreshold)'
+                          : 'Tersedia 1x Cuci Gratis ($activeStamps/$_loyaltyThreshold) — Tambah paket cuci untuk klaim!',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF78350F)),
+                    ),
+                  ),
+                  if (_cartHasWashItem)
+                    Checkbox(
+                      value: _claimFreeWash,
+                      activeColor: const Color(0xFFD97706),
+                      onChanged: (val) {
+                        setState(() => _claimFreeWash = val ?? false);
+                      },
+                    ),
+                ],
+              ),
             ),
-            child: Text(
-              _customerNameController.text.isEmpty ? 'Pilih (+)' : 'Ganti',
-              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -1461,6 +1661,9 @@ class _PesanPageState extends State<PesanPage> {
       );
     }
 
+    final firstWash = _firstWashItemInCart;
+    bool freeRendered = false;
+
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       itemCount: cartItems.length,
@@ -1468,9 +1671,111 @@ class _PesanPageState extends State<PesanPage> {
       itemBuilder: (context, index) {
         final item = cartItems[index];
         final qty = _quantities[item.id ?? 0] ?? 0;
-        final subtotal = item.harga * qty;
         final note = _notes[item.id];
 
+        final m = (item.machineType ?? '').toLowerCase();
+        final n = item.nama.toLowerCase();
+        final isWash = m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah');
+
+        if (_claimFreeWash && isWash && item.id == firstWash?.id && !freeRendered) {
+          freeRendered = true;
+          final int normalQty = qty - 1;
+          final int subtotalNormal = normalQty * item.harga;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 1. Free Line Item
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD97706),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      '1x',
+                      style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 11.5),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${item.nama} (Gratis)',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: Color(0xFFD97706)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const Text(
+                          '@ Rp 0 (Klaim Kupon)',
+                          style: TextStyle(fontSize: 11, color: Color(0xFFD97706), fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Text(
+                    'Rp 0',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFFD97706)),
+                  ),
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: () => setState(() => _quantities[item.id ?? 0] = 0),
+                    child: const Icon(Icons.close_rounded, size: 16, color: StyleConstants.dangerColor),
+                  ),
+                ],
+              ),
+
+              // 2. Extra normal items if qty > 1
+              if (normalQty > 0) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: StyleConstants.primaryColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${normalQty}x',
+                        style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 11.5),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.nama,
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: StyleConstants.textHeading),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '@ ${formatRp(item.harga)}',
+                            style: const TextStyle(fontSize: 11, color: StyleConstants.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      formatRp(subtotalNormal),
+                      style: StyleConstants.tabularNumbers(fontSize: 13, fontWeight: FontWeight.w900, color: StyleConstants.textHeading),
+                    ),
+                    const SizedBox(width: 22),
+                  ],
+                ),
+              ],
+            ],
+          );
+        }
+
+        final subtotal = item.harga * qty;
         return Row(
           children: [
             Container(

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'transaction_model.dart';
 import 'order_model.dart';
@@ -219,11 +220,13 @@ class DatabaseHelper {
             await _ensureMachineColumns(db);
             await _ensureMachinesColumns(db);
             await _ensureOrderAssignmentColumns(db);
+            await _ensureOrderLoyaltyColumns(db);
             await _ensureMachineUsageHistoryTable(db);
             await _ensurePendingNotificationsTable(db);
             await _ensurePaidAmountColumn(db);
             await _ensureCustomerPhoneColumn(db);
             await _ensureCustomersTable(db);
+            await _ensureCustomerLoyaltyColumns(db);
             await _ensureExpensesTable(db);
             await _ensureDurationDaysColumn(db);
             await _ensureStaffRestockableColumn(db);
@@ -385,11 +388,68 @@ class DatabaseHelper {
           name TEXT NOT NULL,
           phone TEXT NOT NULL,
           address TEXT,
-          created_at TEXT NOT NULL
+          created_at TEXT NOT NULL,
+          wash_count_lifetime INTEGER DEFAULT 0,
+          wash_count_active INTEGER DEFAULT 0,
+          rewards_claimed_count INTEGER DEFAULT 0,
+          dry_count_lifetime INTEGER DEFAULT 0,
+          store_item_count_lifetime INTEGER DEFAULT 0,
+          iron_count_lifetime INTEGER DEFAULT 0,
+          total_spent_lifetime INTEGER DEFAULT 0
         )
       ''');
     } catch (e) {
       print('Error ensuring customers table: $e');
+    }
+  }
+
+  Future<void> _ensureCustomerLoyaltyColumns(Database db) async {
+    try {
+      final List<Map<String, dynamic>> info = await db.rawQuery(
+        "PRAGMA table_info(customers)",
+      );
+      final existing = info.map((r) => r['name'] as String).toSet();
+
+      final columns = {
+        'wash_count_lifetime': 'INTEGER DEFAULT 0',
+        'wash_count_active': 'INTEGER DEFAULT 0',
+        'rewards_claimed_count': 'INTEGER DEFAULT 0',
+        'dry_count_lifetime': 'INTEGER DEFAULT 0',
+        'store_item_count_lifetime': 'INTEGER DEFAULT 0',
+        'iron_count_lifetime': 'INTEGER DEFAULT 0',
+        'total_spent_lifetime': 'INTEGER DEFAULT 0',
+      };
+
+      for (var entry in columns.entries) {
+        if (!existing.contains(entry.key)) {
+          await db.execute("ALTER TABLE customers ADD COLUMN ${entry.key} ${entry.value}");
+        }
+      }
+    } catch (e) {
+      print('Error ensuring customer loyalty columns: $e');
+    }
+  }
+
+  Future<void> _ensureOrderLoyaltyColumns(Database db) async {
+    try {
+      final List<Map<String, dynamic>> info = await db.rawQuery(
+        "PRAGMA table_info(orders)",
+      );
+      final existing = info.map((r) => r['name'] as String).toSet();
+
+      final columns = {
+        'loyalty_claimed': 'INTEGER DEFAULT 0',
+        'wash_sequence': 'INTEGER DEFAULT 0',
+        'stamps_used': 'INTEGER DEFAULT 0',
+      };
+
+      for (var entry in columns.entries) {
+        if (!existing.contains(entry.key)) {
+          await db.execute("ALTER TABLE orders ADD COLUMN ${entry.key} ${entry.value}");
+        }
+      }
+    } catch (e) {
+      print('Error ensuring order loyalty columns: $e');
     }
   }
 
@@ -433,6 +493,7 @@ class DatabaseHelper {
       CREATE TABLE orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         customer_name TEXT NOT NULL,
+        customer_phone TEXT,
         order_date TEXT NOT NULL,
         total_amount INTEGER NOT NULL,
         status TEXT NOT NULL,
@@ -443,6 +504,11 @@ class DatabaseHelper {
         qris_url TEXT,
         qris_id TEXT,
         payment_timestamp TEXT,
+        assigned_machine_id INTEGER,
+        machine_started_at TEXT,
+        loyalty_claimed INTEGER DEFAULT 0,
+        wash_sequence INTEGER DEFAULT 0,
+        stamps_used INTEGER DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users (id)
       )
     ''');
@@ -492,6 +558,8 @@ class DatabaseHelper {
         machine_id INTEGER NOT NULL,
         machine_name TEXT NOT NULL,
         customer_name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Success',
+        error_message TEXT,
         started_at TEXT NOT NULL,
         created_at TEXT NOT NULL,
         FOREIGN KEY (order_id) REFERENCES orders (id),
@@ -515,7 +583,14 @@ class DatabaseHelper {
         name TEXT NOT NULL,
         phone TEXT NOT NULL,
         address TEXT,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        wash_count_lifetime INTEGER DEFAULT 0,
+        wash_count_active INTEGER DEFAULT 0,
+        rewards_claimed_count INTEGER DEFAULT 0,
+        dry_count_lifetime INTEGER DEFAULT 0,
+        store_item_count_lifetime INTEGER DEFAULT 0,
+        iron_count_lifetime INTEGER DEFAULT 0,
+        total_spent_lifetime INTEGER DEFAULT 0
       )
     ''');
 
@@ -617,10 +692,10 @@ class DatabaseHelper {
     int orderId = 0;
 
     await db.transaction((txn) async {
-      // Insert the order first
+      // 1. Insert the order
       orderId = await txn.insert('orders', {
-        'customer_name': order.customerName,
-        'customer_phone': order.customerPhone,
+        'customer_name': DbEncryptionHelper.encrypt(order.customerName),
+        'customer_phone': order.customerPhone != null ? DbEncryptionHelper.encrypt(order.customerPhone!) : null,
         'order_date': order.orderDate.toIso8601String(),
         'total_amount': order.totalAmount,
         'status': order.status,
@@ -631,9 +706,19 @@ class DatabaseHelper {
         'qris_url': order.qrisUrl,
         'qris_id': order.qrisId,
         'payment_timestamp': order.paymentTimestamp?.toIso8601String(),
+        'assigned_machine_id': order.assignedMachineId,
+        'machine_started_at': order.machineStartedAt?.toIso8601String(),
+        'loyalty_claimed': order.loyaltyClaimed ? 1 : 0,
+        'wash_sequence': order.washSequence,
+        'stamps_used': order.stampsUsed,
       });
 
-      // Then insert all order items
+      // 2. Insert all order items
+      int washQty = 0;
+      int dryQty = 0;
+      int ironQty = 0;
+      int storeQty = 0;
+
       for (var item in order.items) {
         await txn.insert('order_items', {
           'order_id': orderId,
@@ -641,8 +726,104 @@ class DatabaseHelper {
           'item_name': item.itemName,
           'quantity': item.quantity,
           'price': item.price,
-          'note': item.note,
+          'note': item.note != null ? DbEncryptionHelper.encrypt(item.note!) : null,
         });
+
+        final nameLower = item.itemName.toLowerCase();
+        final mType = (item.machineType ?? '').toLowerCase();
+        if (mType == 'cuci' || nameLower.contains('cuci') || nameLower.contains('wash') || nameLower.contains('basah')) {
+          washQty += item.quantity;
+        } else if (mType == 'pengering' || nameLower.contains('kering') || nameLower.contains('pengering') || nameLower.contains('dry')) {
+          dryQty += item.quantity;
+        } else if (mType == 'gosok' || mType == 'iron' || nameLower.contains('gosok') || nameLower.contains('setrika')) {
+          ironQty += item.quantity;
+        } else {
+          storeQty += item.quantity;
+        }
+      }
+
+      // 3. Atomically update or insert customer loyalty statistics
+      final customerNameClean = order.customerName.trim();
+      final customerPhoneClean = order.customerPhone?.trim();
+
+      if (customerNameClean.isNotEmpty) {
+        List<Map<String, dynamic>> existingCust = [];
+        if (customerPhoneClean != null && customerPhoneClean.isNotEmpty) {
+          existingCust = await txn.query(
+            'customers',
+            where: 'phone = ?',
+            whereArgs: [DbEncryptionHelper.encrypt(customerPhoneClean)],
+          );
+        }
+
+        if (existingCust.isEmpty) {
+          existingCust = await txn.query(
+            'customers',
+            where: 'name = ?',
+            whereArgs: [DbEncryptionHelper.encrypt(customerNameClean)],
+          );
+        }
+
+        if (existingCust.isNotEmpty) {
+          final custMap = existingCust.first;
+          final custId = custMap['id'] as int;
+
+          int activeStamps = (custMap['wash_count_active'] as num?)?.toInt() ?? 0;
+          int lifetimeWash = (custMap['wash_count_lifetime'] as num?)?.toInt() ?? 0;
+          int rewardsClaimed = (custMap['rewards_claimed_count'] as num?)?.toInt() ?? 0;
+          int lifetimeDry = (custMap['dry_count_lifetime'] as num?)?.toInt() ?? 0;
+          int lifetimeStore = (custMap['store_item_count_lifetime'] as num?)?.toInt() ?? 0;
+          int lifetimeIron = (custMap['iron_count_lifetime'] as num?)?.toInt() ?? 0;
+          int lifetimeSpent = (custMap['total_spent_lifetime'] as num?)?.toInt() ?? 0;
+
+          if (order.loyaltyClaimed) {
+            activeStamps = (activeStamps - order.stampsUsed).clamp(0, 999999);
+            rewardsClaimed += 1;
+          }
+
+          activeStamps += washQty;
+          lifetimeWash += washQty;
+          lifetimeDry += dryQty;
+          lifetimeStore += storeQty;
+          lifetimeIron += ironQty;
+          lifetimeSpent += order.totalAmount;
+
+          await txn.update(
+            'customers',
+            {
+              'wash_count_active': activeStamps,
+              'wash_count_lifetime': lifetimeWash,
+              'rewards_claimed_count': rewardsClaimed,
+              'dry_count_lifetime': lifetimeDry,
+              'store_item_count_lifetime': lifetimeStore,
+              'iron_count_lifetime': lifetimeIron,
+              'total_spent_lifetime': lifetimeSpent,
+            },
+            where: 'id = ?',
+            whereArgs: [custId],
+          );
+        } else {
+          int activeStamps = washQty;
+          int rewardsClaimed = 0;
+          if (order.loyaltyClaimed) {
+            activeStamps = (activeStamps - order.stampsUsed).clamp(0, 999999);
+            rewardsClaimed = 1;
+          }
+
+          await txn.insert('customers', {
+            'name': DbEncryptionHelper.encrypt(customerNameClean),
+            'phone': customerPhoneClean != null ? DbEncryptionHelper.encrypt(customerPhoneClean) : '',
+            'address': null,
+            'created_at': DateTime.now().toIso8601String(),
+            'wash_count_active': activeStamps,
+            'wash_count_lifetime': washQty,
+            'rewards_claimed_count': rewardsClaimed,
+            'dry_count_lifetime': dryQty,
+            'store_item_count_lifetime': storeQty,
+            'iron_count_lifetime': ironQty,
+            'total_spent_lifetime': order.totalAmount,
+          });
+        }
       }
     });
 
@@ -739,8 +920,8 @@ class DatabaseHelper {
       result = await txn.update(
         'orders',
         {
-          'customer_name': order.customerName,
-          'customer_phone': order.customerPhone,
+          'customer_name': DbEncryptionHelper.encrypt(order.customerName),
+          'customer_phone': order.customerPhone != null ? DbEncryptionHelper.encrypt(order.customerPhone!) : null,
           'order_date': order.orderDate.toIso8601String(),
           'total_amount': order.totalAmount,
           'status': order.status,
@@ -753,6 +934,9 @@ class DatabaseHelper {
           'payment_timestamp': order.paymentTimestamp?.toIso8601String(),
           'assigned_machine_id': order.assignedMachineId,
           'machine_started_at': order.machineStartedAt?.toIso8601String(),
+          'loyalty_claimed': order.loyaltyClaimed ? 1 : 0,
+          'wash_sequence': order.washSequence,
+          'stamps_used': order.stampsUsed,
         },
         where: 'id = ?',
         whereArgs: [order.id],
@@ -1298,5 +1482,112 @@ class DatabaseHelper {
         return Order.fromMap(orderMap, items);
       }),
     );
+  }
+
+  /// Get comprehensive customer statistics & loyalty points
+  Future<Map<String, dynamic>> getCustomerFullStats({
+    int? customerId,
+    String? name,
+    String? phone,
+  }) async {
+    final db = await database;
+    Map<String, dynamic>? cust;
+
+    if (customerId != null) {
+      final res = await db.query('customers', where: 'id = ?', whereArgs: [customerId]);
+      if (res.isNotEmpty) cust = res.first;
+    }
+    if (cust == null && phone != null && phone.trim().isNotEmpty) {
+      final res = await db.query('customers', where: 'phone = ?', whereArgs: [DbEncryptionHelper.encrypt(phone.trim())]);
+      if (res.isNotEmpty) cust = res.first;
+    }
+    if (cust == null && name != null && name.trim().isNotEmpty) {
+      final res = await db.query('customers', where: 'name = ?', whereArgs: [DbEncryptionHelper.encrypt(name.trim())]);
+      if (res.isNotEmpty) cust = res.first;
+    }
+
+    int activeStamps = (cust?['wash_count_active'] as num?)?.toInt() ?? 0;
+    int lifetimeWash = (cust?['wash_count_lifetime'] as num?)?.toInt() ?? 0;
+    int rewardsClaimed = (cust?['rewards_claimed_count'] as num?)?.toInt() ?? 0;
+    int lifetimeDry = (cust?['dry_count_lifetime'] as num?)?.toInt() ?? 0;
+    int lifetimeStore = (cust?['store_item_count_lifetime'] as num?)?.toInt() ?? 0;
+    int lifetimeIron = (cust?['iron_count_lifetime'] as num?)?.toInt() ?? 0;
+    int lifetimeSpent = (cust?['total_spent_lifetime'] as num?)?.toInt() ?? 0;
+
+    // Also calculate from actual historical orders for backfilling accuracy
+    final customerCleanName = name?.trim() ?? (cust != null ? DbEncryptionHelper.decrypt(cust['name']) : '');
+    final customerCleanPhone = phone?.trim() ?? (cust != null ? DbEncryptionHelper.decrypt(cust['phone']) : '');
+
+    if (customerCleanName.isNotEmpty || customerCleanPhone.isNotEmpty) {
+      try {
+        final allOrders = await getAllOrders();
+        final matchedOrders = allOrders.where((o) {
+          final isNameMatch = customerCleanName.isNotEmpty && o.customerName.trim().toLowerCase() == customerCleanName.toLowerCase();
+          final isPhoneMatch = customerCleanPhone.isNotEmpty && o.customerPhone != null && o.customerPhone!.trim() == customerCleanPhone;
+          return isNameMatch || isPhoneMatch;
+        }).toList();
+
+        int orderWash = 0;
+        int orderDry = 0;
+        int orderIron = 0;
+        int orderStore = 0;
+        int orderSpent = 0;
+        int orderClaimed = 0;
+
+        for (var o in matchedOrders) {
+          orderSpent += o.totalAmount;
+          if (o.loyaltyClaimed) {
+            orderClaimed += 1;
+          }
+          for (var it in o.items) {
+            final n = it.itemName.toLowerCase();
+            final m = (it.machineType ?? '').toLowerCase();
+            if (m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah')) {
+              orderWash += it.quantity;
+            } else if (m == 'pengering' || n.contains('kering') || n.contains('pengering') || n.contains('dry')) {
+              orderDry += it.quantity;
+            } else if (m == 'gosok' || m == 'iron' || n.contains('gosok') || n.contains('setrika')) {
+              orderIron += it.quantity;
+            } else {
+              orderStore += it.quantity;
+            }
+          }
+        }
+
+        if (orderWash > lifetimeWash) lifetimeWash = orderWash;
+        if (orderDry > lifetimeDry) lifetimeDry = orderDry;
+        if (orderIron > lifetimeIron) lifetimeIron = orderIron;
+        if (orderStore > lifetimeStore) lifetimeStore = orderStore;
+        if (orderSpent > lifetimeSpent) lifetimeSpent = orderSpent;
+        if (orderClaimed > rewardsClaimed) rewardsClaimed = orderClaimed;
+
+        // If customer record active stamps is 0 but had past washes without claiming
+        if (activeStamps == 0 && lifetimeWash > 0 && rewardsClaimed == 0) {
+          activeStamps = lifetimeWash;
+        }
+      } catch (_) {}
+    }
+
+    // Load SharedPreferences for loyalty settings
+    final prefs = await SharedPreferences.getInstance();
+    final bool loyaltyEnabled = prefs.getBool('loyalty_program_enabled') ?? true;
+    final int loyaltyThreshold = prefs.getInt('loyalty_wash_threshold') ?? 5;
+
+    return {
+      'customer_id': cust?['id'],
+      'name': customerCleanName,
+      'phone': customerCleanPhone,
+      'wash_count_lifetime': lifetimeWash,
+      'wash_count_active': activeStamps,
+      'rewards_claimed_count': rewardsClaimed,
+      'dry_count_lifetime': lifetimeDry,
+      'store_item_count_lifetime': lifetimeStore,
+      'iron_count_lifetime': lifetimeIron,
+      'total_spent_lifetime': lifetimeSpent,
+      'loyalty_enabled': loyaltyEnabled,
+      'loyalty_threshold': loyaltyThreshold,
+      'can_claim_reward': loyaltyEnabled && activeStamps >= loyaltyThreshold && loyaltyThreshold > 0,
+      'available_rewards': loyaltyThreshold > 0 ? (activeStamps ~/ loyaltyThreshold) : 0,
+    };
   }
 }

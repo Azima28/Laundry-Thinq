@@ -60,6 +60,9 @@ class Order {
   final DateTime? paymentTimestamp;
   final int? assignedMachineId;
   final DateTime? machineStartedAt;
+  final bool loyaltyClaimed;
+  final int washSequence;
+  final int stampsUsed;
 
   Order({
     this.id,
@@ -78,6 +81,9 @@ class Order {
     this.paymentTimestamp,
     this.assignedMachineId,
     this.machineStartedAt,
+    this.loyaltyClaimed = false,
+    this.washSequence = 0,
+    this.stampsUsed = 0,
   });
 
   Map<String, dynamic> toMap() {
@@ -97,6 +103,9 @@ class Order {
       'payment_timestamp': paymentTimestamp?.toIso8601String(),
       'assigned_machine_id': assignedMachineId,
       'machine_started_at': machineStartedAt?.toIso8601String(),
+      'loyalty_claimed': loyaltyClaimed ? 1 : 0,
+      'wash_sequence': washSequence,
+      'stamps_used': stampsUsed,
     };
   }
 
@@ -115,11 +124,14 @@ class Order {
       paymentMethod: map['payment_method'] ?? 'cash',
       qrisUrl: map['qris_url'],
       qrisId: map['qris_id'],
-      paymentTimestamp: map['payment_timestamp'] != null 
+      paymentTimestamp: map['payment_timestamp'] != null
           ? DateTime.parse(map['payment_timestamp'])
           : null,
       assignedMachineId: map['assigned_machine_id'],
       machineStartedAt: map['machine_started_at'] != null ? DateTime.parse(map['machine_started_at']) : null,
+      loyaltyClaimed: (map['loyalty_claimed'] == 1 || map['loyalty_claimed'] == true),
+      washSequence: (map['wash_sequence'] as num?)?.toInt() ?? 0,
+      stampsUsed: (map['stamps_used'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -140,6 +152,9 @@ class Order {
     DateTime? paymentTimestamp,
     int? assignedMachineId,
     DateTime? machineStartedAt,
+    bool? loyaltyClaimed,
+    int? washSequence,
+    int? stampsUsed,
   }) {
     return Order(
       id: id ?? this.id,
@@ -158,6 +173,9 @@ class Order {
       paymentTimestamp: paymentTimestamp ?? this.paymentTimestamp,
       assignedMachineId: assignedMachineId ?? this.assignedMachineId,
       machineStartedAt: machineStartedAt ?? this.machineStartedAt,
+      loyaltyClaimed: loyaltyClaimed ?? this.loyaltyClaimed,
+      washSequence: washSequence ?? this.washSequence,
+      stampsUsed: stampsUsed ?? this.stampsUsed,
     );
   }
 }

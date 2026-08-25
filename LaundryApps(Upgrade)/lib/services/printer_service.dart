@@ -299,6 +299,16 @@ class PrinterService {
     final bool isLunas = order.isPaid || order.paidAmount >= order.totalAmount;
     final int sisaTagihan = order.totalAmount - order.paidAmount;
 
+    String customerKuponStr = '';
+    try {
+      final stats = await db.getCustomerFullStats(name: order.customerName, phone: order.customerPhone);
+      if (stats['loyalty_enabled'] == true && order.customerName.isNotEmpty) {
+        final activeKupon = stats['wash_count_active'] ?? 0;
+        final threshold = stats['loyalty_threshold'] ?? 5;
+        customerKuponStr = '$activeKupon / $threshold';
+      }
+    } catch (_) {}
+
     doc.addPage(
       pw.Page(
         pageFormat: pageFormat,
@@ -465,6 +475,18 @@ class PrinterService {
               ],
               pw.SizedBox(height: config.spacing),
               pw.Divider(thickness: config.dividerThickness, height: 6),
+              if (customerKuponStr.isNotEmpty) ...[
+                pw.SizedBox(height: 2),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Kupon Cuci:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: config.smallTextSize)),
+                    pw.Text(customerKuponStr, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: config.smallTextSize)),
+                  ],
+                ),
+                pw.SizedBox(height: 2),
+                pw.Divider(thickness: config.dividerThickness, height: 6),
+              ],
               pw.SizedBox(height: 4),
 
               // 5. Footer Message

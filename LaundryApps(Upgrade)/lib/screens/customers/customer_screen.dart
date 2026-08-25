@@ -10,6 +10,7 @@ import '../../database/models/order_model.dart';
 import '../../database/models/db_encryption_helper.dart';
 import '../../services/machine_status_service.dart';
 import '../../utils/style_constants.dart';
+import '../../utils/currency_format.dart';
 import '../../utils/contact_import_export_helper.dart';
 
 class CustomerScreen extends StatefulWidget {
@@ -1767,13 +1768,47 @@ class _CustomerScreenState extends State<CustomerScreen> {
             ),
           ),
         ),
-        title: Text(
-          customer.name,
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13.5,
-            color: isSelected ? StyleConstants.primaryColor : StyleConstants.textHeading,
-          ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                customer.name,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13.5,
+                  color: isSelected ? StyleConstants.primaryColor : StyleConstants.textHeading,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (customer.washCountActive > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: customer.washCountActive >= 5
+                      ? const Color(0xFFFEF3C7)
+                      : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: customer.washCountActive >= 5
+                        ? const Color(0xFFFDE68A)
+                        : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Text(
+                  '${customer.washCountActive} Kupon',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: customer.washCountActive >= 5
+                        ? const Color(0xFFB45309)
+                        : const Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
         subtitle: Text(
           customer.phone.isNotEmpty ? customer.phone : 'Belum ada WhatsApp',
@@ -1861,7 +1896,6 @@ class _CustomerScreenState extends State<CustomerScreen> {
     final hasPhone = customer.phone.isNotEmpty;
 
     return Container(
-      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -1874,247 +1908,501 @@ class _CustomerScreenState extends State<CustomerScreen> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row: Customer Avatar + Name & CRM Badge
-          Row(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 36,
-                backgroundColor: primaryColor.withValues(alpha: 0.12),
-                child: Text(
-                  customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
-                  style: TextStyle(color: primaryColor, fontWeight: FontWeight.w900, fontSize: 32),
-                ),
+              // Header Row: Customer Avatar + Name & CRM Badge
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 34,
+                    backgroundColor: primaryColor.withValues(alpha: 0.12),
+                    child: Text(
+                      customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
+                      style: TextStyle(color: primaryColor, fontWeight: FontWeight.w900, fontSize: 30),
+                    ),
+                  ),
+                  const SizedBox(width: 18),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              customer.name,
+                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                            ),
+                            const SizedBox(width: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: hasPhone ? const Color(0xFF10B981).withValues(alpha: 0.12) : const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: hasPhone ? const Color(0xFF10B981).withValues(alpha: 0.3) : const Color(0xFFF59E0B).withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    hasPhone ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                                    size: 12,
+                                    color: hasPhone ? const Color(0xFF10B981) : const Color(0xFFD97706),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    hasPhone ? 'WhatsApp Siap' : 'Nomor Belum Ada',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: hasPhone ? const Color(0xFF047857) : const Color(0xFFB45309),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Terdaftar sejak: ${_formatDate(customer.createdAt)} • Total ${_selectedCustomerOrders.length} Nota Pesanan',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 20),
-              Expanded(
+              const SizedBox(height: 20),
+              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+              const SizedBox(height: 20),
+
+              // =========================================================
+              // STATISTIK LENGKAP & PROGRAM KUPON CUCI
+              // =========================================================
+              FutureBuilder<Map<String, dynamic>>(
+                future: _db.getCustomerFullStats(customerId: customer.id, name: customer.name, phone: customer.phone),
+                builder: (context, snapshot) {
+                  final stats = snapshot.data ?? {};
+                  final int washLifetime = (stats['wash_count_lifetime'] as num?)?.toInt() ?? customer.washCountLifetime;
+                  final int activeStamps = (stats['wash_count_active'] as num?)?.toInt() ?? customer.washCountActive;
+                  final int rewardsClaimed = (stats['rewards_claimed_count'] as num?)?.toInt() ?? customer.rewardsClaimedCount;
+                  final int dryLifetime = (stats['dry_count_lifetime'] as num?)?.toInt() ?? customer.dryCountLifetime;
+                  final int storeLifetime = (stats['store_item_count_lifetime'] as num?)?.toInt() ?? customer.storeItemCountLifetime;
+                  final int ironLifetime = (stats['iron_count_lifetime'] as num?)?.toInt() ?? customer.ironCountLifetime;
+                  final int spentLifetime = (stats['total_spent_lifetime'] as num?)?.toInt() ?? customer.totalSpentLifetime;
+                  final int threshold = (stats['loyalty_threshold'] as num?)?.toInt() ?? 5;
+                  final bool canClaim = stats['can_claim_reward'] == true;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // 1. Loyalty Kupon Cuci Highlight Card (Gold)
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: canClaim ? const Color(0xFFFFFBEB) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: canClaim ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0),
+                            width: canClaim ? 1.5 : 1,
+                          ),
+                          boxShadow: canClaim
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(0xFFD97706).withValues(alpha: 0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFD97706).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.confirmation_number_rounded, color: Color(0xFFD97706), size: 18),
+                                ),
+                                const SizedBox(width: 10),
+                                const Text(
+                                  'Kupon Cuci Pelanggan',
+                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF0F172A)),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: canClaim ? const Color(0xFFD97706) : const Color(0xFFE2E8F0),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    '$activeStamps / $threshold Kupon',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 12,
+                                      color: canClaim ? Colors.white : const Color(0xFF334155),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+
+                            // Stamp Progress Row
+                            Row(
+                              children: List.generate(threshold, (index) {
+                                final isFilled = index < activeStamps;
+                                return Expanded(
+                                  child: Container(
+                                    margin: EdgeInsets.only(right: index == threshold - 1 ? 0 : 6),
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: isFilled ? const Color(0xFFD97706) : Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isFilled ? const Color(0xFFD97706) : const Color(0xFFCBD5E1),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: isFilled
+                                          ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
+                                          : Text(
+                                              '${index + 1}',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF94A3B8)),
+                                            ),
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Subtitle info
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  canClaim
+                                      ? '🎁 Kupon siap digunakan: Tersedia 1x Cuci Gratis di kasir POS!'
+                                      : 'Kurang ${threshold - activeStamps}x cuci lagi untuk dapat 1x gratis',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: canClaim ? const Color(0xFFB45309) : const Color(0xFF64748B),
+                                  ),
+                                ),
+                                Text(
+                                  'Pernah Cuci Gratis: $rewardsClaimed kali',
+                                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 2. Multi-Stat KPI Grid (Cuci, Kering, Sabun, Setrika, Total Belanja)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildCustomerStatTile(
+                              title: 'Total Cuci',
+                              value: '$washLifetime kali',
+                              icon: Icons.local_laundry_service_rounded,
+                              color: const Color(0xFF2563EB),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildCustomerStatTile(
+                              title: 'Total Kering',
+                              value: '$dryLifetime kali',
+                              icon: Icons.wb_sunny_rounded,
+                              color: const Color(0xFFEA580C),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildCustomerStatTile(
+                              title: 'Beli Sabun/Item',
+                              value: '$storeLifetime item',
+                              icon: Icons.shopping_bag_rounded,
+                              color: const Color(0xFF10B981),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildCustomerStatTile(
+                              title: 'Total Setrika',
+                              value: '$ironLifetime kg',
+                              icon: Icons.iron_rounded,
+                              color: const Color(0xFF7C3AED),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: _buildCustomerStatTile(
+                              title: 'Total Belanja (Kas Masuk)',
+                              value: formatRp(spentLifetime),
+                              icon: Icons.account_balance_wallet_rounded,
+                              color: const Color(0xFF0F172A),
+                              isBold: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+              const SizedBox(height: 20),
+
+              // Detail Section Rows (Nomor WhatsApp & Alamat)
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDetailRow(
+                      icon: Icons.phone_rounded,
+                      title: 'Nomor WhatsApp',
+                      value: hasPhone ? customer.phone : 'Belum diatur',
+                      iconColor: const Color(0xFF10B981),
+                      trailing: hasPhone
+                          ? TextButton.icon(
+                              onPressed: () => _openWhatsAppDialog(customer),
+                              icon: const Icon(Icons.chat_rounded, size: 15, color: Color(0xFF10B981)),
+                              label: const Text('Kirim WA', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildDetailRow(
+                      icon: Icons.home_rounded,
+                      title: 'Alamat Rumah',
+                      value: customer.address?.isNotEmpty == true ? customer.address! : '—',
+                      iconColor: const Color(0xFF6366F1),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // WHATSAPP COMMUNICATION HUB (Highlight Box)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Text(
-                          customer.name,
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                        ),
-                        const SizedBox(width: 12),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: hasPhone ? const Color(0xFF10B981).withValues(alpha: 0.12) : const Color(0xFFF59E0B).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: hasPhone ? const Color(0xFF10B981).withValues(alpha: 0.3) : const Color(0xFFF59E0B).withValues(alpha: 0.3),
-                            ),
+                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                hasPhone ? Icons.check_circle_rounded : Icons.info_outline_rounded,
-                                size: 12,
-                                color: hasPhone ? const Color(0xFF10B981) : const Color(0xFFD97706),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                hasPhone ? 'WhatsApp Siap' : 'Nomor Belum Ada',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: hasPhone ? const Color(0xFF047857) : const Color(0xFFB45309),
+                          child: const Icon(Icons.mark_chat_read_rounded, color: Color(0xFF10B981), size: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Pusat Komunikasi WhatsApp Pelanggan',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
+                        ),
+                        const Spacer(),
+                        TextButton.icon(
+                          onPressed: () async {
+                            final res = await MachineStatusService.instance.openWhatsAppWebGUI();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(res['message'] ?? 'Membuka jendela WhatsApp Web...'),
+                                  backgroundColor: res['success'] == true ? const Color(0xFF10B981) : Colors.red,
                                 ),
-                              ),
-                            ],
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.open_in_new_rounded, size: 14, color: Color(0xFF047857)),
+                          label: const Text('Buka WhatsApp Web', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
+                          style: TextButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.1),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Terdaftar sejak: ${_formatDate(customer.createdAt)} • Total ${_selectedCustomerOrders.length} Pesanan Tercatat',
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        // Button 1: Send Template Cucian Selesai
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: hasPhone ? () => _openWhatsAppDialog(customer) : null,
+                            icon: const Icon(Icons.check_circle_outline_rounded, size: 18, color: Colors.white),
+                            label: const Text(
+                              'Kirim Template: Cucian Selesai',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              disabledBackgroundColor: Colors.grey[300],
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              elevation: 0,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Button 2: Custom Text / Ketik Sendiri
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: hasPhone ? () => _openWhatsAppDialog(customer, defaultTemplate: '') : null,
+                            icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFF2563EB)),
+                            label: const Text(
+                              'Tulis Pesan Kustom (Ketik Sendiri)',
+                              style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                              backgroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 24),
+
+              // Actions Buttons Row at Bottom
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: hasPhone ? () => _openWhatsAppDialog(customer) : null,
+                      icon: const Icon(Icons.chat_rounded, size: 18, color: Colors.white),
+                      label: const Text('Kirim WhatsApp', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        disabledBackgroundColor: Colors.grey[300],
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _addOrEditCustomer(customer),
+                      icon: const Icon(Icons.edit_rounded, size: 18, color: Colors.white),
+                      label: const Text('Ubah Profil', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _deleteCustomer(customer),
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.white),
+                      label: const Text('Hapus Pelanggan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 24),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 20),
+        ),
+      ),
+    );
+  }
 
-          // Detail Section Rows
-          Row(
-            children: [
-              Expanded(
-                child: _buildDetailRow(
-                  icon: Icons.phone_rounded,
-                  title: 'Nomor WhatsApp',
-                  value: hasPhone ? customer.phone : 'Belum diatur',
-                  iconColor: const Color(0xFF10B981),
-                  trailing: hasPhone
-                      ? TextButton.icon(
-                          onPressed: () => _openWhatsAppDialog(customer),
-                          icon: const Icon(Icons.chat_rounded, size: 15, color: Color(0xFF10B981)),
-                          label: const Text('Kirim WA', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
-                        )
-                      : null,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildDetailRow(
-                  icon: Icons.home_rounded,
-                  title: 'Alamat Rumah',
-                  value: customer.address?.isNotEmpty == true ? customer.address! : '—',
-                  iconColor: const Color(0xFF6366F1),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // WHATSAPP COMMUNICATION HUB (Highlight Box)
+  Widget _buildCustomerStatTile({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+    bool isBold = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFCBD5E1)),
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.mark_chat_read_rounded, color: Color(0xFF10B981), size: 18),
-                    ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'Pusat Komunikasi WhatsApp Pelanggan',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
-                    ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: () async {
-                        final res = await MachineStatusService.instance.openWhatsAppWebGUI();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(res['message'] ?? 'Membuka jendela WhatsApp Web...'),
-                              backgroundColor: res['success'] == true ? const Color(0xFF10B981) : Colors.red,
-                            ),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.open_in_new_rounded, size: 14, color: Color(0xFF047857)),
-                      label: const Text('Buka WhatsApp Web', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
-                      style: TextButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.1),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                  ],
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    // Button 1: Send Template Cucian Selesai
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: hasPhone ? () => _openWhatsAppDialog(customer) : null,
-                        icon: const Icon(Icons.check_circle_outline_rounded, size: 18, color: Colors.white),
-                        label: const Text(
-                          'Kirim Template: Cucian Selesai',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981),
-                          disabledBackgroundColor: Colors.grey[300],
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Button 2: Custom Text / Ketik Sendiri
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: hasPhone ? () => _openWhatsAppDialog(customer, defaultTemplate: '') : null,
-                        icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFF2563EB)),
-                        label: const Text(
-                          'Tulis Pesan Kustom (Ketik Sendiri)',
-                          style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
-                          backgroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: isBold ? 14 : 13,
+                    fontWeight: FontWeight.w900,
+                    color: isBold ? color : const Color(0xFF0F172A),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-          ),
-          const Spacer(),
-
-          // Actions Buttons Row at Bottom
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: hasPhone ? () => _openWhatsAppDialog(customer) : null,
-                  icon: const Icon(Icons.chat_rounded, size: 18, color: Colors.white),
-                  label: const Text('Kirim WhatsApp', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    disabledBackgroundColor: Colors.grey[300],
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _addOrEditCustomer(customer),
-                  icon: const Icon(Icons.edit_rounded, size: 18, color: Colors.white),
-                  label: const Text('Ubah Profil', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _deleteCustomer(customer),
-                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.white),
-                  label: const Text('Hapus Pelanggan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ],
           ),
         ],
       ),
