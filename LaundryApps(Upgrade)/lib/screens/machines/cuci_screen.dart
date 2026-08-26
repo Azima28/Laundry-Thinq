@@ -595,6 +595,22 @@ class _CuciContentState extends State<CuciContent> {
   }
 
   Widget _buildMachineGrid() {
+    if (_isLoading && _machines.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text(
+              'Sedang memuat data status mesin...',
+              style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      );
+    }
+
     final List<MachineModel> displayMachines = _machines.isNotEmpty
         ? _machines
         : List.generate(
@@ -916,7 +932,7 @@ class _CuciContentState extends State<CuciContent> {
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(18),
-            onTap: (isActivating || !canClick)
+            onTap: (isActivating || !canClick || _isLoading)
                 ? null
                 : () => _handleMachineTap(
                     machine,
@@ -925,7 +941,7 @@ class _CuciContentState extends State<CuciContent> {
                     state,
                     entry,
                   ),
-            onDoubleTap: isActivating
+            onDoubleTap: (isActivating || _isLoading)
                 ? null
                 : () => _confirmForceTurnOffMachine(
                     machine,
@@ -1312,6 +1328,11 @@ class _CuciContentState extends State<CuciContent> {
     String state,
     dynamic entry,
   ) async {
+    if (_isLoading) {
+      Globals.showWarningSnackBar('Sedang memuat data antrean dan status mesin, mohon tunggu sebentar...');
+      return;
+    }
+
     final String customerName = (entry?['customer_name'] ?? '').toString();
     final String runState = (entry?['run_state'] ?? 'Idle').toString();
 
@@ -2420,6 +2441,11 @@ class _CuciContentState extends State<CuciContent> {
     int machineId,
     String machineName,
   ) async {
+    if (_isLoading) {
+      Globals.showWarningSnackBar('Sedang memuat data antrean dan status mesin, mohon tunggu sebentar...');
+      return;
+    }
+
     final Order order = item['order'];
     final machine = _machines.firstWhere(
       (m) => (m.id ?? 0) == machineId,

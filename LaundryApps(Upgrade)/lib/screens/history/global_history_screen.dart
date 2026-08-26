@@ -364,12 +364,23 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         }
       }
 
-      // Combine and sort ledger entries by timestamp descending
+      // Combine and sort ledger entries by timestamp ascending (earliest first so earliest order gets index #1)
       final combined = <Map<String, dynamic>>[
         ...allOrdersList,
         ...pengeluaranList,
       ];
-      combined.sort((a, b) => (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime));
+      combined.sort((a, b) => (a['timestamp'] as DateTime).compareTo(b['timestamp'] as DateTime));
+      cuciLedgerList.sort((a, b) => (a['timestamp'] as DateTime).compareTo(b['timestamp'] as DateTime));
+      keringLedgerList.sort((a, b) => (a['timestamp'] as DateTime).compareTo(b['timestamp'] as DateTime));
+      tokoLedgerList.sort((a, b) => (a['timestamp'] as DateTime).compareTo(b['timestamp'] as DateTime));
+      gosokList.sort((a, b) => (a['timestamp'] as DateTime).compareTo(b['timestamp'] as DateTime));
+      gratisLedgerList.sort((a, b) => (a['timestamp'] as DateTime).compareTo(b['timestamp'] as DateTime));
+      pengeluaranList.sort((a, b) => (a['timestamp'] as DateTime).compareTo(b['timestamp'] as DateTime));
+
+      orders.sort((a, b) => a.orderDate.compareTo(b.orderDate));
+      cuciOrders.sort((a, b) => a.orderDate.compareTo(b.orderDate));
+      pengeringOrders.sort((a, b) => a.orderDate.compareTo(b.orderDate));
+      ironOrders.sort((a, b) => a.orderDate.compareTo(b.orderDate));
 
       if (mounted) {
         setState(() {
@@ -2536,7 +2547,7 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
             ),
             child: Row(
               children: [
-                const SizedBox(width: 70, child: Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                const SizedBox(width: 40, child: Text('NO', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
                 _vDivider(),
                 const Expanded(flex: 3, child: Text('DESKRIPSI / PELANGGAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
                 _vDivider(),
@@ -2549,6 +2560,8 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                 const SizedBox(width: 120, child: Text('KAS MASUK', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.successColor))),
                 _vDivider(),
                 const SizedBox(width: 120, child: Text('KAS KELUAR', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.dangerColor))),
+                _vDivider(),
+                const SizedBox(width: 65, child: Text('WAKTU', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
               ],
             ),
           ),
@@ -2572,10 +2585,11 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       child: Row(
                         children: [
                           SizedBox(
-                            width: 70,
+                            width: 40,
                             child: Text(
-                              item['time'] ?? '--:--',
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: StyleConstants.textMuted),
+                              '${i + 1}.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: StyleConstants.textMuted),
                             ),
                           ),
                           _vDivider(),
@@ -2634,6 +2648,15 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                               isExpense ? formatRp(item['amount'] ?? 0) : '-',
                               textAlign: TextAlign.right,
                               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: StyleConstants.dangerColor),
+                            ),
+                          ),
+                          _vDivider(),
+                          SizedBox(
+                            width: 65,
+                            child: Text(
+                              item['time'] ?? '--:--',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: StyleConstants.textMuted),
                             ),
                           ),
                         ],
@@ -3234,9 +3257,9 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
             ),
             child: Row(
               children: [
-                const SizedBox(width: 60, child: Text('NOTA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                const SizedBox(width: 40, child: Text('NO', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
                 _vDivider(),
-                const SizedBox(width: 60, child: Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
+                const SizedBox(width: 55, child: Text('WAKTU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
                 if (categoryKey == 'cuci' || categoryKey == 'pengering') ...[
                   _vDivider(),
                   const Expanded(flex: 3, child: Text('MESIN DIGUNAKAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted))),
@@ -3251,6 +3274,8 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                 const SizedBox(width: 105, child: Center(child: Text('PEMBAYARAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)))),
                 _vDivider(),
                 const SizedBox(width: 105, child: Align(alignment: Alignment.centerRight, child: Text('TOTAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)))),
+                _vDivider(),
+                const SizedBox(width: 65, child: Center(child: Text('NOTA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)))),
                 _vDivider(),
                 const SizedBox(width: 100, child: Center(child: Text('AKSI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)))),
               ],
@@ -3278,15 +3303,16 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                       child: Row(
                         children: [
                           SizedBox(
-                            width: 60,
+                            width: 40,
                             child: Text(
-                              '#${order.id}',
-                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5, color: StyleConstants.primaryColor),
+                              '${i + 1}.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: StyleConstants.textMuted),
                             ),
                           ),
                           _vDivider(),
                           SizedBox(
-                            width: 60,
+                            width: 55,
                             child: Text(
                               DateFormat('HH:mm').format(order.orderDate),
                               style: const TextStyle(fontSize: 12, color: StyleConstants.textMuted, fontWeight: FontWeight.w600),
@@ -3431,6 +3457,16 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                                 formatRp(order.totalAmount),
                                 textAlign: TextAlign.right,
                                 style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: StyleConstants.textHeading),
+                              ),
+                            ),
+                          ),
+                          _vDivider(),
+                          SizedBox(
+                            width: 65,
+                            child: Center(
+                              child: Text(
+                                '#${order.id}',
+                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5, color: StyleConstants.primaryColor),
                               ),
                             ),
                           ),

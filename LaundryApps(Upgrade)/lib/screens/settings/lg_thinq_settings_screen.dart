@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:laundry_apps/database/models/database_helper.dart';
 import 'package:laundry_apps/database/models/machine_model.dart';
@@ -21,10 +22,12 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
   final TextEditingController _intervalBookingCtrl = TextEditingController(text: '180');
   final TextEditingController _intervalRunningHighCtrl = TextEditingController(text: '300');
   final TextEditingController _intervalRunningLowCtrl = TextEditingController(text: '120');
-  
+  final TextEditingController _washerDurationCtrl = TextEditingController(text: '40');
+
   bool _isLoading = false;
   bool _isConnected = false;
   String _apiBaseUrl = 'http://localhost:5001/';
+  int _washerDurationMinutes = 40;
 
   List<Map<String, dynamic>> _machinesList = [];
   bool _isMachinesLoading = false;
@@ -52,6 +55,7 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
     _intervalBookingCtrl.dispose();
     _intervalRunningHighCtrl.dispose();
     _intervalRunningLowCtrl.dispose();
+    _washerDurationCtrl.dispose();
     super.dispose();
   }
 
@@ -72,7 +76,7 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
           final db = DatabaseHelper.instance;
           final List<MachineModel> existingMachines = await db.getAllMachines();
           final Set<String> existingUrls = existingMachines.map((m) => m.url).toSet();
-          
+
           int addedCount = 0;
           for (var devName in devices) {
             final String targetName = devName.toString().replaceAll(' ', '_');
@@ -80,14 +84,14 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
               final String displayName = targetName.replaceAll('_', ' ');
               final String nameLower = displayName.toLowerCase();
               String key = 'cuci';
-              if (nameLower.contains('dryer') || 
-                  nameLower.contains('pengering') || 
-                  nameLower.contains('dry') || 
+              if (nameLower.contains('dryer') ||
+                  nameLower.contains('pengering') ||
+                  nameLower.contains('dry') ||
                   nameLower.contains('drying') ||
                   nameLower.contains('kering')) {
                 key = 'pengering';
               }
-              
+
               final newMachine = MachineModel(
                 name: displayName,
                 url: targetName,
@@ -98,7 +102,7 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
               addedCount++;
             }
           }
-          
+
           if (addedCount > 0) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -130,6 +134,8 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
           _intervalBookingCtrl.text = (data['interval_booking'] ?? 180).toString();
           _intervalRunningHighCtrl.text = (data['interval_running_high'] ?? 300).toString();
           _intervalRunningLowCtrl.text = (data['interval_running_low'] ?? 120).toString();
+          _washerDurationMinutes = (data['washer_duration_minutes'] ?? 40);
+          _washerDurationCtrl.text = _washerDurationMinutes.toString();
         });
 
         if (_isConnected) {
@@ -158,12 +164,17 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
           'interval_booking': int.tryParse(_intervalBookingCtrl.text.trim()) ?? 180,
           'interval_running_high': int.tryParse(_intervalRunningHighCtrl.text.trim()) ?? 300,
           'interval_running_low': int.tryParse(_intervalRunningLowCtrl.text.trim()) ?? 120,
+          'washer_duration_minutes': int.tryParse(_washerDurationCtrl.text.trim()) ?? 40,
         }),
       );
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pengaturan LG ThinQ berhasil disimpan.'), backgroundColor: Colors.green),
-        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('washer_duration_minutes', int.tryParse(_washerDurationCtrl.text.trim()) ?? 40);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pengaturan LG ThinQ & Durasi Siklus berhasil disimpan.'), backgroundColor: Colors.green),
+          );
+        }
         _fetchStatus();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1005,11 +1016,83 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
                 ),
               ],
             ),
-            
+
+            const SizedBox(height: 32),
+            const Divider(height: 1),
+            const SizedBox(height: 24),
+
+            // Washer Offline Fallback Cycle Duration Section
+            const Text('Durasi Siklus Mesin Cuci (Offline Fallback)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+            const SizedBox(height: 6),
+            const Text(
+              'Durasi timer hitung mundur saat mesin cuci beroperasi dalam mode offline (cloud ThinQ terputus atau mesin manual).',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [30, 35, 40, 45, 50, 60].map((dur) {
+                final isSelected = _washerDurationMinutes == dur;
+                return ChoiceChip(
+                  label: Text(dur == 40 ? '$dur Menit (Standar)' : '$dur Menit'),
+                  selected: isSelected,
+                  selectedColor: primaryColor,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : const Color(0xFF334155),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
+                  ),
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() {
+                        _washerDurationMinutes = dur;
+                        _washerDurationCtrl.text = dur.toString();
+                      });
+                    }
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                SizedBox(
+                  width: 160,
+                  child: TextField(
+                    controller: _washerDurationCtrl,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    decoration: const InputDecoration(
+                      labelText: 'Custom Menit',
+                      suffixText: 'Menit',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    onChanged: (val) {
+                      final p = int.tryParse(val.trim());
+                      if (p != null && p > 0) {
+                        setState(() {
+                          _washerDurationMinutes = p;
+                        });
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Text(
+                    'Nilai ini menentukan batas estimasi selesai pencucian saat offline.',
+                    style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                  ),
+                ),
+              ],
+            ),
+
             const SizedBox(height: 36),
             const Divider(height: 1),
             const SizedBox(height: 24),
-            
+
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [

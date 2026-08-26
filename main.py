@@ -213,7 +213,9 @@ def api_config():
         if 'wa_templates' in data:
             config['wa_templates'] = data['wa_templates']
             
-        # Dryer configuration
+        # Washer & Dryer configuration
+        if 'washer_duration_minutes' in data:
+            config['washer_duration_minutes'] = int(data['washer_duration_minutes'])
         if 'dryer_duration_minutes' in data:
             config['dryer_duration_minutes'] = int(data['dryer_duration_minutes'])
         if 'dryer_always_on' in data:
@@ -312,6 +314,7 @@ def api_config():
         "wa_master_enabled": config.get("wa_master_enabled", True),
         "wa_machine_notifications_enabled": config.get("wa_machine_notifications_enabled", True),
         "wa_templates": config.get("wa_templates", wa_bridge.WA_TEMPLATES),
+        "washer_duration_minutes": config.get("washer_duration_minutes", 40),
         "dryer_duration_minutes": config.get("dryer_duration_minutes", 45),
         "dryer_always_on": config.get("dryer_always_on", False),
         "chatbot_enabled": config.get("chatbot_enabled", True),
@@ -398,10 +401,11 @@ def api_machine_start():
     duration_minutes = data.get('duration')
     if duration_minutes is None or duration_minutes <= 0:
         # If not specified, use full cycle duration based on machine category
+        config = lg_manager.load_lg_config()
         if 'pengering' in entity.lower() or 'dry' in entity.lower() or 'kering' in entity.lower():
-            duration_minutes = 45
+            duration_minutes = config.get('dryer_duration_minutes', 45)
         else:
-            duration_minutes = 40
+            duration_minutes = config.get('washer_duration_minutes', 40)
 
     res, code = machine_manager.start_machine_monitoring(
         entity,
@@ -548,7 +552,8 @@ def lg_status():
         "interval_idle": config.get("interval_idle", 300),
         "interval_booking": config.get("interval_booking", 180),
         "interval_running_high": config.get("interval_running_high", 300),
-        "interval_running_low": config.get("interval_running_low", 120)
+        "interval_running_low": config.get("interval_running_low", 120),
+        "washer_duration_minutes": config.get("washer_duration_minutes", 40)
     })
 
 @app.route('/api/lg/devices')
@@ -567,6 +572,8 @@ def lg_settings():
         config["language"] = data.get("language", config.get("language", "id-ID"))
         if "pat_token" in data:
             config["pat_token"] = data.get("pat_token")
+        if "washer_duration_minutes" in data:
+            config["washer_duration_minutes"] = int(data["washer_duration_minutes"])
 
         # Save interval settings
         for key in ["interval_idle", "interval_booking", "interval_running_high", "interval_running_low"]:
@@ -583,6 +590,7 @@ def lg_settings():
     config["interval_booking"] = config.get("interval_booking", 180)
     config["interval_running_high"] = config.get("interval_running_high", 300)
     config["interval_running_low"] = config.get("interval_running_low", 120)
+    config["washer_duration_minutes"] = config.get("washer_duration_minutes", 40)
     return jsonify(config)
 
 # Legacy API endpoint (backward compatibility with Flutter app)
