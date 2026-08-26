@@ -896,7 +896,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Status: ${_lastQrisStatus ?? "Menunggu Pembayaran (Auto-check 4s)..."}',
+                          'Status: ${_lastQrisStatus ?? "Menunggu Pembayaran (Auto-check 3s)..."}',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -987,7 +987,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
 
   void _startQrisPolling(String orderId) {
     _qrisTimer?.cancel();
-    _qrisTimer = Timer.periodic(const Duration(seconds: 4), (timer) async {
+    _qrisTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       try {
         final status = await MidtransService.checkTransactionStatus(
           orderId,

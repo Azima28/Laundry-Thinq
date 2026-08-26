@@ -143,9 +143,23 @@ class BackendServicesManager {
             workingDirectory: nodeWorkingDir,
           );
         } else {
-          debugPrint('[ServicesManager] Starting Node.js WA microservice: ${nodeFile.path}...');
+          String nodeExe = 'node';
+          final candidateNodeExes = [
+            '$appDir\\wa_service\\node.exe',
+            '$parentDir\\wa_service\\node.exe',
+            '${Directory.current.path}\\wa_service\\node.exe',
+            '$appDir\\node.exe',
+          ];
+          for (final p in candidateNodeExes) {
+            if (File(p).existsSync()) {
+              nodeExe = p;
+              break;
+            }
+          }
+
+          debugPrint('[ServicesManager] Starting Node.js WA microservice with ($nodeExe): ${nodeFile.path}...');
           _nodeProcess = await Process.start(
-            'node',
+            nodeExe,
             [nodeFile.path, '--parent-pid=$parentPid'],
             workingDirectory: nodeWorkingDir,
           );

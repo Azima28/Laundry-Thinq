@@ -281,6 +281,28 @@ let currentQR = null;
 let clientInfo = null;
 let lastRequestTime = 0;
 
+function findBrowserExecutable() {
+    const candidatePaths = [
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+        (process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe') : null),
+        (process.env.PROGRAMFILES ? path.join(process.env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe') : null),
+        (process.env['PROGRAMFILES(X86)'] ? path.join(process.env['PROGRAMFILES(X86)'], 'Microsoft', 'Edge', 'Application', 'msedge.exe') : null),
+    ].filter(Boolean);
+
+    for (const p of candidatePaths) {
+        if (fs.existsSync(p)) {
+            console.log(`[Puppeteer] Using native Windows browser executable: ${p}`);
+            return p;
+        }
+    }
+    return undefined;
+}
+
+const browserExecutable = findBrowserExecutable();
+
 const client = new Client({
     authStrategy: new LocalAuth({
         dataPath: path.join(__dirname, '.wwebjs_auth')
@@ -293,6 +315,7 @@ const client = new Client({
     },
     puppeteer: {
         headless: false,
+        executablePath: browserExecutable,
         defaultViewport: null,
         args: [
             '--no-sandbox',
