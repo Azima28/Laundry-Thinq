@@ -22,9 +22,6 @@ class _HistoryPengeringPageState extends State<HistoryPengeringPage> {
   final TextEditingController _searchController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
 
-  Map<String, int> _machineUsageCounts = {};
-  int _totalUsageCount = 0;
-
   @override
   void initState() {
     super.initState();
@@ -61,7 +58,6 @@ class _HistoryPengeringPageState extends State<HistoryPengeringPage> {
         _filteredRecords = dateFiltered;
         _isLoading = false;
       });
-      _calculateStatistics();
     } catch (e) {
       setState(() {
         _usageHistory = [];
@@ -72,18 +68,6 @@ class _HistoryPengeringPageState extends State<HistoryPengeringPage> {
 
   List<Map<String, dynamic>> _usageHistory = [];
   List<Map<String, dynamic>> _filteredRecords = [];
-
-  void _calculateStatistics() {
-    _machineUsageCounts.clear();
-    _totalUsageCount = _filteredRecords.length;
-
-    for (var record in _filteredRecords) {
-      final machineName =
-          record['machine_name'] as String? ?? 'Mesin Tak Dikenal';
-      _machineUsageCounts[machineName] =
-          (_machineUsageCounts[machineName] ?? 0) + 1;
-    }
-  }
 
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(

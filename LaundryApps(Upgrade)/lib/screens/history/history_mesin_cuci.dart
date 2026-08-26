@@ -26,9 +26,6 @@ class _HistoryMesinCuciPageState extends State<HistoryMesinCuciPage>
   final TextEditingController _searchController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
 
-  Map<String, int> _machineUsageCounts = {};
-  int _totalUsageCount = 0;
-
   @override
   void initState() {
     super.initState();
@@ -73,7 +70,6 @@ class _HistoryMesinCuciPageState extends State<HistoryMesinCuciPage>
         _filtered = dateFiltered;
         _isLoading = false;
       });
-      _calculateStatistics();
     } catch (e, st) {
       debugPrint('ERROR in _loadData: $e\n$st');
       setState(() {
@@ -98,18 +94,6 @@ class _HistoryMesinCuciPageState extends State<HistoryMesinCuciPage>
         }).toList();
       }
     });
-  }
-
-  void _calculateStatistics() {
-    _machineUsageCounts.clear();
-    _totalUsageCount = _filtered.length;
-
-    for (var record in _filtered) {
-      final machineName =
-          record['machine_name'] as String? ?? 'Mesin Tak Dikenal';
-      _machineUsageCounts[machineName] =
-          (_machineUsageCounts[machineName] ?? 0) + 1;
-    }
   }
 
   Future<void> _selectDate() async {

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'backend_services_manager.dart';
 
 class MachineStatusService {
   MachineStatusService._init();
@@ -35,6 +36,23 @@ class MachineStatusService {
         'error': 'Respon server tidak valid (HTTP $statusCode)'
       };
     }
+  }
+
+  String _formatFriendlyError(dynamic e) {
+    final errStr = e.toString();
+    if (errStr.contains('SocketException') ||
+        errStr.contains('refused the network connection') ||
+        errStr.contains('ClientException') ||
+        errStr.contains('Connection refused') ||
+        errStr.contains('errno = 1225')) {
+      // Trigger background auto-recovery
+      BackendServicesManager.instance.ensureServicesRunning();
+      return 'Server background sedang bersiap/menghubungkan ulang. Mohon tunggu beberapa detik lalu coba lagi.';
+    }
+    if (errStr.contains('TimeoutException') || errStr.contains('timed out')) {
+      return 'Waktu koneksi habis (Timeout). Mohon periksa status server.';
+    }
+    return errStr;
   }
 
   // v2: Connectivity status
@@ -191,7 +209,7 @@ class MachineStatusService {
   Future<void> _fetch() async {
     try {
       final uri = Uri.parse(_baseUrl);
-      final resp = await http.get(uri).timeout(const Duration(seconds: 6));
+      final resp = await http.get(uri).timeout(const Duration(seconds: 5));
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         final Map<String, dynamic> data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
         _states.clear();
@@ -209,6 +227,7 @@ class MachineStatusService {
     } catch (e, stack) {
       _lastFetchFailed = true;
       debugPrint('[MachineStatusService] _fetch error: $e\n$stack');
+      BackendServicesManager.instance.ensureServicesRunning();
     } finally {
       _notifier.value++;
     }
@@ -227,7 +246,7 @@ class MachineStatusService {
         return {'success': false, 'message': data['error'] ?? 'Gagal membuka WA: HTTP ${resp.statusCode}'};
       }
     } catch (e) {
-      return {'success': false, 'message': 'Gagal menghubungi WhatsApp service: $e'};
+      return {'success': false, 'message': _formatFriendlyError(e)};
     }
   }
 
@@ -235,7 +254,7 @@ class MachineStatusService {
   Future<void> _fetchConnectivity() async {
     try {
       final uri = Uri.parse('$_dashboardUrl/api/connectivity');
-      final resp = await http.get(uri).timeout(const Duration(seconds: 5));
+      final resp = await http.get(uri).timeout(const Duration(seconds: 4));
       if (resp.statusCode == 200) {
         final data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
         _internetOk = data['internet'] == true;
@@ -244,14 +263,19 @@ class MachineStatusService {
         _waOk = data['whatsapp'] == true;
         _thinqDeviceCount = data['thinq_devices'] ?? 0;
         _bardiDeviceCount = data['bardi_devices'] ?? 0;
+      } else {
+        _internetOk = false;
+        _thinqOk = false;
+        _bardiOk = false;
+        _waOk = false;
       }
     } catch (e, stack) {
       debugPrint('[MachineStatusService] _fetchConnectivity error: $e\n$stack');
-      // If we can't reach the server, everything is down
       _internetOk = false;
       _thinqOk = false;
       _bardiOk = false;
       _waOk = false;
+      BackendServicesManager.instance.ensureServicesRunning();
     }
     _notifier.value++;
   }
@@ -305,7 +329,7 @@ class MachineStatusService {
         return {'success': false, 'error': data['error'] ?? 'Unknown error'};
       }
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      return {'success': false, 'error': _formatFriendlyError(e)};
     }
   }
 
@@ -341,7 +365,7 @@ class MachineStatusService {
         return {'success': false, 'error': data['error'] ?? 'Unknown error'};
       }
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      return {'success': false, 'error': _formatFriendlyError(e)};
     }
   }
 
@@ -374,7 +398,7 @@ class MachineStatusService {
 
       return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      return {'success': false, 'error': _formatFriendlyError(e)};
     }
   }
 
@@ -416,7 +440,7 @@ class MachineStatusService {
         return {'success': false, 'error': data['error'] ?? 'Unknown error'};
       }
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      return {'success': false, 'error': _formatFriendlyError(e)};
     }
   }
 
@@ -462,7 +486,7 @@ class MachineStatusService {
         return {'success': false, 'error': data['error'] ?? 'Unknown error'};
       }
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      return {'success': false, 'error': _formatFriendlyError(e)};
     }
   }
 
@@ -486,7 +510,7 @@ class MachineStatusService {
 
       return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      return {'success': false, 'error': _formatFriendlyError(e)};
     }
   }
 
@@ -577,7 +601,7 @@ class MachineStatusService {
 
       return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      return {'success': false, 'error': _formatFriendlyError(e)};
     }
   }
 
@@ -613,7 +637,7 @@ class MachineStatusService {
 
       return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      return {'success': false, 'error': _formatFriendlyError(e)};
     }
   }
 
@@ -663,7 +687,7 @@ class MachineStatusService {
 
       return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      return {'success': false, 'error': _formatFriendlyError(e)};
     }
   }
 
@@ -727,7 +751,7 @@ class MachineStatusService {
 
       return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      return {'success': false, 'error': _formatFriendlyError(e)};
     }
   }
 
@@ -754,7 +778,7 @@ class MachineStatusService {
 
       return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      return {'success': false, 'error': _formatFriendlyError(e)};
     }
   }
 
@@ -784,7 +808,7 @@ class MachineStatusService {
 
       return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      return {'success': false, 'error': _formatFriendlyError(e)};
     }
   }
 

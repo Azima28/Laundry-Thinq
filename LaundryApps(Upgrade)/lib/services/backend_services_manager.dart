@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -11,24 +12,84 @@ class BackendServicesManager {
   Process? _nodeProcess;
 
   bool _isStarting = false;
+  Timer? _watchdogTimer;
 
   bool get isPythonRunning => _pythonProcess != null;
   bool get isNodeRunning => _nodeProcess != null;
 
-  Future<bool> isBackendReady({Duration timeout = const Duration(seconds: 8)}) async {
+  List<String> _getCandidateDirectories() {
+    final List<String> dirs = [];
+
+    // 1. Executable dir
+    try {
+      final appDir = File(Platform.resolvedExecutable).parent.path;
+      dirs.add(appDir);
+
+      // Traverse up to 5 levels (from build/windows/x64/runner/Debug up to root)
+      Directory current = Directory(appDir);
+      for (int i = 0; i < 5; i++) {
+        current = current.parent;
+        dirs.add(current.path);
+      }
+    } catch (_) {}
+
+    // 2. Working directory & parent
+    try {
+      final cwd = Directory.current.path;
+      dirs.add(cwd);
+      dirs.add(Directory.current.parent.path);
+    } catch (_) {}
+
+    // 3. Known workspace path
+    dirs.add('C:\\Work\\project laundry\\laundry');
+
+    // Remove duplicates and non-existent directories
+    final uniqueDirs = <String>{};
+    final validDirs = <String>[];
+    for (final d in dirs) {
+      final normalized = d.trim().replaceAll('/', '\\');
+      if (normalized.isNotEmpty && uniqueDirs.add(normalized.toLowerCase())) {
+        if (Directory(normalized).existsSync()) {
+          validDirs.add(normalized);
+        }
+      }
+    }
+    return validDirs;
+  }
+
+  Future<bool> isBackendReady({Duration timeout = const Duration(seconds: 4)}) async {
     final stopwatch = Stopwatch()..start();
     while (stopwatch.elapsed < timeout) {
       try {
-        final resp = await http.get(Uri.parse('http://127.0.0.1:5001/')).timeout(const Duration(milliseconds: 1200));
+        final resp = await http.get(Uri.parse('http://127.0.0.1:5001/')).timeout(const Duration(milliseconds: 800));
         if (resp.statusCode >= 200 && resp.statusCode < 500) {
           return true;
         }
       } catch (_) {
         // Backend still booting
       }
-      await Future.delayed(const Duration(milliseconds: 400));
+      await Future.delayed(const Duration(milliseconds: 300));
     }
     return false;
+  }
+
+  Future<void> ensureServicesRunning() async {
+    final ready = await isBackendReady(timeout: const Duration(milliseconds: 800));
+    if (!ready && !_isStarting) {
+      debugPrint('[ServicesManager] Backend not responding. Starting background services...');
+      await startServices();
+    }
+  }
+
+  void startWatchdog() {
+    _watchdogTimer?.cancel();
+    _watchdogTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      final ready = await isBackendReady(timeout: const Duration(seconds: 1));
+      if (!ready && !_isStarting) {
+        debugPrint('[ServicesManager Watchdog] Backend offline. Auto-recovering services...');
+        await startServices();
+      }
+    });
   }
 
   Future<void> startServices() async {
@@ -38,52 +99,58 @@ class BackendServicesManager {
     final int parentPid = pid;
     debugPrint('[ServicesManager] Parent process PID: $parentPid');
 
-    // 1. Resolve working directories relative to executable or current project root
-    String appDir = File(Platform.resolvedExecutable).parent.path;
-    String parentDir = Directory.current.parent.path;
+    final candidateDirs = _getCandidateDirectories();
+    debugPrint('[ServicesManager] Candidate search dirs: $candidateDirs');
 
-    debugPrint('[ServicesManager] Executable Directory: $appDir');
-    debugPrint('[ServicesManager] Working Directory: ${Directory.current.path}');
+    // Check if backend is ALREADY running and responding on port 5001
+    final alreadyReady = await isBackendReady(timeout: const Duration(milliseconds: 600));
+    if (alreadyReady) {
+      debugPrint('[ServicesManager] Backend is already active and responding on port 5001.');
+      _isStarting = false;
+      startWatchdog();
+      return;
+    }
 
-    // Find Python backend executable/script in multiple candidate locations
-    File? pythonFile;
-    String pythonWorkingDir = appDir;
+    // 1. Find Python backend executable/script
+    File? pythonExe;
+    File? pythonScript;
+    String pythonWorkingDir = candidateDirs.isNotEmpty ? candidateDirs.first : Directory.current.path;
 
-    final candidatePythonPaths = [
-      '$appDir\\main.exe',
-      '$appDir\\main.py',
-      '$parentDir\\main.exe',
-      '$parentDir\\main.py',
-      '${Directory.current.path}\\main.exe',
-      '${Directory.current.path}\\main.py',
-    ];
-
-    for (final path in candidatePythonPaths) {
-      final f = File(path);
-      if (f.existsSync()) {
-        pythonFile = f;
-        pythonWorkingDir = f.parent.path;
-        break;
+    for (final dir in candidateDirs) {
+      final exe = File('$dir\\main.exe');
+      if (exe.existsSync() && pythonExe == null) {
+        pythonExe = exe;
+        pythonWorkingDir = dir;
+      }
+      final script = File('$dir\\main.py');
+      if (script.existsSync() && pythonScript == null) {
+        pythonScript = script;
+        if (pythonExe == null) pythonWorkingDir = dir;
       }
     }
 
     // 2. Start Python server: main.exe (compiled) or main.py (dev)
     try {
-      if (pythonFile != null && _pythonProcess == null) {
-        final isExe = pythonFile.path.toLowerCase().endsWith('.exe');
-        if (isExe) {
-          debugPrint('[ServicesManager] Starting compiled Python server: ${pythonFile.path}...');
-          _pythonProcess = await Process.start(
-            pythonFile.path,
-            ['--parent-pid', '$parentPid'],
-            workingDirectory: pythonWorkingDir,
-            environment: {'PYTHONUNBUFFERED': '1'},
-          );
-        } else {
-          debugPrint('[ServicesManager] Starting Python script: ${pythonFile.path}...');
+      if (_pythonProcess == null) {
+        if (pythonExe != null) {
+          debugPrint('[ServicesManager] Starting compiled Python server: ${pythonExe.path} (cwd: $pythonWorkingDir)...');
+          try {
+            _pythonProcess = await Process.start(
+              pythonExe.path,
+              ['--parent-pid', '$parentPid'],
+              workingDirectory: pythonWorkingDir,
+              environment: {'PYTHONUNBUFFERED': '1'},
+            );
+          } catch (exeError) {
+            debugPrint('[ServicesManager] Failed to launch main.exe: $exeError. Falling back to python script...');
+          }
+        }
+
+        if (_pythonProcess == null && pythonScript != null) {
+          debugPrint('[ServicesManager] Starting Python script: ${pythonScript.path} (cwd: $pythonWorkingDir)...');
           _pythonProcess = await Process.start(
             'python',
-            ['-u', pythonFile.path, '--parent-pid', '$parentPid'],
+            ['-u', pythonScript.path, '--parent-pid', '$parentPid'],
             workingDirectory: pythonWorkingDir,
           );
         }
@@ -92,19 +159,16 @@ class BackendServicesManager {
           debugPrint('[ServicesManager] Python backend process terminated with exit code: $code');
           _pythonProcess = null;
         });
-      } else if (pythonFile == null) {
-        debugPrint('[ServicesManager] Warning: Python backend (main.exe / main.py) not found in candidate paths.');
-      }
 
-      if (_pythonProcess != null) {
-        // Pipe stdout & stderr for debugging
-        _pythonProcess!.stdout.transform(const SystemEncoding().decoder).listen((data) {
-          debugPrint('[Python STDOUT] ${data.trim()}');
-        });
-        _pythonProcess!.stderr.transform(const SystemEncoding().decoder).listen((data) {
-          debugPrint('[Python STDERR] ${data.trim()}');
-        });
-        debugPrint('[ServicesManager] Python server successfully started in background.');
+        if (_pythonProcess != null) {
+          _pythonProcess!.stdout.transform(const SystemEncoding().decoder).listen((data) {
+            debugPrint('[Python STDOUT] ${data.trim()}');
+          });
+          _pythonProcess!.stderr.transform(const SystemEncoding().decoder).listen((data) {
+            debugPrint('[Python STDERR] ${data.trim()}');
+          });
+          debugPrint('[ServicesManager] Python server process spawned.');
+        }
       }
     } catch (e) {
       debugPrint('[ServicesManager] Error starting Python server: $e');
@@ -112,55 +176,45 @@ class BackendServicesManager {
 
     // 3. Start Node.js WhatsApp microservice
     try {
-      File? nodeFile;
-      String nodeWorkingDir = '$appDir\\wa_service';
+      File? nodeExe;
+      File? nodeScript;
+      String nodeWorkingDir = candidateDirs.isNotEmpty ? candidateDirs.first : Directory.current.path;
 
-      final candidateNodePaths = [
-        '$appDir\\wa_service\\wa_service.exe',
-        '$appDir\\wa_service\\index.js',
-        '$parentDir\\wa_service\\wa_service.exe',
-        '$parentDir\\wa_service\\index.js',
-        '${Directory.current.path}\\wa_service\\wa_service.exe',
-        '${Directory.current.path}\\wa_service\\index.js',
-      ];
-
-      for (final path in candidateNodePaths) {
-        final f = File(path);
-        if (f.existsSync()) {
-          nodeFile = f;
-          nodeWorkingDir = f.parent.path;
-          break;
+      for (final dir in candidateDirs) {
+        final exe = File('$dir\\wa_service\\wa_service.exe');
+        if (exe.existsSync() && nodeExe == null) {
+          nodeExe = exe;
+          nodeWorkingDir = '$dir\\wa_service';
+        }
+        final script = File('$dir\\wa_service\\index.js');
+        if (script.existsSync() && nodeScript == null) {
+          nodeScript = script;
+          if (nodeExe == null) nodeWorkingDir = '$dir\\wa_service';
         }
       }
 
-      if (nodeFile != null && _nodeProcess == null) {
-        final isExe = nodeFile.path.toLowerCase().endsWith('.exe');
-        if (isExe) {
-          debugPrint('[ServicesManager] Starting compiled Node.js WA microservice: ${nodeFile.path}...');
+      if (_nodeProcess == null) {
+        if (nodeExe != null) {
+          debugPrint('[ServicesManager] Starting compiled Node.js WA microservice: ${nodeExe.path}...');
           _nodeProcess = await Process.start(
-            nodeFile.path,
+            nodeExe.path,
             ['--parent-pid=$parentPid'],
             workingDirectory: nodeWorkingDir,
           );
-        } else {
-          String nodeExe = 'node';
-          final candidateNodeExes = [
-            '$appDir\\wa_service\\node.exe',
-            '$parentDir\\wa_service\\node.exe',
-            '${Directory.current.path}\\wa_service\\node.exe',
-            '$appDir\\node.exe',
-          ];
-          for (final p in candidateNodeExes) {
-            if (File(p).existsSync()) {
-              nodeExe = p;
+        } else if (nodeScript != null) {
+          String runtimeNode = 'node';
+          for (final dir in candidateDirs) {
+            final localNode = File('$dir\\wa_service\\node.exe');
+            if (localNode.existsSync()) {
+              runtimeNode = localNode.path;
               break;
             }
           }
 
-          debugPrint('[ServicesManager] Starting Node.js WA microservice with ($nodeExe): ${nodeFile.path}...');
+          debugPrint('[ServicesManager] Starting Node.js WA microservice with ($runtimeNode): ${nodeScript.path}...');
           _nodeProcess = await Process.start(
-            nodeExe,
-            [nodeFile.path, '--parent-pid=$parentPid'],
+            runtimeNode,
+            [nodeScript.path, '--parent-pid=$parentPid'],
             workingDirectory: nodeWorkingDir,
           );
         }
@@ -169,30 +223,30 @@ class BackendServicesManager {
           debugPrint('[ServicesManager] Node.js WA process terminated with exit code: $code');
           _nodeProcess = null;
         });
-      } else if (nodeFile == null) {
-        debugPrint('[ServicesManager] Warning: WhatsApp microservice not found.');
-      }
 
-      if (_nodeProcess != null) {
-        // Pipe stdout & stderr
-        _nodeProcess!.stdout.transform(const SystemEncoding().decoder).listen((data) {
-          debugPrint('[Node STDOUT] ${data.trim()}');
-        });
-        _nodeProcess!.stderr.transform(const SystemEncoding().decoder).listen((data) {
-          debugPrint('[Node STDERR] ${data.trim()}');
-        });
-        debugPrint('[ServicesManager] Node.js WhatsApp microservice successfully started in background.');
+        if (_nodeProcess != null) {
+          _nodeProcess!.stdout.transform(const SystemEncoding().decoder).listen((data) {
+            debugPrint('[Node STDOUT] ${data.trim()}');
+          });
+          _nodeProcess!.stderr.transform(const SystemEncoding().decoder).listen((data) {
+            debugPrint('[Node STDERR] ${data.trim()}');
+          });
+          debugPrint('[ServicesManager] Node.js WhatsApp microservice spawned.');
+        }
       }
     } catch (e) {
       debugPrint('[ServicesManager] Error starting Node.js server: $e');
     }
 
     _isStarting = false;
+    startWatchdog();
   }
 
   Future<void> stopServices() async {
     debugPrint('[ServicesManager] Stopping background child services...');
-    
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+
     if (_pythonProcess != null) {
       _pythonProcess!.kill();
       _pythonProcess = null;

@@ -110,24 +110,6 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  Future<void> _updateOrderStatus(Order order, String newStatus) async {
-    final success = await _repository.updateOrderStatus(order.id!, newStatus);
-    if (success) {
-      _loadOrders();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Status pengerjaan berhasil diperbarui.'), backgroundColor: Colors.green),
-        );
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal memperbarui status pengerjaan.'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
   void _showPaymentDialog(Order order) {
     final sisaTagihan = order.totalAmount - order.paidAmount;
     final controller = TextEditingController(text: sisaTagihan.toString());
