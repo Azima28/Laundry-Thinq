@@ -653,8 +653,9 @@ class _PesanPageState extends State<PesanPage> {
 
         final m = (it.machineType ?? '').toLowerCase();
         final n = it.nama.toLowerCase();
-        final isWash = m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah');
-        final isDry = m == 'pengering' || n.contains('kering') || n.contains('dry');
+        final isIron = m == 'gosok' || m == 'iron' || n.contains('gosok') || n.contains('setrika') || n.contains('iron') || n.contains('lipat') || it.type == TransactionType.iron;
+        final isDry = m == 'pengering' || n.contains('kering') || n.contains('dry') || n.contains('pengering');
+        final isWash = (m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah')) && !n.contains('kering saja') && !isIron;
         final isMachine = isWash || isDry;
 
         // Collect per-tub notes for this item
@@ -699,7 +700,7 @@ class _PesanPageState extends State<PesanPage> {
               quantity: qty - 1,
               price: it.harga,
               note: remainingNote,
-              machineType: it.machineType ?? 'cuci',
+              machineType: it.machineType ?? (isWash ? 'cuci' : (isDry ? 'pengering' : (isIron ? 'gosok' : 'toko'))),
               itemId: it.id ?? 1,
             ));
           }
@@ -719,7 +720,7 @@ class _PesanPageState extends State<PesanPage> {
             quantity: qty,
             price: it.harga,
             note: itemNote,
-            machineType: it.machineType ?? (isWash ? 'cuci' : (isDry ? 'pengering' : 'toko')),
+            machineType: it.machineType ?? (isWash ? 'cuci' : (isDry ? 'pengering' : (isIron ? 'gosok' : 'toko'))),
             itemId: it.id ?? 1,
           ));
         }
@@ -1325,7 +1326,9 @@ class _PesanPageState extends State<PesanPage> {
     for (var it in finalOrder.items) {
       final n = it.itemName.toLowerCase();
       final m = (it.machineType ?? '').toLowerCase();
-      if (m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah')) {
+      final bool isIron = m == 'gosok' || m == 'iron' || n.contains('gosok') || n.contains('setrika') || n.contains('iron') || n.contains('lipat');
+      final bool isWash = (m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah')) && !n.contains('kering saja') && !isIron;
+      if (isWash) {
         activeKuponCalc += it.quantity;
       }
     }

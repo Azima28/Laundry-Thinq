@@ -622,15 +622,11 @@ def api_wa_status():
 @api_app.route('/api/wa/open-gui')
 def api_wa_open_gui():
     """Proxy to WhatsApp Node.js service to focus/open the WhatsApp Web GUI window."""
-    last_err = None
-    for _ in range(3):
-        try:
-            resp = requests.get(f"{wa_bridge.WA_SERVICE_URL}/open-gui", timeout=8)
-            return Response(resp.text, mimetype='application/json'), resp.status_code
-        except Exception as e:
-            last_err = e
-            time.sleep(1)
-    return jsonify({"error": f"WhatsApp service belum siap: {str(last_err)}"}), 503
+    try:
+        resp = requests.get(f"{wa_bridge.WA_SERVICE_URL}/open-gui", timeout=10)
+        return Response(resp.text, mimetype='application/json'), resp.status_code
+    except Exception as e:
+        return jsonify({"error": f"WhatsApp service belum siap: {str(e)}"}), 503
 
 
 @app.route('/api/wa/qr')

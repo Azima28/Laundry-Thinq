@@ -219,7 +219,7 @@ class MachineStatusService {
     try {
       final cleanBase = _dashboardUrl.endsWith('/') ? _dashboardUrl.substring(0, _dashboardUrl.length - 1) : _dashboardUrl;
       final uri = Uri.parse('$cleanBase/api/wa/open-gui');
-      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
+      final resp = await http.get(uri).timeout(const Duration(seconds: 15));
       final data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
       if (resp.statusCode == 200) {
         return {'success': true, 'message': data['message'] ?? 'Jendela WhatsApp Web telah dibuka.'};

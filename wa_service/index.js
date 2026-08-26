@@ -1195,29 +1195,31 @@ client.on('disconnected', (reason) => {
  * GET /open-gui
  * Activates and brings the live WhatsApp Web GUI window to the front
  */
-app.get('/open-gui', async (req, res) => {
+app.get('/open-gui', (req, res) => {
     lastRequestTime = Date.now();
-    try {
-        if (!isReady && !isInitializing) {
-            initializeClient();
-            return res.json({ success: true, message: 'Menginisialisasi jendela WhatsApp Web...' });
-        }
+    res.json({ success: true, message: 'Membuka jendela WhatsApp Web...' });
 
-        if (client.pupPage) {
-            await client.pupPage.bringToFront();
-            if (process.platform === 'win32') {
-                const { exec } = require('child_process');
-                exec('powershell -NoProfile -Command "(New-Object -ComObject WScript.Shell).AppActivate(\'WhatsApp\')"');
+    // Execute bringToFront and AppActivate asynchronously in background
+    (async () => {
+        try {
+            if (!isReady && !isInitializing) {
+                initializeClient();
+                return;
             }
-            return res.json({ success: true, message: 'Jendela WhatsApp Web telah dibuka.' });
-        } else {
-            initializeClient();
-            return res.json({ success: true, message: 'Mengaktifkan browser WhatsApp Web...' });
+
+            if (client && client.pupPage) {
+                await client.pupPage.bringToFront();
+                if (process.platform === 'win32') {
+                    const { exec } = require('child_process');
+                    exec('powershell -NoProfile -Command "(New-Object -ComObject WScript.Shell).AppActivate(\'WhatsApp\')"');
+                }
+            } else if (!isReady && !isInitializing) {
+                initializeClient();
+            }
+        } catch (e) {
+            console.error('[WA] Error bringing window to front:', e.message);
         }
-    } catch (e) {
-        console.error('[WA] Error on /open-gui:', e.message);
-        res.status(500).json({ success: false, error: e.message });
-    }
+    })();
 });
 
 /**

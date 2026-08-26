@@ -759,11 +759,15 @@ class DatabaseHelper {
 
         final nameLower = item.itemName.toLowerCase();
         final mType = (item.machineType ?? '').toLowerCase();
-        if (mType == 'cuci' || nameLower.contains('cuci') || nameLower.contains('wash') || nameLower.contains('basah')) {
+        final bool isIron = mType == 'gosok' || mType == 'iron' || nameLower.contains('gosok') || nameLower.contains('setrika') || nameLower.contains('iron') || nameLower.contains('lipat');
+        final bool isDry = mType == 'pengering' || nameLower.contains('kering saja') || nameLower.contains('pengering') || nameLower.contains('dry');
+        final bool isWash = (mType == 'cuci' || nameLower.contains('cuci') || nameLower.contains('wash') || nameLower.contains('basah')) && !nameLower.contains('kering saja') && !isIron;
+
+        if (isWash) {
           washQty += item.quantity;
-        } else if (mType == 'pengering' || nameLower.contains('kering') || nameLower.contains('pengering') || nameLower.contains('dry')) {
+        } else if (isDry) {
           dryQty += item.quantity;
-        } else if (mType == 'gosok' || mType == 'iron' || nameLower.contains('gosok') || nameLower.contains('setrika')) {
+        } else if (isIron) {
           ironQty += item.quantity;
         } else {
           storeQty += item.quantity;
@@ -1642,11 +1646,15 @@ class DatabaseHelper {
           for (var it in o.items) {
             final n = it.itemName.toLowerCase();
             final m = (it.machineType ?? '').toLowerCase();
-            if (m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah')) {
+            final bool isIron = m == 'gosok' || m == 'iron' || n.contains('gosok') || n.contains('setrika') || n.contains('iron') || n.contains('lipat');
+            final bool isDry = m == 'pengering' || n.contains('kering saja') || n.contains('pengering') || n.contains('dry');
+            final bool isWash = (m == 'cuci' || n.contains('cuci') || n.contains('wash') || n.contains('basah')) && !n.contains('kering saja') && !isIron;
+
+            if (isWash) {
               orderWash += it.quantity;
-            } else if (m == 'pengering' || n.contains('kering') || n.contains('pengering') || n.contains('dry')) {
+            } else if (isDry) {
               orderDry += it.quantity;
-            } else if (m == 'gosok' || m == 'iron' || n.contains('gosok') || n.contains('setrika')) {
+            } else if (isIron) {
               orderIron += it.quantity;
             } else {
               orderStore += it.quantity;
