@@ -231,11 +231,13 @@ def init_db():
         except sqlite3.OperationalError:
             pass
 
-    # Add loyalty columns to orders table if not present
+    # Add loyalty & QRIS columns to orders table if not present
     order_loyalty_cols = [
         'loyalty_claimed INTEGER DEFAULT 0',
         'wash_sequence INTEGER DEFAULT 0',
-        'stamps_used INTEGER DEFAULT 0'
+        'stamps_used INTEGER DEFAULT 0',
+        'qris_created_at TEXT',
+        'qris_status TEXT DEFAULT "pending"'
     ]
     for col in order_loyalty_cols:
         try:

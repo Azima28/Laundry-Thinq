@@ -227,6 +227,8 @@ class DatabaseHelper {
             await _ensureCustomerPhoneColumn(db);
             await _ensureCustomersTable(db);
             await _ensureCustomerLoyaltyColumns(db);
+            await _ensureOrderLoyaltyColumns(db);
+            await _ensureQrisColumns(db);
             await _ensureExpensesTable(db);
             await _ensureDurationDaysColumn(db);
             await _ensureStaffRestockableColumn(db);
@@ -453,6 +455,28 @@ class DatabaseHelper {
     }
   }
 
+  Future<void> _ensureQrisColumns(Database db) async {
+    try {
+      final List<Map<String, dynamic>> info = await db.rawQuery(
+        "PRAGMA table_info(orders)",
+      );
+      final existing = info.map((r) => r['name'] as String).toSet();
+
+      final columns = {
+        'qris_created_at': 'TEXT',
+        'qris_status': 'TEXT DEFAULT "pending"',
+      };
+
+      for (var entry in columns.entries) {
+        if (!existing.contains(entry.key)) {
+          await db.execute("ALTER TABLE orders ADD COLUMN ${entry.key} ${entry.value}");
+        }
+      }
+    } catch (e) {
+      print('Error ensuring QRIS columns: $e');
+    }
+  }
+
   Future<void> _ensureExpensesTable(Database db) async {
     try {
       await db.execute('''
@@ -503,6 +527,8 @@ class DatabaseHelper {
         payment_method TEXT NOT NULL DEFAULT 'cash',
         qris_url TEXT,
         qris_id TEXT,
+        qris_created_at TEXT,
+        qris_status TEXT DEFAULT 'pending',
         payment_timestamp TEXT,
         assigned_machine_id INTEGER,
         machine_started_at TEXT,
@@ -705,6 +731,8 @@ class DatabaseHelper {
         'payment_method': order.paymentMethod,
         'qris_url': order.qrisUrl,
         'qris_id': order.qrisId,
+        'qris_created_at': order.qrisCreatedAt?.toIso8601String(),
+        'qris_status': order.qrisStatus ?? 'pending',
         'payment_timestamp': order.paymentTimestamp?.toIso8601String(),
         'assigned_machine_id': order.assignedMachineId,
         'machine_started_at': order.machineStartedAt?.toIso8601String(),
@@ -973,6 +1001,78 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  /// Get pending QRIS orders that need automated status check (only within last 24h)
+  Future<List<Order>> getPendingQrisOrders() async {
+    final db = await database;
+    final List<Map<String, dynamic>> orderMaps = await db.rawQuery('''
+      SELECT * FROM orders
+      WHERE is_paid = 0
+        AND qris_id IS NOT NULL
+        AND qris_id != ""
+        AND (payment_method LIKE "%QRIS%" OR payment_method LIKE "%qris%")
+      ORDER BY id DESC
+    ''');
+
+    final List<Order> orders = [];
+    for (var orderMap in orderMaps) {
+      final List<Map<String, dynamic>> itemMaps = await db.rawQuery('''
+        SELECT oi.*, t.machine_type
+        FROM order_items oi
+        LEFT JOIN transactions t ON oi.item_id = t.id
+        WHERE oi.order_id = ?
+      ''', [orderMap['id']]);
+
+      final items = itemMaps.map((item) => OrderItem.fromMap(item)).toList();
+      orders.add(Order.fromMap(orderMap, items));
+    }
+    return orders;
+  }
+
+  /// Mark pending QRIS order as successfully paid (Settlement / Lunas Otomatis)
+  Future<void> updateOrderQrisPaymentSuccess(int orderId, {String? paymentTimestamp, String? qrisStatus}) async {
+    final db = await database;
+    final nowStr = paymentTimestamp ?? DateTime.now().toIso8601String();
+    await db.rawUpdate('''
+      UPDATE orders
+      SET is_paid = 1,
+          paid_amount = total_amount,
+          payment_method = "QRIS Dinamis (Lunas Otomatis)",
+          payment_timestamp = ?,
+          qris_status = ?
+      WHERE id = ?
+    ''', [nowStr, qrisStatus ?? 'settlement', orderId]);
+  }
+
+  /// Update / re-generate QRIS data for an existing order with a fresh 24h validity window
+  Future<void> updateOrderQrisDetails(
+    int orderId, {
+    required String qrisId,
+    required String qrisUrl,
+    required DateTime qrisCreatedAt,
+    String qrisStatus = 'pending',
+  }) async {
+    final db = await database;
+    await db.rawUpdate('''
+      UPDATE orders
+      SET qris_id = ?,
+          qris_url = ?,
+          qris_created_at = ?,
+          qris_status = ?,
+          payment_method = "QRIS Dinamis (Tertunda)"
+      WHERE id = ?
+    ''', [qrisId, qrisUrl, qrisCreatedAt.toIso8601String(), qrisStatus, orderId]);
+  }
+
+  /// Update QRIS status flag (e.g. 'expire', 'cancel', 'pending')
+  Future<void> updateOrderQrisStatus(int orderId, String qrisStatus) async {
+    final db = await database;
+    await db.rawUpdate('''
+      UPDATE orders
+      SET qris_status = ?
+      WHERE id = ?
+    ''', [qrisStatus, orderId]);
   }
 
   Future<int> insertTransaction(TransactionModel transaction) async {

@@ -57,6 +57,8 @@ class Order {
   final String paymentMethod;
   final String? qrisUrl;
   final String? qrisId;
+  final DateTime? qrisCreatedAt;
+  final String? qrisStatus;
   final DateTime? paymentTimestamp;
   final int? assignedMachineId;
   final DateTime? machineStartedAt;
@@ -78,6 +80,8 @@ class Order {
     this.paymentMethod = 'cash',
     this.qrisUrl,
     this.qrisId,
+    this.qrisCreatedAt,
+    this.qrisStatus = 'pending',
     this.paymentTimestamp,
     this.assignedMachineId,
     this.machineStartedAt,
@@ -100,6 +104,8 @@ class Order {
       'payment_method': paymentMethod,
       'qris_url': qrisUrl,
       'qris_id': qrisId,
+      'qris_created_at': qrisCreatedAt?.toIso8601String(),
+      'qris_status': qrisStatus,
       'payment_timestamp': paymentTimestamp?.toIso8601String(),
       'assigned_machine_id': assignedMachineId,
       'machine_started_at': machineStartedAt?.toIso8601String(),
@@ -124,6 +130,8 @@ class Order {
       paymentMethod: map['payment_method'] ?? 'cash',
       qrisUrl: map['qris_url'],
       qrisId: map['qris_id'],
+      qrisCreatedAt: map['qris_created_at'] != null ? DateTime.tryParse(map['qris_created_at']) : null,
+      qrisStatus: map['qris_status'] ?? 'pending',
       paymentTimestamp: map['payment_timestamp'] != null
           ? DateTime.parse(map['payment_timestamp'])
           : null,
@@ -149,6 +157,8 @@ class Order {
     String? paymentMethod,
     String? qrisUrl,
     String? qrisId,
+    DateTime? qrisCreatedAt,
+    String? qrisStatus,
     DateTime? paymentTimestamp,
     int? assignedMachineId,
     DateTime? machineStartedAt,
@@ -170,6 +180,8 @@ class Order {
       paymentMethod: paymentMethod ?? this.paymentMethod,
       qrisUrl: qrisUrl ?? this.qrisUrl,
       qrisId: qrisId ?? this.qrisId,
+      qrisCreatedAt: qrisCreatedAt ?? this.qrisCreatedAt,
+      qrisStatus: qrisStatus ?? this.qrisStatus,
       paymentTimestamp: paymentTimestamp ?? this.paymentTimestamp,
       assignedMachineId: assignedMachineId ?? this.assignedMachineId,
       machineStartedAt: machineStartedAt ?? this.machineStartedAt,

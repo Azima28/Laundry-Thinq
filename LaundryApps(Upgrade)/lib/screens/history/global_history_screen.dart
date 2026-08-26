@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/models/database_helper.dart';
 import '../../database/models/order_model.dart';
 import '../../database/models/machine_model.dart';
@@ -8,6 +11,8 @@ import '../../database/models/transaction_model.dart';
 import '../../transactions/transaction_repository.dart';
 import '../../transactions/order_repository.dart';
 import '../../services/machine_status_service.dart';
+import '../../services/midtrans_service.dart';
+import '../../services/qris_polling_service.dart';
 import '../../utils/currency_format.dart';
 import '../../utils/pdf_export_helper.dart';
 import '../../utils/style_constants.dart';
@@ -76,13 +81,19 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
     super.initState();
     _mainCategory = widget.initialCategoryTab;
     _searchCtrl.addListener(() => setState(() {}));
+    QrisPollingService.instance.updates.addListener(_onQrisUpdate);
     _loadAllData();
   }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
+    QrisPollingService.instance.updates.removeListener(_onQrisUpdate);
     super.dispose();
+  }
+
+  void _onQrisUpdate() {
+    if (mounted) _loadAllData();
   }
 
   bool _isCuciItem(OrderItem it) {
@@ -1457,6 +1468,138 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
                           ],
                         ),
                       ),
+                      if (!order.isPaid) ...[
+                        const SizedBox(height: 14),
+                        // 5. Dynamic QRIS Status & Actions Section
+                        Builder(
+                          builder: (context) {
+                            final createdAt = order.qrisCreatedAt ?? order.orderDate;
+                            final elapsedHours = DateTime.now().difference(createdAt).inHours;
+                            final isExpired = elapsedHours >= 24;
+                            final hasQris = order.qrisUrl != null && order.qrisUrl!.isNotEmpty;
+
+                            return Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF), // Slate/Blue 50
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFBFDBFE)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.qr_code_2_rounded, size: 20, color: Color(0xFF1D4ED8)),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'PEMBAYARAN QRIS DINAMIS:',
+                                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: Color(0xFF1E3A8A), letterSpacing: 0.5),
+                                      ),
+                                      const Spacer(),
+                                      if (hasQris)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: isExpired ? const Color(0xFFFEE2E2) : const Color(0xFFDCFCE7),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: isExpired ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                isExpired ? Icons.timer_off_rounded : Icons.timer_outlined,
+                                                size: 11,
+                                                color: isExpired ? const Color(0xFFDC2626) : const Color(0xFF059669),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                isExpired ? 'Kadaluarsa (> 24j)' : 'Aktif (24 Jam)',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: isExpired ? const Color(0xFFB91C1C) : const Color(0xFF047857),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  if (hasQris && !isExpired) ...[
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            onPressed: () {
+                                              Navigator.pop(ctx);
+                                              _showLargeQrisModalForOrder(order);
+                                            },
+                                            icon: const Icon(Icons.qr_code_rounded, size: 16),
+                                            label: const Text('Lihat QRIS Besar', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: StyleConstants.primaryColor,
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(vertical: 10),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              elevation: 0,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: OutlinedButton.icon(
+                                            onPressed: () async {
+                                              final res = await QrisPollingService.instance.checkSpecificOrder(order.id!);
+                                              if (res['is_paid'] == true) {
+                                                Navigator.pop(ctx);
+                                                _loadAllData();
+                                                Globals.showSuccessSnackBar('✅ Pembayaran Nota #${order.id} LUNAS terverifikasi!');
+                                              } else {
+                                                Globals.showWarningSnackBar(res['message'] ?? 'Belum ada pembayaran.');
+                                              }
+                                            },
+                                            icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                                            label: const Text('Cek Status Bayar', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                                            style: OutlinedButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(vertical: 10),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ] else ...[
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
+                                        onPressed: () {
+                                          Navigator.pop(ctx);
+                                          _regenerateQrisForOrder(order);
+                                        },
+                                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                                        label: Text(
+                                          hasQris ? 'Generate Ulang QRIS Baru (24 Jam)' : 'Buat Tagihan QRIS Dinamis (24 Jam)',
+                                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF1D4ED8),
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(vertical: 11),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          elevation: 0,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1488,6 +1631,326 @@ class _GlobalHistoryScreenState extends State<GlobalHistoryScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _regenerateQrisForOrder(Order order) async {
+    final remainingAmount = order.totalAmount - order.paidAmount;
+    if (remainingAmount <= 0) {
+      Globals.showWarningSnackBar('Tagihan nota ini sudah lunas.');
+      return;
+    }
+
+    Globals.showSuccessSnackBar('Membuat kode QRIS baru untuk Nota #${order.id}...');
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final serverKey = prefs.getString('midtrans_server_key') ?? '';
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final newOrderId = 'QRIS-ORD-${order.id}-$timestamp';
+
+      final res = await MidtransService.createQRISTransaction(
+        orderId: newOrderId,
+        amount: remainingAmount.toDouble(),
+        customerName: order.customerName,
+        overrideServerKey: serverKey,
+      );
+
+      if (res['success'] != true) {
+        Globals.showErrorSnackBar('Gagal membuat QRIS: ${res['message']}');
+        return;
+      }
+
+      final qrisData = res['qris_url'] ?? res['qr_code_url'];
+      if (qrisData == null || qrisData.toString().isEmpty) {
+        Globals.showErrorSnackBar('QR Code tidak ditemukan dalam respon gateway.');
+        return;
+      }
+
+      final now = DateTime.now();
+      await _db.updateOrderQrisDetails(
+        order.id!,
+        qrisId: newOrderId,
+        qrisUrl: qrisData.toString(),
+        qrisCreatedAt: now,
+        qrisStatus: 'pending',
+      );
+
+      _loadAllData();
+      Globals.showSuccessSnackBar('QRIS baru untuk Nota #${order.id} berhasil dibuat (Berlaku 24 Jam).');
+
+      // Open the modal immediately
+      final updatedOrder = order.copyWith(
+        qrisId: newOrderId,
+        qrisUrl: qrisData.toString(),
+        qrisCreatedAt: now,
+        qrisStatus: 'pending',
+        paymentMethod: 'QRIS Dinamis (Tertunda)',
+      );
+      if (mounted) {
+        _showLargeQrisModalForOrder(updatedOrder);
+      }
+    } catch (e) {
+      Globals.showErrorSnackBar('Error membuat QRIS: $e');
+    }
+  }
+
+  Future<void> _showLargeQrisModalForOrder(Order order) async {
+    final createdAt = order.qrisCreatedAt ?? order.orderDate;
+    final expireAt = createdAt.add(const Duration(hours: 24));
+    final qrisData = order.qrisUrl ?? '';
+    final remainingBalance = order.totalAmount - order.paidAmount;
+    Timer? localTicker;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            localTicker ??= Timer.periodic(const Duration(seconds: 1), (_) {
+              if (dialogContext.mounted) setDialogState(() {});
+            });
+
+            final now = DateTime.now();
+            final remaining = expireAt.difference(now);
+            final isExpired = remaining.isNegative;
+            final hours = remaining.inHours.clamp(0, 24);
+            final minutes = (remaining.inMinutes % 60).clamp(0, 59);
+            final seconds = (remaining.inSeconds % 60).clamp(0, 59);
+            final countdownStr = '${hours.toString().padLeft(2, "0")}:${minutes.toString().padLeft(2, "0")}:${seconds.toString().padLeft(2, "0")}';
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              elevation: 20,
+              backgroundColor: Colors.white,
+              child: Container(
+                width: 480,
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Top Ribbon
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: StyleConstants.primaryColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.qr_code_2_rounded, color: StyleConstants.primaryColor, size: 22),
+                            ),
+                            const SizedBox(width: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'QRIS Nota #${order.id}',
+                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: StyleConstants.textHeading),
+                                ),
+                                const Text(
+                                  'BCA, Mandiri, GoPay, OVO, Dana, ShopeePay',
+                                  style: TextStyle(fontSize: 11, color: StyleConstants.textMuted),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: StyleConstants.textMuted),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Customer & Total Summary Pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: StyleConstants.borderLight),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Pelanggan:', style: TextStyle(fontSize: 11, color: StyleConstants.textMuted)),
+                              Text(
+                                order.customerName,
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: StyleConstants.textHeading),
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text('Sisa Tagihan:', style: TextStyle(fontSize: 11, color: StyleConstants.textMuted)),
+                              Text(
+                                formatRp(remainingBalance),
+                                style: StyleConstants.tabularNumbers(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: StyleConstants.primaryColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    if (isExpired) ...[
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, size: 48, color: Color(0xFFDC2626)),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'QRIS Telah Kadaluarsa (> 24 Jam)',
+                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF991B1B)),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Silakan klik tombol di bawah untuk membuat ulang kode QRIS baru yang berlaku 24 jam ke depan.',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF7F1D1D)),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 14),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _regenerateQrisForOrder(order);
+                              },
+                              icon: const Icon(Icons.refresh_rounded, size: 18),
+                              label: const Text('Buat Ulang QRIS Baru (24 Jam)', style: TextStyle(fontWeight: FontWeight.w800)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: StyleConstants.primaryColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      // LARGE QR CODE (240x240)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: StyleConstants.borderLight, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: QrImageView(
+                          data: qrisData,
+                          version: QrVersions.auto,
+                          size: 240,
+                          backgroundColor: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Countdown Pill
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.timer_outlined, size: 14, color: Color(0xFF1D4ED8)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Berlaku 24 Jam: sisa $countdownStr',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF1D4ED8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _regenerateQrisForOrder(order);
+                              },
+                              icon: const Icon(Icons.refresh_rounded, size: 16),
+                              label: const Text('Buat Ulang QRIS', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                final res = await QrisPollingService.instance.checkSpecificOrder(order.id!);
+                                if (res['is_paid'] == true) {
+                                  Navigator.pop(ctx);
+                                  _loadAllData();
+                                  Globals.showSuccessSnackBar('✅ Pembayaran Nota #${order.id} LUNAS terverifikasi!');
+                                } else {
+                                  Globals.showWarningSnackBar(res['message'] ?? 'Belum ada pembayaran.');
+                                }
+                              },
+                              icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                              label: const Text('Cek Status Bayar', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: StyleConstants.primaryColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                elevation: 0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    localTicker?.cancel();
   }
 
   Widget _detailTimelineRow({

@@ -1696,6 +1696,46 @@ def api_orders_update_payment(order_id):
         return jsonify({"success": False, "error": err}), 400
     return jsonify({"success": True, "order": res})
 
+@app.route('/api/qris/verify-pending', methods=['POST', 'GET'])
+@api_app.route('/api/qris/verify-pending', methods=['POST', 'GET'])
+def api_qris_verify_pending():
+    """Server-side retrieval and status check of pending 24h QRIS orders."""
+    import database
+    conn = database.get_db_connection(row_factory=True)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, customer_name, total_amount, qris_id, qris_url, qris_created_at, order_date
+        FROM orders
+        WHERE is_paid = 0
+          AND qris_id IS NOT NULL
+          AND qris_id != ''
+          AND (payment_method LIKE '%QRIS%' OR payment_method LIKE '%qris%')
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+
+    pending_list = []
+    now = datetime.now()
+    for r in rows:
+        created_str = r['qris_created_at'] or r['order_date']
+        try:
+            created_dt = datetime.fromisoformat(created_str.replace('Z', ''))
+        except Exception:
+            created_dt = now
+        elapsed_hours = (now - created_dt).total_seconds() / 3600.0
+        if elapsed_hours <= 24.0:
+            pending_list.append({
+                "id": r['id'],
+                "customer_name": database.decrypt_val(r['customer_name']),
+                "total_amount": r['total_amount'],
+                "qris_id": r['qris_id'],
+                "qris_url": r['qris_url'],
+                "qris_created_at": created_str,
+                "remaining_hours": max(0.0, 24.0 - elapsed_hours)
+            })
+
+    return jsonify({"success": True, "count": len(pending_list), "pending_orders": pending_list})
+
 # -------------------
 # BACKEND-CENTRIC FINANCE & LEDGER API
 # -------------------

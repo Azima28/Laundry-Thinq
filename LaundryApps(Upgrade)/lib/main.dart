@@ -29,6 +29,7 @@ import 'screens/machines/mesin_cuci_screen.dart';
 import 'services/machine_status_service.dart';
 import 'services/notification_service.dart';
 import 'services/backend_services_manager.dart';
+import 'services/qris_polling_service.dart';
 import 'screens/machines/mesin_pengering_screen.dart';
 import 'database/models/database_helper.dart';
 import 'transactions/user_repository.dart';
@@ -109,6 +110,11 @@ void main() async {
     // Jalankan service status mesin
     try {
       await MachineStatusService.instance.start();
+    } catch (_) {}
+
+    // Jalankan service background auto-check QRIS tertunda (30s auto-poller)
+    try {
+      QrisPollingService.instance.start();
     } catch (_) {}
 
     // Cleanup data sampah/stuck (dilakukan terakhir agar tidak mengganggu)
