@@ -461,11 +461,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
         contentPadding: const EdgeInsets.symmetric(horizontal: 24),
         actionsPadding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.info_outline_rounded, color: Color(0xFF0F172A), size: 24),
-            SizedBox(width: 12),
-            Text('Smart Laundry Desktop Pro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF0F172A))),
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.asset(
+                'assets/images/logo.png',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(Icons.local_laundry_service_rounded, color: Color(0xFF0F172A), size: 24),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text('Smart Laundry Desktop Pro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF0F172A))),
           ],
         ),
         content: Column(

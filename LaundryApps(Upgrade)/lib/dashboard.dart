@@ -282,7 +282,6 @@ class _DashboardPageState extends State<DashboardPage> {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    gradient: StyleConstants.primaryGradient,
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
@@ -292,10 +291,21 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.local_laundry_service_rounded,
-                    color: Colors.white,
-                    size: 22,
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      decoration: BoxDecoration(
+                        gradient: StyleConstants.primaryGradient,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.local_laundry_service_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
                   ),
                 ),
                 if (_isSidebarExpanded) ...[

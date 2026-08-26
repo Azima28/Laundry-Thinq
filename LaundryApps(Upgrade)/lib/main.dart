@@ -136,7 +136,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Laundry App',
+      title: 'Smart Laundry POS',
       scaffoldMessengerKey: Globals.scaffoldMessengerKey,
       initialRoute: !isSetupDone ? '/setup_wizard' : (isLoggedIn ? '/check_role' : '/'),
       routes: {

@@ -169,11 +169,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         Row(
                           children: [
                             Container(
-                              width: 42,
-                              height: 42,
+                              width: 44,
+                              height: 44,
                               decoration: BoxDecoration(
-                                gradient: StyleConstants.primaryGradient,
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(12),
                                 boxShadow: [
                                   BoxShadow(
                                     color: StyleConstants.primaryColor.withValues(alpha: 0.4),
@@ -182,10 +181,21 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ],
                               ),
-                              child: const Icon(
-                                Icons.local_laundry_service_rounded,
-                                color: Colors.white,
-                                size: 24,
+                              clipBehavior: Clip.antiAlias,
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  decoration: BoxDecoration(
+                                    gradient: StyleConstants.primaryGradient,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.local_laundry_service_rounded,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 14),
