@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 class BackendServicesManager {
   static final BackendServicesManager instance = BackendServicesManager._internal();
@@ -11,27 +12,31 @@ class BackendServicesManager {
 
   bool _isStarting = false;
 
+  bool get isPythonRunning => _pythonProcess != null;
+  bool get isNodeRunning => _nodeProcess != null;
+
+  Future<bool> isBackendReady({Duration timeout = const Duration(seconds: 8)}) async {
+    final stopwatch = Stopwatch()..start();
+    while (stopwatch.elapsed < timeout) {
+      try {
+        final resp = await http.get(Uri.parse('http://127.0.0.1:5001/')).timeout(const Duration(milliseconds: 1200));
+        if (resp.statusCode >= 200 && resp.statusCode < 500) {
+          return true;
+        }
+      } catch (_) {
+        // Backend still booting
+      }
+      await Future.delayed(const Duration(milliseconds: 400));
+    }
+    return false;
+  }
+
   Future<void> startServices() async {
     if (_isStarting) return;
     _isStarting = true;
 
     final int parentPid = pid;
     debugPrint('[ServicesManager] Parent process PID: $parentPid');
-
-    // Clean lingering processes on ports 3000, 5000, 5001 (Windows-only, non-blocking)
-    try {
-      if (Platform.isWindows) {
-        debugPrint('[ServicesManager] Cleaning lingering backend processes on ports 3000, 5000, 5001...');
-        await Process.run('powershell', [
-          '-NoProfile',
-          '-NonInteractive',
-          '-Command',
-          'Get-NetTCPConnection -LocalPort 3000, 5000, 5001 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id \$_.OwningProcess -Force -ErrorAction SilentlyContinue }'
-        ]).timeout(const Duration(seconds: 2), onTimeout: () => ProcessResult(0, 0, '', ''));
-      }
-    } catch (e) {
-      debugPrint('[ServicesManager] Error cleaning lingering processes: $e');
-    }
 
     // 1. Resolve working directories relative to executable or current project root
     String appDir = File(Platform.resolvedExecutable).parent.path;
@@ -64,7 +69,7 @@ class BackendServicesManager {
 
     // 2. Start Python server: main.exe (compiled) or main.py (dev)
     try {
-      if (pythonFile != null) {
+      if (pythonFile != null && _pythonProcess == null) {
         final isExe = pythonFile.path.toLowerCase().endsWith('.exe');
         if (isExe) {
           debugPrint('[ServicesManager] Starting compiled Python server: ${pythonFile.path}...');
@@ -82,7 +87,12 @@ class BackendServicesManager {
             workingDirectory: pythonWorkingDir,
           );
         }
-      } else {
+
+        _pythonProcess?.exitCode.then((code) {
+          debugPrint('[ServicesManager] Python backend process terminated with exit code: $code');
+          _pythonProcess = null;
+        });
+      } else if (pythonFile == null) {
         debugPrint('[ServicesManager] Warning: Python backend (main.exe / main.py) not found in candidate paths.');
       }
 
@@ -123,7 +133,7 @@ class BackendServicesManager {
         }
       }
 
-      if (nodeFile != null) {
+      if (nodeFile != null && _nodeProcess == null) {
         final isExe = nodeFile.path.toLowerCase().endsWith('.exe');
         if (isExe) {
           debugPrint('[ServicesManager] Starting compiled Node.js WA microservice: ${nodeFile.path}...');
@@ -140,7 +150,12 @@ class BackendServicesManager {
             workingDirectory: nodeWorkingDir,
           );
         }
-      } else {
+
+        _nodeProcess?.exitCode.then((code) {
+          debugPrint('[ServicesManager] Node.js WA process terminated with exit code: $code');
+          _nodeProcess = null;
+        });
+      } else if (nodeFile == null) {
         debugPrint('[ServicesManager] Warning: WhatsApp microservice not found.');
       }
 

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../database/models/database_helper.dart';
-import '../../database/models/machine_model.dart';
+import 'package:laundry_apps/services/backend_services_manager.dart';
 
 class BardiTuyaSettingsScreen extends StatefulWidget {
   const BardiTuyaSettingsScreen({Key? key}) : super(key: key);
@@ -58,6 +56,7 @@ class _BardiTuyaSettingsScreenState extends State<BardiTuyaSettingsScreen> {
   Future<void> _fetchCredentialsAndStatus() async {
     setState(() => _isLoading = true);
     try {
+      await BackendServicesManager.instance.isBackendReady(timeout: const Duration(seconds: 4));
       final response = await http.get(Uri.parse('${_apiBaseUrl}api/tuya/settings')).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);

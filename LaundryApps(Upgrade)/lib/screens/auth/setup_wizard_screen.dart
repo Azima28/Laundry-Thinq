@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import '../../services/printer_service.dart';
 import '../../services/machine_status_service.dart';
+import '../../services/backend_services_manager.dart';
 import '../../database/models/database_helper.dart';
 import '../../database/models/machine_model.dart';
 import '../../transactions/user_repository.dart';
@@ -240,6 +241,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
   Future<void> _testThinq() async {
     setState(() => _isLoading = true);
     try {
+      // Ensure backend server is ready before dispatching request
+      await BackendServicesManager.instance.isBackendReady(timeout: const Duration(seconds: 5));
+
       final dashboardUri = Uri.parse(MachineStatusService.instance.dashboardUrl);
       final apiBaseUrl = '${dashboardUri.scheme}://${dashboardUri.host}:5001';
 
@@ -255,7 +259,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
           'interval_running_high': 300,
           'interval_running_low': 120,
         }),
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         // Query status to verify connectivity
@@ -290,6 +294,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
   Future<void> _testBardi() async {
     setState(() => _isLoading = true);
     try {
+      // Ensure backend server is ready before dispatching request
+      await BackendServicesManager.instance.isBackendReady(timeout: const Duration(seconds: 5));
+
       final dashboardUri = Uri.parse(MachineStatusService.instance.dashboardUrl);
       final apiBaseUrl = '${dashboardUri.scheme}://${dashboardUri.host}:5001';
 
@@ -1977,37 +1984,6 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildStepItemText(String step, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 18,
-            height: 18,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: Color(0xFFE2E8F0),
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              step,
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.4),
-            ),
-          ),
-        ],
       ),
     );
   }

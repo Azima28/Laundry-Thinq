@@ -101,14 +101,14 @@ void main() async {
       await NotificationService.instance.init();
     } catch (_) {}
 
+    // Inisialisasi proses child background (Python ThinQ & Node.js WA) terlebih dahulu
+    try {
+      await BackendServicesManager.instance.startServices();
+    } catch (_) {}
+
     // Jalankan service status mesin
     try {
       await MachineStatusService.instance.start();
-    } catch (_) {}
-
-    // Inisialisasi proses child background (Python ThinQ & Node.js WA)
-    try {
-      await BackendServicesManager.instance.startServices();
     } catch (_) {}
 
     // Cleanup data sampah/stuck (dilakukan terakhir agar tidak mengganggu)

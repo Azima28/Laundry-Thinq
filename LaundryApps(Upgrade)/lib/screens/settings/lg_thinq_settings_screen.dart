@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:laundry_apps/database/models/database_helper.dart';
 import 'package:laundry_apps/database/models/machine_model.dart';
+import 'package:laundry_apps/services/backend_services_manager.dart';
 
 class LgThinqSettingsScreen extends StatefulWidget {
   const LgThinqSettingsScreen({Key? key}) : super(key: key);
@@ -117,6 +117,7 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
   Future<void> _fetchStatus() async {
     setState(() => _isLoading = true);
     try {
+      await BackendServicesManager.instance.isBackendReady(timeout: const Duration(seconds: 4));
       final response = await http.get(Uri.parse('${_apiBaseUrl}api/lg/status')).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -145,6 +146,7 @@ class _LgThinqSettingsScreenState extends State<LgThinqSettingsScreen> {
   Future<void> _saveSettings() async {
     setState(() => _isLoading = true);
     try {
+      await BackendServicesManager.instance.isBackendReady(timeout: const Duration(seconds: 4));
       final response = await http.post(
         Uri.parse('${_apiBaseUrl}api/lg/settings'),
         headers: {'Content-Type': 'application/json'},

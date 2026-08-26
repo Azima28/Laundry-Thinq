@@ -1777,21 +1777,27 @@ def start_parent_watchdog(parent_pid):
         SYNCHRONIZE = 0x00100000
         WAIT_OBJECT_0 = 0x00000000
 
-        handle = kernel32.OpenProcess(SYNCHRONIZE, False, parent_pid)
-        if handle == 0:
-            print("[Watchdog] Proses induk tidak ditemukan. Mengakhiri python...")
-            os._exit(0)
+        try:
+            handle = kernel32.OpenProcess(SYNCHRONIZE, False, parent_pid)
+            if handle == 0:
+                print("[Watchdog] Info: Handle proses induk tidak dapat dibuka secara langsung (JobObject akan menangani penutupan).")
+                return
 
-        while True:
-            res = kernel32.WaitForSingleObject(handle, 1000)
-            if res == WAIT_OBJECT_0:
-                print("[Watchdog] Proses induk telah keluar (signaled). Mengakhiri python...")
-                kernel32.CloseHandle(handle)
-                os._exit(0)
-            elif res != 0x00000102:  # WAIT_TIMEOUT is 258 (0x102)
-                print("[Watchdog] Status induk tidak aktif. Mengakhiri python...")
-                kernel32.CloseHandle(handle)
-                os._exit(0)
+            while True:
+                res = kernel32.WaitForSingleObject(handle, 2000)
+                if res == WAIT_OBJECT_0:
+                    print("[Watchdog] Proses induk telah keluar. Mengakhiri python...")
+                    kernel32.CloseHandle(handle)
+                    os._exit(0)
+                elif res == 0x00000102:  # WAIT_TIMEOUT (parent still running)
+                    time.sleep(1)
+                else:
+                    # Non-standard return, break gracefully without abrupt exit
+                    print("[Watchdog] Info: Monitoring handle selesai.")
+                    kernel32.CloseHandle(handle)
+                    break
+        except Exception as e:
+            print(f"[Watchdog] Exception in watchdog: {e}")
 
     t = threading.Thread(target=watchdog_thread, daemon=True)
     t.start()
