@@ -587,7 +587,10 @@ class PrinterService {
       if (stats['loyalty_enabled'] == true && order.customerName.isNotEmpty) {
         final activeKupon = stats['wash_count_active'] ?? 0;
         final threshold = stats['loyalty_threshold'] ?? 5;
-        customerKuponStr = '$activeKupon / $threshold';
+        final canClaim = activeKupon >= threshold && threshold > 0;
+        customerKuponStr = canClaim
+            ? '$activeKupon / $threshold (Kamu bisa claim gratis cuci)'
+            : '$activeKupon / $threshold';
       }
     } catch (_) {}
 
@@ -891,6 +894,24 @@ class PrinterService {
         bytes += 'Status: BELUM BAYAR\n'.codeUnits;
         bytes += 'Tagihan: ${formatRp(sisaTagihan)}\n'.codeUnits;
         bytes += [0x1B, 0x45, 0x00]; // Bold off
+      }
+
+      String btKuponStr = '';
+      try {
+        final stats = await DatabaseHelper.instance.getCustomerFullStats(name: order.customerName, phone: order.customerPhone);
+        if (stats['loyalty_enabled'] == true && order.customerName.isNotEmpty) {
+          final activeKupon = stats['wash_count_active'] ?? 0;
+          final threshold = stats['loyalty_threshold'] ?? 5;
+          final canClaim = activeKupon >= threshold && threshold > 0;
+          btKuponStr = canClaim
+              ? '$activeKupon / $threshold (Kamu bisa claim gratis cuci)'
+              : '$activeKupon / $threshold';
+        }
+      } catch (_) {}
+
+      if (btKuponStr.isNotEmpty) {
+        bytes += '--------------------------------\n'.codeUnits;
+        bytes += 'Kupon Cuci: $btKuponStr\n'.codeUnits;
       }
 
       bytes += '--------------------------------\n'.codeUnits;

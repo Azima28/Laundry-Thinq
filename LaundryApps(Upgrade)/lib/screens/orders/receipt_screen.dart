@@ -93,7 +93,10 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       if (stats['loyalty_enabled'] == true && widget.order.customerName.isNotEmpty) {
         final activeKupon = stats['wash_count_active'] ?? 0;
         final threshold = stats['loyalty_threshold'] ?? 5;
-        kuponStr = '$activeKupon / $threshold';
+        final canClaim = activeKupon >= threshold && threshold > 0;
+        kuponStr = canClaim
+            ? '$activeKupon / $threshold (Kamu bisa claim gratis cuci)'
+            : '$activeKupon / $threshold';
       }
     } catch (_) {}
 

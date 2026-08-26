@@ -1335,7 +1335,12 @@ class _PesanPageState extends State<PesanPage> {
     buffer.writeln("*STATUS PEMBAYARAN:* *$statusBayar*");
     if (_loyaltyEnabled) {
       buffer.writeln("---------------------------------");
-      buffer.writeln("*Kupon Cuci:* *$activeKuponCalc / $_loyaltyThreshold*");
+      final bool canClaimLoyalty = activeKuponCalc >= _loyaltyThreshold && _loyaltyThreshold > 0;
+      if (canClaimLoyalty) {
+        buffer.writeln("*Kupon Cuci:* *$activeKuponCalc / $_loyaltyThreshold* _(Kamu bisa claim gratis cuci)_");
+      } else {
+        buffer.writeln("*Kupon Cuci:* *$activeKuponCalc / $_loyaltyThreshold*");
+      }
     }
     buffer.writeln("---------------------------------");
     buffer.writeln("*INFORMASI:* Kakak akan menerima pesan WhatsApp otomatis ketika proses pencucian dimulai dan setelah selesai/siap diambil.");
