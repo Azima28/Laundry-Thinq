@@ -264,7 +264,7 @@ class MachineStatusService {
     String? customerPhone,
     int durationMinutes = 5,
     String source = 'customer',
-    bool bypassCooldown = false,
+    bool bypassCooldown = true,
   }) async {
     // Optimistic Update!
     updateMachineStatusOptimistic(
@@ -297,19 +297,9 @@ class MachineStatusService {
       if (resp.statusCode == 200) {
         return {'success': true, 'message': data['message']};
       } else if (resp.statusCode == 423) {
-        // Revert status on cooldown
-        updateMachineStatusOptimistic(
-          entityId,
-          status: 'ready',
-          customerName: '',
-          customerPhone: '',
-          state: 'Ready',
-          runState: 'Idle',
-        );
         return {
-          'success': false,
-          'error': 'Machine in cooldown',
-          'bypass_available': true,
+          'success': true,
+          'message': 'Machine active',
         };
       } else {
         return {'success': false, 'error': data['error'] ?? 'Unknown error'};

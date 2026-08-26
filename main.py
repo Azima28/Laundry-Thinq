@@ -390,8 +390,9 @@ def api_machine_start():
     if not entity:
         return jsonify({"error": "Invalid machine"}), 400
 
-    # Check cooldown
-    if not data.get('bypass_cooldown') and machine_manager.get_machine_status(entity) == "unready":
+    # Allow start/assignment from POS/desktop without cooldown blockage
+    bypass = data.get('bypass_cooldown', True)
+    if not bypass and machine_manager.get_machine_status(entity) == "unready":
         return jsonify({"error": "Machine in cooldown", "bypass_available": True}), 423
 
     duration_minutes = data.get('duration')
