@@ -650,14 +650,14 @@ class _PengeringContentState extends State<PengeringContent> {
         state.contains('ON') ||
         (entry != null && entry['is_relay_on'] == true);
 
-    final bool isRunning = customerName.isNotEmpty &&
-                           ((state == 'RUNNING' ||
+    final bool isRunning = ((state == 'RUNNING' ||
                             state == 'RUN' ||
                             (runState.isNotEmpty &&
                              runState != 'Idle' &&
                              runState != 'Completed' &&
                              runState != 'Ready' &&
                              runState != 'Relay ON' &&
+                             runState != 'Standby' &&
                              runState != '-' &&
                              runState != 'unknown')) && !isPause);
 
@@ -793,8 +793,7 @@ class _PengeringContentState extends State<PengeringContent> {
         badgeTextColor = Colors.white;
         titleColor = const Color(0xFF065F46);
         subColor = const Color(0xFF047857);
-        final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
-        badgeText = "READY$timeText";
+        badgeText = "READY";
         canClick = true;
       }
     } else {
@@ -852,7 +851,7 @@ class _PengeringContentState extends State<PengeringContent> {
       }
     }
 
-    if (customerName.isEmpty) {
+    if (customerName.isEmpty && !isRunning && !isPause && !isError && !isOfflineRunning) {
       canClick = _selectedOrderItem != null;
     }
 

@@ -675,8 +675,7 @@ class _CuciContentState extends State<CuciContent> {
     final bool isPause = runState.toLowerCase().contains('pause') ||
         state.toLowerCase().contains('pause');
 
-    final bool isRunning = customerName.isNotEmpty &&
-                           ((state == 'RUNNING' ||
+    final bool isRunning = ((state == 'RUNNING' ||
                             state == 'RUN' ||
                             (runState.isNotEmpty &&
                              runState != 'Idle' &&
@@ -811,8 +810,7 @@ class _CuciContentState extends State<CuciContent> {
         badgeTextColor = Colors.white;
         titleColor = const Color(0xFF065F46);
         subColor = const Color(0xFF047857);
-        final String timeText = (remain.isNotEmpty && remain != '--:--') ? ' $remain' : '';
-        badgeText = "READY$timeText";
+        badgeText = "READY";
         canClick = true;
       }
     } else {
@@ -874,7 +872,7 @@ class _CuciContentState extends State<CuciContent> {
       }
     }
 
-    if (customerName.isEmpty) {
+    if (customerName.isEmpty && !isRunning && !isPause && !isError && !isOfflineRunning) {
       canClick = _selectedOrderItem != null;
     }
 
