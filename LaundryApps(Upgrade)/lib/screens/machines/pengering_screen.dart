@@ -888,6 +888,13 @@ class _PengeringContentState extends State<PengeringContent> {
                     state,
                     entry,
                   ),
+            onDoubleTap: isActivating
+                ? null
+                : () => _confirmForceTurnOffMachine(
+                    machine,
+                    displayName,
+                    entry,
+                  ),
             child: Padding(
               padding: const EdgeInsets.all(18),
               child: Column(
@@ -1048,6 +1055,213 @@ class _PengeringContentState extends State<PengeringContent> {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmForceTurnOffMachine(
+    MachineModel machine,
+    String displayName,
+    dynamic entry,
+  ) async {
+    final String customerName = (entry?['customer_name'] ?? '').toString();
+    final String state = (entry?['state'] ?? 'Ready').toString().toUpperCase();
+    final String runState = (entry?['run_state'] ?? 'Idle').toString();
+    final String remain = (entry?['remain_time'] ?? '').toString();
+    final bool isRelayOn = (entry?['is_relay_on'] == true) || runState.toLowerCase().contains('relay on');
+
+    String statusDescription = 'Siap Digunakan (Ready)';
+    if (state == 'RUNNING' || state == 'RUN' || (runState != 'Idle' && runState != 'Ready' && runState != '-')) {
+      statusDescription = 'Sedang Berjalan (${remain.isNotEmpty && remain != "--:--" ? remain : runState})';
+    } else if (isRelayOn) {
+      statusDescription = 'Stopkontak Menyala / Standby';
+    } else if (customerName.isNotEmpty) {
+      statusDescription = 'Booking / Terisi ($customerName)';
+    }
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          elevation: 16,
+          backgroundColor: Colors.white,
+          child: Container(
+            width: 440,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEE2E2),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.power_settings_new_rounded,
+                        color: Color(0xFFDC2626),
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Matikan Mesin Pengering',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            displayName,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFDC2626),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Status Saat Ini:',
+                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                          ),
+                          Flexible(
+                            child: Text(
+                              statusDescription,
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                              textAlign: TextAlign.end,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (customerName.isNotEmpty && customerName != '-') ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Pelanggan:',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                            ),
+                            Text(
+                              customerName,
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF2563EB)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Apakah Anda yakin ingin mematikan daya stopkontak dan menghentikan mesin ini secara paksa ke status OFF / Ready?',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF475569),
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        ),
+                        child: const Text(
+                          'Batal',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        icon: const Icon(Icons.power_settings_new_rounded, size: 18),
+                        label: const Text(
+                          'Ya, Matikan (OFF)',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFDC2626),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      final service = MachineStatusService.instance;
+      service.setActivating(machine.id ?? 0, true);
+
+      // Optimistic status update to OFF / Ready
+      service.updateMachineStatusOptimistic(
+        machine.name,
+        status: 'ready',
+        customerName: '',
+        customerPhone: '',
+        state: 'Ready',
+        runState: 'Idle',
+      );
+
+      final String targetEntity = machine.name.isNotEmpty ? machine.name : displayName;
+      final res = await service.stopMachineMonitoring(entityId: targetEntity);
+
+      service.setActivating(machine.id ?? 0, false);
+
+      if (res['success'] == true) {
+        Globals.showSuccessSnackBar('Mesin $displayName berhasil dimatikan ke status OFF (Ready).');
+      } else {
+        Globals.showWarningSnackBar('Mesin $displayName diubah ke status Ready (${res['error'] ?? 'Lokal'}).');
+      }
+
+      await _loadActiveOrders();
+    }
   }
 
   Future<void> _handleMachineTap(
