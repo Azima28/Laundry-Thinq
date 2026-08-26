@@ -143,11 +143,12 @@ def machines_json():
     return Response(json.dumps(result, indent=2, ensure_ascii=False), mimetype='application/json')
 
 @app.route('/api/logs')
+@api_app.route('/api/logs')
 def api_logs():
     try:
         limit = request.args.get('limit', 100, type=int)
         logs = database.get_recent_logs(
-            limit=limit, 
+            limit=limit,
             machine=request.args.get('machine'),
             action=request.args.get('action'),
             date=request.args.get('date'),
@@ -158,6 +159,7 @@ def api_logs():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/system')
+@api_app.route('/api/system')
 def api_system():
     """Return system configuration info for the About page."""
     # Auto-detect local IP
@@ -168,11 +170,11 @@ def api_system():
         s.close()
     except Exception:
         local_ip = "127.0.0.1"
-    
+
     from config import DASHBOARD_PORT, API_PORT, HOST, DB_PATH
     hostname = socket.gethostname()
     local_domain = f"{hostname}.local" if not hostname.endswith(".local") else hostname
-    
+
     return jsonify({
         "dashboard_port": DASHBOARD_PORT,
         "api_port": API_PORT,
@@ -186,6 +188,7 @@ def api_system():
     })
 
 @app.route('/api/config', methods=['GET', 'POST'])
+@api_app.route('/api/config', methods=['GET', 'POST'])
 def api_config():
     """Get or save editable config settings."""
     if request.method == 'POST':
@@ -313,6 +316,7 @@ def api_config():
     })
 
 @app.route('/api/stats')
+@api_app.route('/api/stats')
 def api_stats():
     daily_raw = database.get_daily_stats()
     machine_raw = database.get_machine_usage_stats()
@@ -320,6 +324,7 @@ def api_stats():
     return jsonify({"daily": dict(daily_raw), "machines": dict(machine_raw)})
 
 @app.route('/api/machine-logs')
+@api_app.route('/api/machine-logs')
 def api_machine_logs():
     """Get machine completion logs with optional filters."""
     logs = database.get_machine_logs(
@@ -331,6 +336,7 @@ def api_machine_logs():
     return Response(json.dumps(logs, indent=2, ensure_ascii=False), mimetype='application/json')
 
 @app.route('/api/machine-logs/stats')
+@api_app.route('/api/machine-logs/stats')
 def api_machine_logs_stats():
     """Get machine log statistics with optional filter."""
     stats = database.get_machine_log_stats(
@@ -340,6 +346,7 @@ def api_machine_logs_stats():
     return jsonify(stats)
 
 @app.route('/api/machine/attributes/<name>')
+@api_app.route('/api/machine/attributes/<name>')
 def api_machine_attributes(name):
     """Fetch raw machine attributes directly from LG ThinQ."""
     loop = asyncio.new_event_loop()
@@ -354,9 +361,10 @@ def api_machine_attributes(name):
 # v2: MONITORING CONTROL ROUTES (No relay/ESP)
 # -------------------
 @app.route('/api/machine/start', methods=['POST'])
+@api_app.route('/api/machine/start', methods=['POST'])
 def api_machine_start():
     """Start monitoring a machine (v2 monitoring-only).
-    
+
     Expects JSON body:
     {
         "entity_id": "Mesin_Cuci_2",
@@ -369,15 +377,15 @@ def api_machine_start():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON body"}), 400
-    
+
     entity = machine_manager.resolve_entity(data.get('entity_id', ''))
     if not entity:
         return jsonify({"error": "Invalid machine"}), 400
-    
+
     # Check cooldown
     if not data.get('bypass_cooldown') and machine_manager.get_machine_status(entity) == "unready":
         return jsonify({"error": "Machine in cooldown", "bypass_available": True}), 423
-    
+
     duration_minutes = data.get('duration')
     if duration_minutes is None or duration_minutes <= 0:
         # If not specified, use full cycle duration based on machine category
@@ -397,9 +405,10 @@ def api_machine_start():
 
 
 @app.route('/api/machine/stop', methods=['POST'])
+@api_app.route('/api/machine/stop', methods=['POST'])
 def api_machine_stop():
     """Stop monitoring a machine and release it (v2).
-    
+
     Expects JSON body:
     {
         "entity_id": "Mesin_Cuci_2"
@@ -408,16 +417,17 @@ def api_machine_stop():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON body"}), 400
-    
+
     entity = machine_manager.resolve_entity(data.get('entity_id', ''))
     if not entity:
         return jsonify({"error": "Invalid machine"}), 400
-    
+
     res, code = machine_manager.stop_machine_monitoring(entity, source=data.get('source', 'admin'))
     return jsonify({"message": res}), code
 
 
 @app.route('/api/machine/replace', methods=['POST'])
+@api_app.route('/api/machine/replace', methods=['POST'])
 def api_machine_replace():
     """Replace customer on an occupied/active machine.
 
@@ -457,6 +467,7 @@ def api_machine_replace():
 
 
 @app.route('/api/machine/finish', methods=['POST'])
+@api_app.route('/api/machine/finish', methods=['POST'])
 def api_machine_finish():
     """Manually stop monitoring and release a machine (Selesaikan).
 
@@ -490,9 +501,10 @@ def api_machine_finish():
 
 
 @app.route('/api/wa/send-custom', methods=['POST'])
+@api_app.route('/api/wa/send-custom', methods=['POST'])
 def api_wa_send_custom():
     """Send a custom WA message to a phone number.
-    
+
     Expects JSON body:
     {
         "phone": "08123456789",
@@ -502,12 +514,12 @@ def api_wa_send_custom():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON body"}), 400
-    
+
     phone = data.get('phone')
     message = data.get('message')
     if not phone or not message:
         return jsonify({"error": "Phone and message are required"}), 400
-    
+
     result = wa_bridge.send_wa_message(phone, message)
     return jsonify(result), 200 if result.get('success') else 500
 
@@ -515,6 +527,7 @@ def api_wa_send_custom():
 # -------------------
 # LG AUTH ROUTES
 # -------------------
+@app.route('/api/lg/status')
 @api_app.route('/api/lg/status')
 def lg_status():
     config = lg_manager.load_lg_config()
@@ -529,11 +542,13 @@ def lg_status():
         "interval_running_low": config.get("interval_running_low", 120)
     })
 
+@app.route('/api/lg/devices')
 @api_app.route('/api/lg/devices')
 def lg_devices():
     devices = lg_manager.get_discovered_devices()
     return jsonify({"devices": devices})
 
+@app.route('/api/lg/settings', methods=['GET', 'POST'])
 @api_app.route('/api/lg/settings', methods=['GET', 'POST'])
 def lg_settings():
     config = lg_manager.load_lg_config()
@@ -543,7 +558,7 @@ def lg_settings():
         config["language"] = data.get("language", config.get("language", "id-ID"))
         if "pat_token" in data:
             config["pat_token"] = data.get("pat_token")
-        
+
         # Save interval settings
         for key in ["interval_idle", "interval_booking", "interval_running_high", "interval_running_low"]:
             if key in data:
@@ -551,10 +566,10 @@ def lg_settings():
                     config[key] = int(data[key])
                 except:
                     pass
-                    
+
         lg_manager.save_lg_config(config)
         return jsonify({"message": "Saved"})
-        
+
     config["interval_idle"] = config.get("interval_idle", 300)
     config["interval_booking"] = config.get("interval_booking", 180)
     config["interval_running_high"] = config.get("interval_running_high", 300)
@@ -562,6 +577,8 @@ def lg_settings():
     return jsonify(config)
 
 # Legacy API endpoint (backward compatibility with Flutter app)
+@app.route('/<machine>/<action>', defaults={'nama': 'customer'}, methods=['GET', 'POST'])
+@app.route('/<machine>/<action>/<nama>', methods=['GET', 'POST'])
 @api_app.route('/<machine>/<action>', defaults={'nama': 'customer'}, methods=['GET', 'POST'])
 @api_app.route('/<machine>/<action>/<nama>', methods=['GET', 'POST'])
 def machine_action(machine, action, nama):
@@ -571,7 +588,7 @@ def machine_action(machine, action, nama):
     if action.lower() == PERINTAH_HIDUP.lower():
         if machine_manager.get_machine_status(entity) == "unready":
             return "unready", 423
-        
+
         res, code = machine_manager.start_machine_monitoring(
             entity, source=nama, duration_seconds=300
         )
@@ -587,12 +604,14 @@ def machine_action(machine, action, nama):
 # v2: WHATSAPP ROUTES
 # -------------------
 @app.route('/api/wa/status')
+@api_app.route('/api/wa/status')
 def api_wa_status():
     """Check WhatsApp service connection status."""
     return jsonify(wa_bridge.get_wa_status())
 
 
 @app.route('/api/wa/open-gui')
+@api_app.route('/api/wa/open-gui')
 def api_wa_open_gui():
     """Proxy to WhatsApp Node.js service to focus/open the WhatsApp Web GUI window."""
     last_err = None
@@ -607,6 +626,7 @@ def api_wa_open_gui():
 
 
 @app.route('/api/wa/qr')
+@api_app.route('/api/wa/qr')
 def api_wa_qr():
     """Proxy to WhatsApp Node.js service to fetch current QR code."""
     try:
@@ -618,6 +638,7 @@ def api_wa_qr():
         return jsonify({"error": f"Failed to reach WhatsApp service: {str(e)}"}), 503
 
 @app.route('/api/wa/test-poll')
+@api_app.route('/api/wa/test-poll')
 def api_wa_test_poll():
     """Proxy to trigger a test poll sent from Node.js."""
     phone = request.args.get('phone', '')
@@ -628,6 +649,7 @@ def api_wa_test_poll():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/wa/test-poll-result')
+@api_app.route('/api/wa/test-poll-result')
 def api_wa_test_poll_result():
     """Proxy to fetch the latest test poll vote from Node.js memory."""
     try:
@@ -923,6 +945,7 @@ def _check_if_timer_is_completed(timer, cursor):
     return False
 
 
+@app.route('/api/wa/chatbot/status-cucian')
 @api_app.route('/api/wa/chatbot/status-cucian')
 def api_wa_chatbot_status_cucian():
     """Endpoint for WhatsApp chatbot to fetch active laundry status by phone number or Order ID."""
@@ -1471,9 +1494,10 @@ def api_wa_chatbot_status_cucian():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/wa/send', methods=['POST'])
+@api_app.route('/api/wa/send', methods=['POST'])
 def api_wa_send():
     """Send a WhatsApp message manually.
-    
+
     Expects JSON body:
     {
         "phone": "08123456789",
@@ -1483,12 +1507,13 @@ def api_wa_send():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON body"}), 400
-    
+
     result = wa_bridge.send_wa_message(data.get('phone'), data.get('message'))
     return jsonify(result)
 
 
 @app.route('/api/wa/outbox')
+@api_app.route('/api/wa/outbox')
 def api_wa_outbox():
     """Get pending WA messages from outbox."""
     pending = database.get_pending_wa_outbox(limit=50)
@@ -1496,6 +1521,7 @@ def api_wa_outbox():
 
 
 @app.route('/api/connectivity')
+@api_app.route('/api/connectivity')
 def api_connectivity():
     """Get connectivity status for Internet, LG ThinQ, Bardi Tuya, and WA Service."""
     # Internet check
@@ -1856,6 +1882,7 @@ def start_parent_watchdog(parent_pid):
 # -------------------
 # MACHINE MANAGEMENT API
 # -------------------
+@app.route('/api/machines', methods=['GET'])
 @api_app.route('/api/machines', methods=['GET'])
 def get_machines_list():
     try:
@@ -1864,18 +1891,19 @@ def get_machines_list():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/machines', methods=['POST'])
 @api_app.route('/api/machines', methods=['POST'])
 def save_machine_endpoint():
     try:
         data = request.get_json()
         if not data or not data.get("name") or not data.get("key"):
             return jsonify({"error": "Missing name or key parameters"}), 400
-            
+
         name = data.get("name")
         url = data.get("url", "-")
         key = data.get("key", "cuci")
         machine_id = data.get("id")
-        
+
         success = database.save_machine(name, url, key, machine_id)
         if success:
             lg_manager.reload_devices_from_db()
@@ -1884,6 +1912,7 @@ def save_machine_endpoint():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/machines/<int:machine_id>', methods=['DELETE'])
 @api_app.route('/api/machines/<int:machine_id>', methods=['DELETE'])
 def delete_machine_endpoint(machine_id):
     try:
@@ -1895,6 +1924,7 @@ def delete_machine_endpoint(machine_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/thinq/discover', methods=['GET'])
 @api_app.route('/api/thinq/discover', methods=['GET'])
 def discover_thinq_endpoint():
     try:
@@ -1903,13 +1933,14 @@ def discover_thinq_endpoint():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/machines/reorder', methods=['POST'])
 @api_app.route('/api/machines/reorder', methods=['POST'])
 def reorder_machines_endpoint():
     try:
         data = request.get_json()
         if not data or not isinstance(data.get("ids"), list):
             return jsonify({"error": "Missing or invalid ids parameter"}), 400
-            
+
         ids = data.get("ids")
         success = database.reorder_machines(ids)
         if success:
@@ -1919,6 +1950,7 @@ def reorder_machines_endpoint():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/tuya/settings', methods=['GET', 'POST'])
 @api_app.route('/api/tuya/settings', methods=['GET', 'POST'])
 def api_tuya_settings():
     """Get or save Tuya API configuration credentials."""
@@ -1929,7 +1961,7 @@ def api_tuya_settings():
             access_secret = data.get("access_secret", "").strip()
             app_uid = data.get("app_uid", "").strip()
             endpoint = data.get("endpoint", "https://openapi.tuyaus.com").strip()
-            
+
             # Save into config.json
             config = lg_manager.load_lg_config()
             config["tuya_access_id"] = access_id
@@ -1937,7 +1969,7 @@ def api_tuya_settings():
             config["tuya_app_uid"] = app_uid
             config["tuya_endpoint"] = endpoint
             lg_manager.save_lg_config(config)
-            
+
             # Update devices.json api_credentials block
             creds = {
                 "access_id": access_id,
@@ -1946,11 +1978,11 @@ def api_tuya_settings():
             }
             devices_list = tuya_manager.load_devices_list()
             tuya_manager.save_tuya_devices_list(creds, devices_list)
-            
+
             return jsonify({"success": True, "message": "Tuya settings saved successfully"})
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 500
-            
+
     # GET - return current credentials
     creds = tuya_manager.load_tuya_credentials()
     return jsonify({
@@ -1961,6 +1993,7 @@ def api_tuya_settings():
         "endpoint": creds.get("endpoint") or "https://openapi.tuyaus.com"
     })
 
+@app.route('/api/tuya/sync-keys', methods=['POST'])
 @api_app.route('/api/tuya/sync-keys', methods=['POST'])
 def sync_tuya_keys():
     """
@@ -1973,10 +2006,10 @@ def sync_tuya_keys():
         access_secret = data.get("access_secret")
         app_uid = data.get("app_uid")
         endpoint = data.get("endpoint", "https://openapi.tuyaus.com")
-        
+
         if not (access_id and access_secret and app_uid):
             return jsonify({"success": False, "error": "Missing access_id, access_secret, or app_uid"}), 400
-            
+
         res = tuya_manager.sync_tuya_keys(access_id, access_secret, app_uid, endpoint)
         if res.get("success"):
             return jsonify({
@@ -1990,6 +2023,7 @@ def sync_tuya_keys():
         import traceback
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
 
+@app.route('/api/tuya/devices')
 @api_app.route('/api/tuya/devices')
 def tuya_devices():
     """
@@ -1997,6 +2031,20 @@ def tuya_devices():
     """
     devices = tuya_manager.get_cz_devices()
     return jsonify({"devices": devices})
+
+
+# -------------------
+# GLOBAL JSON ERROR HANDLERS (No HTML Errors)
+# -------------------
+@app.errorhandler(404)
+@api_app.errorhandler(404)
+def _global_handle_404(e):
+    return jsonify({"success": False, "error": "Endpoint tidak ditemukan (404)"}), 404
+
+@app.errorhandler(500)
+@api_app.errorhandler(500)
+def _global_handle_500(e):
+    return jsonify({"success": False, "error": f"Server error: {str(e)}"}), 500
 
 if __name__ == "__main__":
     print("\n>>> SMART LAUNDRY v2.0 (MONITORING-ONLY + WA) <<<\n")

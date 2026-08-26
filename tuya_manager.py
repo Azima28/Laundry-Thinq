@@ -312,6 +312,16 @@ def start_dryer(entity_id, duration_minutes):
     # --- 1. LOCAL LAN FIRST (OFFLINE 0ms) ---
     ok_local, err_local = start_dryer_local(dev, duration_minutes)
     if ok_local:
+        with _tuya_cache_lock:
+            norm = str(entity_id).lower().replace("_", " ").strip()
+            _tuya_state_cache[norm] = {
+                "success": True,
+                "online": True,
+                "switch": True,
+                "countdown": duration_minutes * 60,
+                "power": 0.0,
+                "mode": "local_lan"
+            }
         return {"success": True, "mode": "local_lan"}
 
     print(f"[Tuya] Local LAN failed ({err_local}), falling back to Tuya Cloud API...")
@@ -351,6 +361,16 @@ def start_dryer(entity_id, duration_minutes):
         print(f"[Tuya Cloud] Starting dryer {entity_id} ({device_id}) for {duration_minutes} min...")
         res = c.sendcommand(device_id, payload)
         if isinstance(res, dict) and res.get("success"):
+            with _tuya_cache_lock:
+                norm = str(entity_id).lower().replace("_", " ").strip()
+                _tuya_state_cache[norm] = {
+                    "success": True,
+                    "online": True,
+                    "switch": True,
+                    "countdown": duration_minutes * 60,
+                    "power": 0.0,
+                    "mode": "cloud"
+                }
             return {"success": True, "mode": "cloud"}
         else:
             msg = res.get("msg") if isinstance(res, dict) else "Cloud command rejected"
@@ -365,6 +385,26 @@ def stop_dryer(entity_id):
     if not dev:
         print(f"[Tuya] Device matching {entity_id} not found in devices.json")
         return {"success": False, "error": "Device not found"}
+
+    # Always reset cache & broadcast immediately for responsive UI
+    with _tuya_cache_lock:
+        norm = str(entity_id).lower().replace("_", " ").strip()
+        _tuya_state_cache[norm] = {
+            "success": True,
+            "online": True,
+            "switch": False,
+            "countdown": 0,
+            "power": 0.0,
+            "mode": "local_lan"
+        }
+    try:
+        import sse_manager
+        sensor = entity_id.replace(" ", "_")
+        st = f"{sensor}|Ready|Idle|--:--|-|-|0|-"
+        sse_manager.latest_state[sensor] = st
+        sse_manager.broadcast(st)
+    except Exception:
+        pass
 
     # --- 1. LOCAL LAN FIRST (OFFLINE 0ms) ---
     ok_local, err_local = stop_dryer_local(dev)

@@ -10,7 +10,7 @@ class MachineStatusService {
 
   Timer? _timer;
   String _baseUrl = 'http://127.0.0.1:5001/';
-  String _dashboardUrl = 'http://127.0.0.1:5000/';
+  String _dashboardUrl = 'http://127.0.0.1:5001';
   final Map<String, dynamic> _states = {};
   final ValueNotifier<int> _notifier = ValueNotifier<int>(0);
   bool _hasFetchedOnce = false;
@@ -18,6 +18,24 @@ class MachineStatusService {
   final Set<int> _activatingIds = {};
   final Set<String> _processingOrderKeys = {};
   final Set<String> _failedOrderKeys = {};
+
+  // Safe JSON decoding helper to prevent FormatException on HTML error pages
+  Map<String, dynamic> _safeJsonDecode(String body, {int statusCode = 200}) {
+    try {
+      final decoded = json.decode(body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      } else if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+      return {'success': statusCode >= 200 && statusCode < 300, 'data': decoded};
+    } catch (_) {
+      return {
+        'success': false,
+        'error': 'Respon server tidak valid (HTTP $statusCode)'
+      };
+    }
+  }
 
   // v2: Connectivity status
   bool _internetOk = false;
@@ -132,12 +150,13 @@ class MachineStatusService {
       await prefs.setString('machines_base_url', _baseUrl);
     }
 
-    // Derive dashboard URL from API URL
-    // API is on port 5001, dashboard on port 5000
     try {
       final apiUri = Uri.parse(_baseUrl);
-      _dashboardUrl = '${apiUri.scheme}://${apiUri.host}:5000';
-    } catch (_) {}
+      final port = apiUri.hasPort ? apiUri.port : 5001;
+      _dashboardUrl = '${apiUri.scheme}://${apiUri.host}:$port';
+    } catch (_) {
+      _dashboardUrl = 'http://127.0.0.1:5001';
+    }
 
     await _fetch();
     _fetchConnectivity(); // Initial connectivity check
@@ -157,11 +176,13 @@ class MachineStatusService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('machines_base_url', url);
 
-    // Derive dashboard URL
     try {
       final apiUri = Uri.parse(url);
-      _dashboardUrl = '${apiUri.scheme}://${apiUri.host}:5000';
-    } catch (_) {}
+      final port = apiUri.hasPort ? apiUri.port : 5001;
+      _dashboardUrl = '${apiUri.scheme}://${apiUri.host}:$port';
+    } catch (_) {
+      _dashboardUrl = 'http://127.0.0.1:5001';
+    }
 
     await _fetch();
     _fetchConnectivity();
@@ -172,13 +193,13 @@ class MachineStatusService {
       final uri = Uri.parse(_baseUrl);
       final resp = await http.get(uri).timeout(const Duration(seconds: 6));
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        final Map<String, dynamic> data =
-            json.decode(resp.body) as Map<String, dynamic>;
+        final Map<String, dynamic> data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
         _states.clear();
         data.forEach((k, v) {
           _states[k] = v;
-          if (k.startsWith('sensor.'))
+          if (k.startsWith('sensor.')) {
             _states[k.replaceFirst('sensor.', '')] = v;
+          }
         });
         _lastFetchFailed = false;
         _hasFetchedOnce = true;
@@ -199,11 +220,11 @@ class MachineStatusService {
       final cleanBase = _dashboardUrl.endsWith('/') ? _dashboardUrl.substring(0, _dashboardUrl.length - 1) : _dashboardUrl;
       final uri = Uri.parse('$cleanBase/api/wa/open-gui');
       final resp = await http.get(uri).timeout(const Duration(seconds: 8));
+      final data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
       if (resp.statusCode == 200) {
-        final data = json.decode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
         return {'success': true, 'message': data['message'] ?? 'Jendela WhatsApp Web telah dibuka.'};
       } else {
-        return {'success': false, 'message': 'Gagal membuka WA: HTTP ${resp.statusCode}'};
+        return {'success': false, 'message': data['error'] ?? 'Gagal membuka WA: HTTP ${resp.statusCode}'};
       }
     } catch (e) {
       return {'success': false, 'message': 'Gagal menghubungi WhatsApp service: $e'};
@@ -216,7 +237,7 @@ class MachineStatusService {
       final uri = Uri.parse('$_dashboardUrl/api/connectivity');
       final resp = await http.get(uri).timeout(const Duration(seconds: 5));
       if (resp.statusCode == 200) {
-        final data = json.decode(resp.body) as Map<String, dynamic>;
+        final data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
         _internetOk = data['internet'] == true;
         _thinqOk = data['thinq'] == true;
         _bardiOk = data['bardi'] == true;
@@ -271,7 +292,7 @@ class MachineStatusService {
           )
           .timeout(const Duration(seconds: 10));
 
-      final data = json.decode(resp.body) as Map<String, dynamic>;
+      final data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
 
       if (resp.statusCode == 200) {
         return {'success': true, 'message': data['message']};
@@ -322,7 +343,7 @@ class MachineStatusService {
           )
           .timeout(const Duration(seconds: 10));
 
-      final data = json.decode(resp.body) as Map<String, dynamic>;
+      final data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
 
       if (resp.statusCode == 200) {
         return {'success': true, 'message': data['message']};
@@ -340,7 +361,7 @@ class MachineStatusService {
       final uri = Uri.parse('$_dashboardUrl/api/wa/status');
       final resp = await http.get(uri).timeout(const Duration(seconds: 5));
       if (resp.statusCode == 200) {
-        return json.decode(resp.body) as Map<String, dynamic>;
+        return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
       }
     } catch (_) {}
     return {'connected': false, 'error': 'Cannot reach WA service'};
@@ -361,7 +382,7 @@ class MachineStatusService {
           )
           .timeout(const Duration(seconds: 15));
 
-      return json.decode(resp.body) as Map<String, dynamic>;
+      return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
       return {'success': false, 'error': e.toString()};
     }
@@ -398,7 +419,7 @@ class MachineStatusService {
           )
           .timeout(const Duration(seconds: 10));
 
-      final data = json.decode(resp.body) as Map<String, dynamic>;
+      final data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
       if (resp.statusCode == 200) {
         return {'success': true, 'message': data['message']};
       } else {
@@ -444,7 +465,7 @@ class MachineStatusService {
           )
           .timeout(const Duration(seconds: 10));
 
-      final data = json.decode(resp.body) as Map<String, dynamic>;
+      final data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
       if (resp.statusCode == 200) {
         return {'success': true, 'message': data['message']};
       } else {
@@ -466,11 +487,14 @@ class MachineStatusService {
           .post(
             uri,
             headers: {'Content-Type': 'application/json'},
-            body: json.encode({'phone': phone, 'message': message}),
+            body: json.encode({
+              'phone': phone,
+              'message': message,
+            }),
           )
           .timeout(const Duration(seconds: 15));
 
-      return json.decode(resp.body) as Map<String, dynamic>;
+      return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
       return {'success': false, 'error': e.toString()};
     }
@@ -561,8 +585,7 @@ class MachineStatusService {
           )
           .timeout(const Duration(seconds: 8));
 
-      final data = json.decode(resp.body) as Map<String, dynamic>;
-      return data;
+      return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
       return {'success': false, 'error': e.toString()};
     }
@@ -574,7 +597,7 @@ class MachineStatusService {
       final uri = Uri.parse('$_dashboardUrl/api/auth/check-admin-exists');
       final resp = await http.get(uri).timeout(const Duration(seconds: 5));
       if (resp.statusCode == 200) {
-        final data = json.decode(resp.body) as Map<String, dynamic>;
+        final data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
         return data['admin_exists'] == true;
       }
     } catch (e) {
@@ -598,7 +621,7 @@ class MachineStatusService {
           )
           .timeout(const Duration(seconds: 8));
 
-      return json.decode(resp.body) as Map<String, dynamic>;
+      return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
       return {'success': false, 'error': e.toString()};
     }
@@ -617,7 +640,7 @@ class MachineStatusService {
           .timeout(const Duration(seconds: 6));
 
       if (resp.statusCode == 200) {
-        final data = json.decode(resp.body) as Map<String, dynamic>;
+        final data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
         return data['valid'] == true;
       }
     } catch (e) {
@@ -648,7 +671,7 @@ class MachineStatusService {
           )
           .timeout(const Duration(seconds: 8));
 
-      return json.decode(resp.body) as Map<String, dynamic>;
+      return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
       return {'success': false, 'error': e.toString()};
     }
@@ -673,7 +696,7 @@ class MachineStatusService {
           .timeout(const Duration(seconds: 6));
 
       if (resp.statusCode == 200) {
-        final data = json.decode(resp.body) as Map<String, dynamic>;
+        final data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
         return data['calculation'] as Map<String, dynamic>?;
       }
     } catch (e) {
@@ -712,7 +735,7 @@ class MachineStatusService {
           )
           .timeout(const Duration(seconds: 10));
 
-      return json.decode(resp.body) as Map<String, dynamic>;
+      return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
       return {'success': false, 'error': e.toString()};
     }
@@ -739,7 +762,7 @@ class MachineStatusService {
           )
           .timeout(const Duration(seconds: 8));
 
-      return json.decode(resp.body) as Map<String, dynamic>;
+      return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
       return {'success': false, 'error': e.toString()};
     }
@@ -769,7 +792,7 @@ class MachineStatusService {
           )
           .timeout(const Duration(seconds: 8));
 
-      return json.decode(resp.body) as Map<String, dynamic>;
+      return _safeJsonDecode(resp.body, statusCode: resp.statusCode);
     } catch (e) {
       return {'success': false, 'error': e.toString()};
     }
@@ -791,7 +814,7 @@ class MachineStatusService {
       final uri = Uri.parse('$_dashboardUrl/api/ledger/summary$query');
       final resp = await http.get(uri).timeout(const Duration(seconds: 8));
       if (resp.statusCode == 200) {
-        final data = json.decode(resp.body) as Map<String, dynamic>;
+        final data = _safeJsonDecode(resp.body, statusCode: resp.statusCode);
         return data['summary'] as Map<String, dynamic>?;
       }
     } catch (e) {

@@ -807,8 +807,7 @@ def start_machine_monitoring(entity_id, customer_name=None, customer_phone=None,
         duration_minutes = duration_seconds // 60
         res = tuya_manager.start_dryer(entity_id, duration_minutes)
         if not res.get("success"):
-            print(f"[Tuya] Failed to start smartplug {entity_id}: {res.get('error')}")
-            return f"failed_to_start_smartplug: {res.get('error')}", 500
+            print(f"[Tuya] Warning: Failed to start physical smartplug {entity_id}: {res.get('error')}. Continuing software monitoring.")
 
     # Check monitoring mode
     config = lg_manager.load_lg_config()
