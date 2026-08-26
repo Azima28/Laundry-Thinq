@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:laundry_apps/services/backend_services_manager.dart';
 
 class BardiTuyaSettingsScreen extends StatefulWidget {
@@ -15,11 +16,16 @@ class _BardiTuyaSettingsScreenState extends State<BardiTuyaSettingsScreen> {
   final _accessSecretCtrl = TextEditingController();
   final _appUidCtrl = TextEditingController();
   final _endpointCtrl = TextEditingController(text: 'https://openapi.tuyaus.com');
+  final _dryerDurationCtrl = TextEditingController(text: '45');
 
   bool _isLoading = false;
   bool _isConnected = false;
   String _apiBaseUrl = 'http://localhost:5001/';
-  
+
+  // Dryer runtime settings
+  int _dryerDurationMinutes = 45;
+  bool _dryerAlwaysOn = false;
+
   List<dynamic> _scannedPlugs = [];
   bool _isScanning = false;
 
@@ -42,6 +48,7 @@ class _BardiTuyaSettingsScreenState extends State<BardiTuyaSettingsScreen> {
     _accessSecretCtrl.dispose();
     _appUidCtrl.dispose();
     _endpointCtrl.dispose();
+    _dryerDurationCtrl.dispose();
     super.dispose();
   }
 
@@ -66,7 +73,10 @@ class _BardiTuyaSettingsScreenState extends State<BardiTuyaSettingsScreen> {
             _accessSecretCtrl.text = data['access_secret'] ?? '';
             _appUidCtrl.text = data['app_uid'] ?? '';
             _endpointCtrl.text = data['endpoint'] ?? 'https://openapi.tuyaus.com';
-            
+            _dryerDurationMinutes = data['dryer_duration_minutes'] ?? 45;
+            _dryerAlwaysOn = data['dryer_always_on'] ?? false;
+            _dryerDurationCtrl.text = _dryerDurationMinutes.toString();
+
             _isConnected = _accessIdCtrl.text.isNotEmpty && _accessSecretCtrl.text.isNotEmpty && _appUidCtrl.text.isNotEmpty;
           });
         }
@@ -75,6 +85,44 @@ class _BardiTuyaSettingsScreenState extends State<BardiTuyaSettingsScreen> {
       debugPrint('[BardiTuyaSettings] Error fetching credentials: $e');
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _saveDryerOperationalSettings() async {
+    final int parsed = int.tryParse(_dryerDurationCtrl.text.trim()) ?? 45;
+    setState(() {
+      _dryerDurationMinutes = parsed > 0 ? parsed : 45;
+    });
+    try {
+      final response = await http.post(
+        Uri.parse('${_apiBaseUrl}api/tuya/settings'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'access_id': _accessIdCtrl.text.trim(),
+          'access_secret': _accessSecretCtrl.text.trim(),
+          'app_uid': _appUidCtrl.text.trim(),
+          'endpoint': _endpointCtrl.text.trim(),
+          'dryer_duration_minutes': _dryerDurationMinutes,
+          'dryer_always_on': _dryerAlwaysOn,
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('dryer_duration_minutes', _dryerDurationMinutes);
+        await prefs.setBool('dryer_always_on', _dryerAlwaysOn);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pengaturan durasi pengering berhasil disimpan.'), backgroundColor: Colors.green),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan durasi: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -637,6 +685,8 @@ class _BardiTuyaSettingsScreenState extends State<BardiTuyaSettingsScreen> {
                 children: [
                   _buildStatusCard(),
                   const SizedBox(height: 24),
+                  _buildDryerOperationalSettingsCard(),
+                  const SizedBox(height: 24),
                   _buildCredentialsForm(),
                   const SizedBox(height: 24),
                   _buildDevicesListCard(),
@@ -645,6 +695,196 @@ class _BardiTuyaSettingsScreenState extends State<BardiTuyaSettingsScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildDryerOperationalSettingsCard() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD97706).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.timer_outlined, color: Color(0xFFD97706), size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Waktu & Mode Operasional Mesin Pengering',
+                      style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Atur durasi menyala stopkontak relay Bardi saat mesin pengering diaktifkan.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 20),
+
+          // Switch Always ON
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _dryerAlwaysOn ? const Color(0xFFFFFBEB) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _dryerAlwaysOn ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _dryerAlwaysOn ? Icons.flash_on_rounded : Icons.timer_outlined,
+                  color: _dryerAlwaysOn ? const Color(0xFFD97706) : const Color(0xFF64748B),
+                  size: 26,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Mode Selalu Hidup (Always ON / Tanpa Timer Countdown)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: _dryerAlwaysOn ? const Color(0xFF92400E) : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _dryerAlwaysOn
+                            ? 'Stopkontak pengering akan menyala terus menerus tanpa batas timer otomatis. Baru mati saat dimatikan manual oleh kasir via double-tap / Selesaikan.'
+                            : 'Stopkontak pengering akan otomatis mati saat durasi menit di bawah tercapai.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: _dryerAlwaysOn ? const Color(0xFFB45309) : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _dryerAlwaysOn,
+                  activeColor: const Color(0xFFD97706),
+                  onChanged: (val) {
+                    setState(() {
+                      _dryerAlwaysOn = val;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          if (!_dryerAlwaysOn) ...[
+            const Text(
+              'Durasi Menyala Pengering (Menit):',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [30, 40, 45, 60, 90].map((dur) {
+                final isSelected = _dryerDurationMinutes == dur;
+                return ChoiceChip(
+                  label: Text(dur == 45 ? '$dur Menit (Standar)' : '$dur Menit'),
+                  selected: isSelected,
+                  selectedColor: const Color(0xFFD97706),
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : const Color(0xFF334155),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
+                  ),
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() {
+                        _dryerDurationMinutes = dur;
+                        _dryerDurationCtrl.text = dur.toString();
+                      });
+                    }
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                SizedBox(
+                  width: 150,
+                  child: TextField(
+                    controller: _dryerDurationCtrl,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: 'Custom Menit',
+                      suffixText: 'Menit',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    onChanged: (val) {
+                      final p = int.tryParse(val.trim());
+                      if (p != null && p > 0) {
+                        setState(() {
+                          _dryerDurationMinutes = p;
+                        });
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Text(
+                    'Durasi ini mengatur timer hardware stopkontak Bardi dan batas siklus pengering.',
+                    style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              onPressed: _saveDryerOperationalSettings,
+              icon: const Icon(Icons.save_rounded, size: 18),
+              label: const Text('Simpan Pengaturan Durasi Pengering', style: TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD97706),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

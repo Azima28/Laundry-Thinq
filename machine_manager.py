@@ -494,8 +494,8 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                         if not status or not status.get("success"):
                             status = tuya_manager.get_dryer_status(ent)
                         if status and status.get("success"):
-                            if not status.get("switch", False):
-                                print(f"[Tuya] Dryer {ent} switch detected as OFF (5s hardware poll). Stopping countdown.")
+                            if not status.get("switch", False) and (is_running_flag or dur_min > 5):
+                                print(f"[Tuya] Active dryer {ent} switch turned OFF. Stopping countdown.")
                                 break
                             tuya_cd = status.get("countdown", 0)
                             if tuya_cd > 0 and abs(tuya_cd - remaining) > 3:
@@ -575,7 +575,11 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                         broadcast(state)
                 else:
                     # Manual/Tuya machine or degraded/bypass LG machine - broadcast directly
-                    if is_running_flag:
+                    config = lg_manager.load_lg_config()
+                    is_always_on = config.get("dryer_always_on", False)
+                    if is_always_on and (is_tuya or 'pengering' in ent.lower() or 'dry' in ent.lower()):
+                        state = f"{ent}|Ready|Relay ON|--:--|-|-|0|{cust_name_str}"
+                    elif is_running_flag or dur_min > 5:
                         siklus_label = f"{dur_min} Menit"
                         state = f"{ent}|Ready|{siklus_label}|{control_time}|-|-|0|{cust_name_str}"
                     else:
@@ -609,10 +613,14 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
             lg_manager.latest_state[ent] = state
             broadcast(state)
 
-            if is_tuya:
-                # Tuya device completion - release and notify
-                print(f"[Tuya] Autoclosing dryer {ent} and triggering notifications.")
-                finish_and_notify(ent, send_wa=True)
+            if is_tuya or 'pengering' in ent.lower() or 'dry' in ent.lower():
+                # Check if this was an actual drying run (dur_min > 5 or is_running_flag)
+                if is_running_flag or dur_min > 5:
+                    print(f"[Tuya] Completed drying cycle for {ent}. Triggering notifications.")
+                    finish_and_notify(ent, send_wa=True)
+                else:
+                    print(f"[Tuya] Booking window expired for {ent}. Setting Ready without WA selesai.")
+                    _expire_booking(ent)
             else:
                 # Clean up memory status for manual machines
                 with machine_status_lock:
@@ -802,15 +810,29 @@ def start_machine_monitoring(entity_id, customer_name=None, customer_phone=None,
     """
     print(f"[Monitor] Starting monitoring for {entity_id} (customer={customer_name}, phone={customer_phone}, duration={duration_seconds}s)")
 
+    config = lg_manager.load_lg_config()
+    is_always_on = config.get("dryer_always_on", False)
+    configured_dryer_dur = config.get("dryer_duration_minutes", 45)
+
     is_tuya = tuya_manager.resolve_tuya_device(entity_id) is not None
-    if is_tuya:
-        duration_minutes = duration_seconds // 60
-        res = tuya_manager.start_dryer(entity_id, duration_minutes)
-        if not res.get("success"):
-            print(f"[Tuya] Warning: Failed to start physical smartplug {entity_id}: {res.get('error')}. Continuing software monitoring.")
+    is_dryer = is_tuya or 'pengering' in entity_id.lower() or 'dry' in entity_id.lower() or 'kering' in entity_id.lower()
+
+    if is_dryer:
+        if duration_seconds <= 300:
+            if is_always_on:
+                duration_minutes = 0
+                duration_seconds = 86400  # 24h open timer
+            else:
+                duration_minutes = configured_dryer_dur
+                duration_seconds = duration_minutes * 60
+        else:
+            duration_minutes = duration_seconds // 60
+
+        tuya_res = tuya_manager.start_dryer(entity_id, duration_minutes=duration_minutes)
+        if not tuya_res.get("success"):
+            print(f"[Tuya] Warning: Failed to start physical smartplug {entity_id}: {tuya_res.get('error')}. Continuing software monitoring.")
 
     # Check monitoring mode
-    config = lg_manager.load_lg_config()
     monitoring_mode = config.get("monitoring_mode", "hybrid")
 
     # Log usage (all modes)
@@ -835,7 +857,7 @@ def start_machine_monitoring(entity_id, customer_name=None, customer_phone=None,
     end_time = datetime.now() + timedelta(seconds=duration_seconds)
 
     # Initialize state tracker for the new transaction
-    is_running_now = is_currently_offline and duration_minutes > 5
+    is_running_now = (is_currently_offline or is_dryer) and duration_minutes > 5
     run_state_init = "Running (Offline)" if is_running_now else "Idle"
 
     with state_transitions_lock:

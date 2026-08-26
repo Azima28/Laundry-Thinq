@@ -229,14 +229,14 @@ def start_dryer_local(dev, duration_minutes):
     if not outlet:
         return False, "No local key/device configuration"
     try:
-        duration_seconds = duration_minutes * 60
+        duration_seconds = (duration_minutes * 60) if (duration_minutes and duration_minutes > 0) else 0
         # Turn on switch (DPS 1) and set hardware timer (DPS 9)
         res = outlet.set_multiple_values({
             1: True,
             9: duration_seconds
         })
         if isinstance(res, dict) and not res.get("Error"):
-            print(f"[Tuya Local] Successfully turned ON {dev.get('name')} and set {duration_minutes}m ({duration_seconds}s) hardware countdown via LAN")
+            print(f"[Tuya Local] Successfully turned ON {dev.get('name')} (Countdown: {duration_seconds}s) via LAN")
             return True, None
 
         # Fallback to single turn_on + set_value
@@ -302,8 +302,16 @@ def get_dryer_status_local(dev):
     except Exception:
         return None
 
-def start_dryer(entity_id, duration_minutes):
+def start_dryer(entity_id, duration_minutes=None):
     """Turn Bardi smart plug ON: Local LAN First -> Fallback to Cloud."""
+    config = lg_manager.load_lg_config()
+    is_always_on = config.get("dryer_always_on", False)
+    if duration_minutes is None or duration_minutes < 0:
+        duration_minutes = config.get("dryer_duration_minutes", 45)
+
+    if is_always_on:
+        duration_minutes = 0
+
     dev = resolve_tuya_device(entity_id)
     if not dev:
         print(f"[Tuya] Device matching {entity_id} not found in devices.json")
@@ -318,7 +326,7 @@ def start_dryer(entity_id, duration_minutes):
                 "success": True,
                 "online": True,
                 "switch": True,
-                "countdown": duration_minutes * 60,
+                "countdown": (duration_minutes * 60) if duration_minutes > 0 else 0,
                 "power": 0.0,
                 "mode": "local_lan"
             }
@@ -339,7 +347,7 @@ def start_dryer(entity_id, duration_minutes):
         )
         device_id = dev["id"]
         switch_code = get_switch_code(c, device_id)
-        duration_seconds = duration_minutes * 60
+        duration_seconds = (duration_minutes * 60) if duration_minutes > 0 else 0
 
         payload = {
             "commands": [
@@ -367,7 +375,7 @@ def start_dryer(entity_id, duration_minutes):
                     "success": True,
                     "online": True,
                     "switch": True,
-                    "countdown": duration_minutes * 60,
+                    "countdown": duration_seconds,
                     "power": 0.0,
                     "mode": "cloud"
                 }

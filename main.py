@@ -213,6 +213,12 @@ def api_config():
         if 'wa_templates' in data:
             config['wa_templates'] = data['wa_templates']
             
+        # Dryer configuration
+        if 'dryer_duration_minutes' in data:
+            config['dryer_duration_minutes'] = int(data['dryer_duration_minutes'])
+        if 'dryer_always_on' in data:
+            config['dryer_always_on'] = bool(data['dryer_always_on'])
+
         # Chatbot configurations
         if 'chatbot_enabled' in data:
             config['chatbot_enabled'] = bool(data['chatbot_enabled'])
@@ -306,6 +312,8 @@ def api_config():
         "wa_master_enabled": config.get("wa_master_enabled", True),
         "wa_machine_notifications_enabled": config.get("wa_machine_notifications_enabled", True),
         "wa_templates": config.get("wa_templates", wa_bridge.WA_TEMPLATES),
+        "dryer_duration_minutes": config.get("dryer_duration_minutes", 45),
+        "dryer_always_on": config.get("dryer_always_on", False),
         "chatbot_enabled": config.get("chatbot_enabled", True),
         "chatbot_price_list": config.get("chatbot_price_list", default_prices),
         "chatbot_hours": config.get("chatbot_hours", default_hours),
@@ -1968,6 +1976,10 @@ def api_tuya_settings():
             config["tuya_access_secret"] = access_secret
             config["tuya_app_uid"] = app_uid
             config["tuya_endpoint"] = endpoint
+            if "dryer_duration_minutes" in data:
+                config["dryer_duration_minutes"] = int(data["dryer_duration_minutes"])
+            if "dryer_always_on" in data:
+                config["dryer_always_on"] = bool(data["dryer_always_on"])
             lg_manager.save_lg_config(config)
 
             # Update devices.json api_credentials block
@@ -1985,12 +1997,15 @@ def api_tuya_settings():
 
     # GET - return current credentials
     creds = tuya_manager.load_tuya_credentials()
+    config = lg_manager.load_lg_config()
     return jsonify({
         "success": True,
         "access_id": creds.get("access_id") or "",
         "access_secret": creds.get("access_secret") or "",
         "app_uid": creds.get("app_uid") or "",
-        "endpoint": creds.get("endpoint") or "https://openapi.tuyaus.com"
+        "endpoint": creds.get("endpoint") or "https://openapi.tuyaus.com",
+        "dryer_duration_minutes": config.get("dryer_duration_minutes", 45),
+        "dryer_always_on": config.get("dryer_always_on", False)
     })
 
 @app.route('/api/tuya/sync-keys', methods=['POST'])
