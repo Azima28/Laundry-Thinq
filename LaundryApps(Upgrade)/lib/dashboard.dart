@@ -11,6 +11,7 @@ import 'screens/admin/hubungi_pelanggan_screen.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/admin/pengeluaran_screen.dart';
 import 'screens/history/global_history_screen.dart';
+import 'screens/orders/restock_screen.dart';
 import 'services/machine_status_service.dart';
 import 'database/models/database_helper.dart';
 import 'utils/style_constants.dart';
@@ -159,6 +160,8 @@ class _DashboardPageState extends State<DashboardPage> {
       case 6:
         return const PengeluaranScreen();
       case 7:
+        return const RestockScreen(showAppBar: false);
+      case 8:
         return SettingsScreen();
       default:
         return _buildDashboardHome(displayName);
@@ -182,6 +185,8 @@ class _DashboardPageState extends State<DashboardPage> {
       case 6:
         return 'Catatan Pengeluaran & Kas Kecil';
       case 7:
+        return 'Restock & Kelola Stok Inventaris';
+      case 8:
         return 'Pusat Pengaturan Sistem & Hardware';
       default:
         return 'Smart Laundry Pro Desktop';
@@ -408,9 +413,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(height: 4),
                 _sidebarMenuItem(5, Icons.receipt_long_rounded, 'Riwayat', null),
                 const SizedBox(height: 4),
-                _sidebarMenuItem(6, Icons.receipt_long_rounded, 'Pengeluaran', null),
+                _sidebarMenuItem(6, Icons.account_balance_wallet_rounded, 'Pengeluaran', null),
                 const SizedBox(height: 4),
-                _sidebarMenuItem(7, Icons.tune_rounded, 'Pengaturan Hub', null),
+                _sidebarMenuItem(7, Icons.inventory_2_rounded, 'Stok Produk Toko', null),
+                const SizedBox(height: 4),
+                _sidebarMenuItem(8, Icons.tune_rounded, 'Pengaturan Hub', null),
               ],
             ),
           ),
@@ -934,6 +941,13 @@ class _DashboardPageState extends State<DashboardPage> {
                             icon: Icons.account_balance_wallet_rounded,
                             color: const Color(0xFFE11D48),
                             onTap: () => _selectTab(6),
+                          ),
+                          _buildQuickNavTile(
+                            title: 'Restock Produk Toko',
+                            desc: 'Tambah stok barang (sabun/parfum)',
+                            icon: Icons.inventory_2_rounded,
+                            color: const Color(0xFF8B5CF6),
+                            onTap: () => _selectTab(7),
                           ),
                         ],
                       ),

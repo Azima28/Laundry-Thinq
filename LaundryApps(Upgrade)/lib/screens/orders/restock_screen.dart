@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../transactions/transaction_repository.dart';
+import '../../transactions/user_repository.dart';
 import '../../database/models/transaction_model.dart';
 import '../../utils/currency_format.dart';
 
 class RestockScreen extends StatefulWidget {
-  const RestockScreen({Key? key}) : super(key: key);
+  final bool showAppBar;
+  const RestockScreen({Key? key, this.showAppBar = true}) : super(key: key);
 
   @override
   State<RestockScreen> createState() => _RestockScreenState();
@@ -14,6 +17,7 @@ class _RestockScreenState extends State<RestockScreen> {
   final TransactionRepository _repository = TransactionRepository();
   List<TransactionModel> _items = [];
   bool _isLoading = true;
+  bool _isAdmin = false;
 
   final Color primaryColor = const Color(0xFF4E80EE);
   final Color backgroundColor = const Color(0xFFF8FAFC);
@@ -27,13 +31,22 @@ class _RestockScreenState extends State<RestockScreen> {
   Future<void> _loadItems() async {
     setState(() => _isLoading = true);
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id');
+      bool adminFlag = false;
+      if (userId != null) {
+        final user = await UserRepository().getUserById(userId);
+        adminFlag = (user?.role == 'admin');
+      }
+
       final items = await _repository.getAllTransactions();
       setState(() {
+        _isAdmin = adminFlag;
         _items = items
             .where((item) =>
                 item.type == TransactionType.item &&
                 !item.isUnlimitedStock &&
-                item.isStaffRestockable)
+                (adminFlag || item.isStaffRestockable))
             .toList();
         _isLoading = false;
       });
@@ -193,16 +206,18 @@ class _RestockScreenState extends State<RestockScreen> {
 
     return Scaffold(
       backgroundColor: backgroundColor,
-      appBar: AppBar(
-        title: const Text('Restock Inventaris', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('Restock Inventaris', style: TextStyle(fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                onPressed: () => Navigator.pop(context),
+              ),
+            )
+          : null,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

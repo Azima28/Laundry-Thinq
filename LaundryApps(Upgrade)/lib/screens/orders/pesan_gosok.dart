@@ -471,7 +471,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
     final total = _calculateTotal();
     final totalWeight = _calculateTotalWeight();
 
-    if (totalWeight <= 0 || total <= 0) {
+    if (totalWeight <= 0 || total < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pilih minimal 1 paket layanan setrika terlebih dahulu!'), backgroundColor: StyleConstants.warningColor),
       );
@@ -490,7 +490,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
     String paymentMethodName = 'Tunai';
 
     if (_selectedPaymentTab == 'cash') {
-      if (_cashReceived < total) {
+      if (total > 0 && _cashReceived < total) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Uang tunai yang diterima kurang dari total tagihan!'), backgroundColor: StyleConstants.warningColor),
         );
@@ -498,7 +498,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
       }
       isPaidFlag = true;
       paidAmount = total;
-      paymentMethodName = 'Tunai / Cash';
+      paymentMethodName = total == 0 ? 'Gratis' : 'Tunai / Cash';
     } else if (_selectedPaymentTab == 'tempo') {
       if (_tempoSubMode == 'dp') {
         if (_dpAmount <= 0 || _dpAmount >= total) {
@@ -1689,7 +1689,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
   // --- INTEGRATED PAYMENT & HIGH-CONTRAST TOTAL SECTION ---
   Widget _buildIntegratedPaymentSection(int total, double totalWeight) {
     final change = _cashReceived - total;
-    final isCashValid = total > 0 && _cashReceived >= total;
+    final isCashValid = (total == 0 && totalWeight > 0) || (total > 0 && _cashReceived >= total);
     final isDpValid = total > 0 && _dpAmount > 0 && _dpAmount < total;
 
     return Container(
@@ -1798,7 +1798,7 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
               spacing: 6,
               runSpacing: 4,
               children: [
-                _quickCashChip(total, 'Uang Pas', isExact: true),
+                _quickCashChip(total, total == 0 ? 'Rp 0 (Pas)' : 'Uang Pas', isExact: true),
                 _quickCashChip(10000, '10k'),
                 _quickCashChip(20000, '20k'),
                 _quickCashChip(50000, '50k'),
@@ -1861,12 +1861,15 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
               ),
               child: _isSubmitting
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Row(
+                  : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.check_circle_rounded, size: 18),
-                        SizedBox(width: 8),
-                        Text('BAYAR LUNAS & CETAK STRUK (ENTER)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.3)),
+                        const Icon(Icons.check_circle_rounded, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          total == 0 ? 'SELESAIKAN ORDER (RP 0)' : 'BAYAR LUNAS & CETAK STRUK (ENTER)',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.3),
+                        ),
                       ],
                     ),
             ),

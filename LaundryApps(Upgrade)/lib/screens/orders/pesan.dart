@@ -16,6 +16,7 @@ import '../../utils/style_constants.dart';
 import '../../utils/tub_note_helper.dart';
 import '../../utils/globals.dart';
 import 'receipt_screen.dart';
+import 'restock_screen.dart';
 
 class PesanPage extends StatefulWidget {
   const PesanPage({super.key});
@@ -583,7 +584,7 @@ class _PesanPageState extends State<PesanPage> {
     final total = _calculateTotal();
     final totalItems = _calculateTotalItems();
 
-    if (totalItems <= 0 || total <= 0) {
+    if (totalItems <= 0 || total < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pilih minimal 1 paket layanan cucian terlebih dahulu!'), backgroundColor: StyleConstants.warningColor),
       );
@@ -602,7 +603,7 @@ class _PesanPageState extends State<PesanPage> {
     String paymentMethodName = 'Tunai';
 
     if (_selectedPaymentTab == 'cash') {
-      if (_cashReceived < total) {
+      if (total > 0 && _cashReceived < total) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Uang tunai yang diterima kurang dari total tagihan!'), backgroundColor: StyleConstants.warningColor),
         );
@@ -610,7 +611,7 @@ class _PesanPageState extends State<PesanPage> {
       }
       isPaidFlag = true;
       paidAmount = total;
-      paymentMethodName = 'Tunai / Cash';
+      paymentMethodName = total == 0 ? 'Gratis (Klaim Kupon)' : 'Tunai / Cash';
     } else if (_selectedPaymentTab == 'tempo') {
       if (_tempoSubMode == 'dp') {
         if (_dpAmount <= 0 || _dpAmount >= total) {
@@ -1647,6 +1648,25 @@ class _PesanPageState extends State<PesanPage> {
           ),
           const SizedBox(width: 16),
 
+          // Restock Stok Button for Cashier/Staff
+          OutlinedButton.icon(
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RestockScreen()),
+              );
+              _loadItems();
+            },
+            icon: const Icon(Icons.inventory_2_rounded, size: 16, color: Color(0xFF6366F1)),
+            label: const Text('Restock Stok', style: TextStyle(color: Color(0xFF6366F1), fontSize: 13, fontWeight: FontWeight.w800)),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+          const SizedBox(width: 8),
+
           // Clear cart button
           if (_calculateTotalItems() > 0)
             OutlinedButton.icon(
@@ -2423,7 +2443,7 @@ class _PesanPageState extends State<PesanPage> {
   // --- INTEGRATED PAYMENT & HIGH-CONTRAST TOTAL SECTION ---
   Widget _buildIntegratedPaymentSection(int total, int totalItems) {
     final change = _cashReceived - total;
-    final isCashValid = total > 0 && _cashReceived >= total;
+    final isCashValid = (total == 0 && totalItems > 0) || (total > 0 && _cashReceived >= total);
     final isDpValid = total > 0 && _dpAmount > 0 && _dpAmount < total;
 
     return Container(
@@ -2532,7 +2552,7 @@ class _PesanPageState extends State<PesanPage> {
               spacing: 8,
               runSpacing: 6,
               children: [
-                _quickCashChip(total, 'Uang Pas', isExact: true),
+                _quickCashChip(total, total == 0 ? 'Rp 0 (Pas)' : 'Uang Pas', isExact: true),
                 _quickCashChip(10000, '10k'),
                 _quickCashChip(20000, '20k'),
                 _quickCashChip(50000, '50k'),
@@ -2595,12 +2615,15 @@ class _PesanPageState extends State<PesanPage> {
               ),
               child: _isSubmitting
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Row(
+                  : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.check_circle_rounded, size: 20),
-                        SizedBox(width: 8),
-                        Text('BAYAR LUNAS & CETAK STRUK (ENTER)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, letterSpacing: 0.3)),
+                        const Icon(Icons.check_circle_rounded, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          total == 0 ? 'SELESAIKAN ORDER (RP 0)' : 'BAYAR LUNAS & CETAK STRUK (ENTER)',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, letterSpacing: 0.3),
+                        ),
                       ],
                     ),
             ),
