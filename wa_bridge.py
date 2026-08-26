@@ -11,6 +11,8 @@ import database
 
 # Default config (akan di-override dari config.json)
 WA_SERVICE_URL = "http://localhost:3000"
+WA_MASTER_ENABLED = True
+WA_MACHINE_NOTIFICATIONS_ENABLED = True
 
 # WA message templates (default)
 WA_TEMPLATES = {
@@ -27,11 +29,13 @@ _outbox_running = False
 
 def load_wa_config():
     """Load WA configuration from config.json."""
-    global WA_SERVICE_URL, WA_TEMPLATES
+    global WA_SERVICE_URL, WA_TEMPLATES, WA_MASTER_ENABLED, WA_MACHINE_NOTIFICATIONS_ENABLED
     try:
         import lg_manager
         config = lg_manager.load_lg_config()
         WA_SERVICE_URL = config.get("wa_service_url", WA_SERVICE_URL)
+        WA_MASTER_ENABLED = config.get("wa_master_enabled", True)
+        WA_MACHINE_NOTIFICATIONS_ENABLED = config.get("wa_machine_notifications_enabled", True)
         templates = config.get("wa_templates", {})
         if templates:
             WA_TEMPLATES.update(templates)
@@ -64,13 +68,17 @@ def _normalize_phone(phone):
 
 def send_wa_message(phone, message, save_to_outbox=True):
     """Send WhatsApp message via Node.js service.
-    
+
     If sending fails and save_to_outbox is True, the message is saved
     to the wa_outbox table for later retry.
-    
+
     Returns:
         dict: {"success": bool, "error": str or None}
     """
+    if not WA_MASTER_ENABLED:
+        print(f"[WA] WhatsApp master is disabled in settings. Skipping message to {phone}")
+        return {"success": True, "skipped": True, "error": None}
+
     phone = _normalize_phone(phone)
     if not phone:
         return {"success": False, "error": "No phone number provided"}
@@ -115,8 +123,8 @@ def send_wa_message(phone, message, save_to_outbox=True):
 
 def send_wa_booking(phone, nama, mesin):
     """Send WA notification: machine is booked and ready to use."""
-    if not phone:
-        return
+    if not phone or not WA_MASTER_ENABLED or not WA_MACHINE_NOTIFICATIONS_ENABLED:
+        return {"success": True, "skipped": True}
     sequence = database.get_current_wash_sequence(phone, nama)
     if sequence > 1:
         print(f"[WA] Skipping 'booking' WA for {mesin} because sequence is {sequence} (> 1)")
@@ -130,31 +138,31 @@ def send_wa_booking(phone, nama, mesin):
 
 def send_wa_cucian_masuk(phone, nama, mesin):
     """Send WA notification: machine cycle has been set/started in dashboard.
-    
+
     Checks if a notification of this type has already been sent to this phone
     recently (within 1 hour) to avoid spamming customers who have multiple active machines.
     """
-    if not phone:
-        return
-        
+    if not phone or not WA_MASTER_ENABLED or not WA_MACHINE_NOTIFICATIONS_ENABLED:
+        return {"success": True, "skipped": True}
+
     # Skip if they have already received a start WA for this session in the last 1 hour
     if database.has_phone_received_event_recently(phone, "cucian_masuk", 3600):
         print(f"[WA] Skipping duplicate 'cucian_masuk' WA for {mesin} -> {phone} (already sent recently)")
         return {"success": True, "skipped": True}
-        
+
     sequence = database.get_current_wash_sequence(phone, nama)
     if sequence > 1:
         print(f"[WA] Skipping 'cucian_masuk' WA for {mesin} because sequence is {sequence} (> 1)")
         return {"success": True, "skipped": True}
-        
+
     template = WA_TEMPLATES.get("cucian_masuk", "")
     if not template or not template.strip():
         template = WA_TEMPLATES.get("booking", "")
     if not template or not template.strip():
         template = "{sequence} Cucian mu sudah di proses"
-        
+
     message = template.replace("{name}", nama).replace("{mesin}", mesin.replace("_", " ")).replace("{sequence}", str(sequence))
-    
+
     result = send_wa_message(phone, message)
     if result and result.get("success"):
         database.log_wa_sent(mesin, "cucian_masuk", phone)
@@ -163,15 +171,15 @@ def send_wa_cucian_masuk(phone, nama, mesin):
 
 def send_wa_cucian_mulai(phone, nama, mesin, estimasi_waktu):
     """Send WA notification: washing has started with time estimate.
-    
+
     Args:
         phone: Customer phone number
         nama: Customer name
         mesin: Machine name (e.g. "Mesin_Cuci_2")
         estimasi_waktu: Estimated time string (e.g. "1:15" for 1 hour 15 min)
     """
-    if not phone:
-        return
+    if not phone or not WA_MASTER_ENABLED or not WA_MACHINE_NOTIFICATIONS_ENABLED:
+        return {"success": True, "skipped": True}
 
     sequence = database.get_current_wash_sequence(phone, nama)
     if sequence > 1:
@@ -211,8 +219,8 @@ def send_wa_cucian_mulai(phone, nama, mesin, estimasi_waktu):
 
 def send_wa_cucian_selesai(phone, nama, mesin):
     """Send WA notification: washing is complete."""
-    if not phone:
-        return
+    if not phone or not WA_MASTER_ENABLED or not WA_MACHINE_NOTIFICATIONS_ENABLED:
+        return {"success": True, "skipped": True}
 
     # Check if we already sent a 'complete' notification for this machine recently
     if database.has_wa_been_sent(mesin, "complete", phone, cooldown_seconds=600):

@@ -23,6 +23,10 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
   String? _qrMessage;
   Timer? _qrRefreshTimer;
 
+  // Global & Sub-Feature Switches
+  bool _waMasterEnabled = true;
+  bool _waMachineNotificationsEnabled = true;
+
   // Templates controllers
   final TextEditingController _bookingController = TextEditingController();
   final TextEditingController _cucianMasukController = TextEditingController();
@@ -135,7 +139,6 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
   Future<void> _loadWaStatus() async {
     try {
       final status = await _statusService.getWaStatus();
-      bool wasConnected = _connected;
       bool isNowConnected = status['connected'] == true;
       if (mounted) {
         setState(() {
@@ -144,11 +147,6 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
           _pushname = status['pushname'];
           _isLoading = false;
         });
-      }
-
-      if (!wasConnected && isNowConnected) {
-        _sendTestPoll();
-        _checkVoteResult();
       }
 
       if (!_connected) {
@@ -195,6 +193,8 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
         if (mounted) {
           setState(() {
             _testPhoneCtrl.text = prefs.getString('wa_test_phone') ?? '6289522584477';
+            _waMasterEnabled = data['wa_master_enabled'] ?? true;
+            _waMachineNotificationsEnabled = data['wa_machine_notifications_enabled'] ?? true;
             _chatbotEnabled = data['chatbot_enabled'] ?? true;
             _chatbotWelcomeController.text = data['chatbot_welcome_message'] ?? 'Halo! Selamat datang di Smart Laundry. Ada yang bisa kami bantu?';
             _chatbotWelcomeCooldown = data['chatbot_welcome_cooldown'] ?? 0;
@@ -213,6 +213,8 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
         uri,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
+          'wa_master_enabled': _waMasterEnabled,
+          'wa_machine_notifications_enabled': _waMachineNotificationsEnabled,
           'wa_templates': {
             'booking': _bookingController.text,
             'cucian_masuk': _cucianMasukController.text,
@@ -230,6 +232,8 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
       if (resp.statusCode == 200) {
         // Save locally to SharedPrefs too
         final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('wa_master_enabled', _waMasterEnabled);
+        await prefs.setBool('wa_machine_notifications_enabled', _waMachineNotificationsEnabled);
         await prefs.setString('wa_booking_template', _bookingController.text);
         await prefs.setString('wa_cucian_masuk_template', _cucianMasukController.text);
         await prefs.setString('wa_cucian_mulai_template', _cucianMulaiController.text);
@@ -239,10 +243,10 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
         await prefs.setInt('wa_chatbot_welcome_cooldown', _chatbotWelcomeCooldown);
         await prefs.setInt('wa_chatbot_staff_cooldown', _chatbotStaffCooldown);
         await prefs.setString('wa_chatbot_menu', json.encode(_chatbotMenu));
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Template WhatsApp berhasil disimpan.'), backgroundColor: Colors.green),
+            const SnackBar(content: Text('Pengaturan WhatsApp berhasil disimpan.'), backgroundColor: Colors.green),
           );
         }
       } else {
@@ -561,6 +565,60 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // Master Switch Banner
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _waMasterEnabled ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: _waMasterEnabled ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _waMasterEnabled ? Icons.chat_rounded : Icons.block_rounded,
+                                  color: _waMasterEnabled ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                                  size: 26,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Master Switch: Semua Fitur WhatsApp',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13.5,
+                                          color: _waMasterEnabled ? const Color(0xFF065F46) : const Color(0xFF991B1B),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _waMasterEnabled
+                                            ? 'Fitur WhatsApp aktif (notifikasi mesin & chatbot beroperasi sesuai tab di bawah).'
+                                            : 'Seluruh fitur WhatsApp dinonaktifkan total (tidak ada notifikasi & bot mati).',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          color: _waMasterEnabled ? const Color(0xFF047857) : const Color(0xFFB91C1C),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Switch(
+                                  value: _waMasterEnabled,
+                                  activeColor: const Color(0xFF10B981),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _waMasterEnabled = val;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
                           Container(
                             decoration: const BoxDecoration(
                               border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
@@ -592,40 +650,94 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
-                                      const Text(
-                                        'Template Pesan WhatsApp',
-                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                      Container(
+                                        margin: const EdgeInsets.only(bottom: 20),
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        decoration: BoxDecoration(
+                                          color: _waMachineNotificationsEnabled ? const Color(0xFFF8FAFC) : const Color(0xFFFFFBEB),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: _waMachineNotificationsEnabled ? const Color(0xFFE2E8F0) : const Color(0xFFFDE68A),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'Aktifkan Notifikasi Mesin Otomatis',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13.5,
+                                                      color: _waMachineNotificationsEnabled ? const Color(0xFF0F172A) : const Color(0xFF92400E),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    _waMachineNotificationsEnabled
+                                                        ? 'Kirim pesan otomatis saat cucian booking, masuk, mulai berputar, atau selesai.'
+                                                        : 'Notifikasi mesin dinonaktifkan (pesan otomatis mesin tidak akan dikirim).',
+                                                    style: TextStyle(
+                                                      fontSize: 11.5,
+                                                      color: _waMachineNotificationsEnabled ? const Color(0xFF64748B) : const Color(0xFFB45309),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Switch(
+                                              value: _waMachineNotificationsEnabled,
+                                              onChanged: _waMasterEnabled
+                                                  ? (val) {
+                                                      setState(() {
+                                                        _waMachineNotificationsEnabled = val;
+                                                      });
+                                                    }
+                                                  : null,
+                                              activeColor: primaryColor,
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      const SizedBox(height: 8),
-                                      const Text(
-                                        'Atur pesan yang akan dikirim secara otomatis. Gunakan tag {name} untuk nama pelanggan, {mesin} untuk nama mesin cuci, dan {estimasi} untuk sisa waktu.',
-                                        style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), height: 1.45),
-                                      ),
-                                      const SizedBox(height: 24),
-                                      _templateField(
-                                        label: '1. Pesan Saat Booking (Batas 5 Menit)',
-                                        controller: _bookingController,
-                                        hint: 'Contoh: Halo Kak {name}, mesin cuci {mesin} sudah siap digunakan...',
-                                      ),
-                                      const SizedBox(height: 20),
-                                      _templateField(
-                                        label: '2. Pesan Saat Cucian Masuk (Sebelum Mulai)',
-                                        controller: _cucianMasukController,
-                                        hint: 'Contoh: Halo Kak {name}, cucian anda sudah masuk ke mesin cuci...',
-                                      ),
-                                      const SizedBox(height: 20),
-                                      _templateField(
-                                        label: '3. Pesan Saat Cucian Mulai Berputar (Running)',
-                                        controller: _cucianMulaiController,
-                                        hint: 'Contoh: Halo Kak {name}, cucianmu di {mesin} sudah mulai diproses, estimasi selesai {estimasi}...',
-                                      ),
-                                      const SizedBox(height: 20),
-                                      _templateField(
-                                        label: '4. Pesan Saat Cucian Selesai',
-                                        controller: _cucianSelesaiController,
-                                        hint: 'Contoh: Halo Kak {name}, cucianmu di {mesin} sudah selesai! Silakan diambil...',
-                                      ),
-                                      const SizedBox(height: 20),
+                                      if (_waMachineNotificationsEnabled) ...[
+                                        const Text(
+                                          'Template Pesan WhatsApp',
+                                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'Atur pesan yang akan dikirim secara otomatis. Gunakan tag {name} untuk nama pelanggan, {mesin} untuk nama mesin cuci, dan {estimasi} untuk sisa waktu.',
+                                          style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), height: 1.45),
+                                        ),
+                                        const SizedBox(height: 24),
+                                        _templateField(
+                                          label: '1. Pesan Saat Booking (Batas 5 Menit)',
+                                          controller: _bookingController,
+                                          hint: 'Contoh: Halo Kak {name}, mesin cuci {mesin} sudah siap digunakan...',
+                                        ),
+                                        const SizedBox(height: 20),
+                                        _templateField(
+                                          label: '2. Pesan Saat Cucian Masuk (Sebelum Mulai)',
+                                          controller: _cucianMasukController,
+                                          hint: 'Contoh: Halo Kak {name}, cucian anda sudah masuk ke mesin cuci...',
+                                        ),
+                                        const SizedBox(height: 20),
+                                        _templateField(
+                                          label: '3. Pesan Saat Cucian Mulai Berputar (Running)',
+                                          controller: _cucianMulaiController,
+                                          hint: 'Contoh: Halo Kak {name}, cucianmu di {mesin} sudah mulai diproses, estimasi selesai {estimasi}...',
+                                        ),
+                                        const SizedBox(height: 20),
+                                        _templateField(
+                                          label: '4. Pesan Saat Cucian Selesai',
+                                          controller: _cucianSelesaiController,
+                                          hint: 'Contoh: Halo Kak {name}, cucianmu di {mesin} sudah selesai! Silakan diambil...',
+                                        ),
+                                        const SizedBox(height: 20),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -634,35 +746,58 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
-                                      const Text(
-                                        'Pengaturan Chatbot Auto-Reply',
-                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      const Text(
-                                        'Pelanggan dapat mengirim chat untuk berinteraksi dengan chatbot via Polling WA.',
-                                        style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
-                                      ),
-                                      const SizedBox(height: 20),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          const Text(
-                                            'Aktifkan Chatbot',
-                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
+                                      Container(
+                                        margin: const EdgeInsets.only(bottom: 20),
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        decoration: BoxDecoration(
+                                          color: _chatbotEnabled ? const Color(0xFFF8FAFC) : const Color(0xFFFFFBEB),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: _chatbotEnabled ? const Color(0xFFE2E8F0) : const Color(0xFFFDE68A),
                                           ),
-                                          Switch(
-                                            value: _chatbotEnabled,
-                                            onChanged: (val) {
-                                              setState(() {
-                                                _chatbotEnabled = val;
-                                              });
-                                            },
-                                            activeColor: primaryColor,
-                                          ),
-                                        ],
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'Aktifkan Chatbot Auto-Reply',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13.5,
+                                                      color: _chatbotEnabled ? const Color(0xFF0F172A) : const Color(0xFF92400E),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    _chatbotEnabled
+                                                        ? 'Bot otomatis membalas chat masuk pelanggan dengan polling menu.'
+                                                        : 'Chatbot dinonaktifkan (kasir dapat chat manual tanpa gangguan balasan bot).',
+                                                    style: TextStyle(
+                                                      fontSize: 11.5,
+                                                      color: _chatbotEnabled ? const Color(0xFF64748B) : const Color(0xFFB45309),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Switch(
+                                              value: _chatbotEnabled,
+                                              onChanged: _waMasterEnabled
+                                                  ? (val) {
+                                                      setState(() {
+                                                        _chatbotEnabled = val;
+                                                      });
+                                                    }
+                                                  : null,
+                                              activeColor: primaryColor,
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      const SizedBox(height: 20),
                                       if (_chatbotEnabled) ...[
                                         _templateField(
                                           label: 'Pesan Sambutan (Judul Welcome Poll):',

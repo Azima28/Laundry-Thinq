@@ -203,6 +203,10 @@ def api_config():
             config['sse_keep_alive_timeout'] = int(data['sse_keep_alive_timeout'])
         if 'wa_service_url' in data:
             config['wa_service_url'] = data['wa_service_url']
+        if 'wa_master_enabled' in data:
+            config['wa_master_enabled'] = bool(data['wa_master_enabled'])
+        if 'wa_machine_notifications_enabled' in data:
+            config['wa_machine_notifications_enabled'] = bool(data['wa_machine_notifications_enabled'])
         if 'wa_templates' in data:
             config['wa_templates'] = data['wa_templates']
             
@@ -296,6 +300,8 @@ def api_config():
         "worker_threads": config.get("worker_threads", 32),
         "sse_keep_alive_timeout": config.get("sse_keep_alive_timeout", 15),
         "wa_service_url": config.get("wa_service_url", "http://localhost:3000"),
+        "wa_master_enabled": config.get("wa_master_enabled", True),
+        "wa_machine_notifications_enabled": config.get("wa_machine_notifications_enabled", True),
         "wa_templates": config.get("wa_templates", wa_bridge.WA_TEMPLATES),
         "chatbot_enabled": config.get("chatbot_enabled", True),
         "chatbot_price_list": config.get("chatbot_price_list", default_prices),

@@ -788,6 +788,12 @@ async function checkActivePollVotes() {
     // Only check and log if WhatsApp is connected AND there are active polls waiting for customer vote
     if (!isReady || activePollsToMonitor.size === 0) return;
 
+    const config = loadConfig();
+    if (config.wa_master_enabled === false || config.chatbot_enabled === false) {
+        activePollsToMonitor.clear();
+        return;
+    }
+
     _pollCheckCount++;
     if (_pollCheckCount <= 5 || _pollCheckCount % 40 === 0) {
         console.log(`[PollMonitor] ⏱ Timer #${_pollCheckCount}: isReady=${isReady} activePolls=${activePollsToMonitor.size}${activePollsToMonitor.size > 0 ? ' IDs: ' + [...activePollsToMonitor.keys()].map(k => k.split('_').pop()).join(', ') : ''}`);
@@ -900,7 +906,7 @@ client.on('vote_update', async (vote) => {
 
     // 2. Chatbot response logic
     const config = loadConfig();
-    if (config.chatbot_enabled === false) return;
+    if (config.wa_master_enabled === false || config.chatbot_enabled === false) return;
     if (!vote.selectedOptions || vote.selectedOptions.length === 0) return;
     
     const pollId = vote.parentMsgKey ? vote.parentMsgKey._serialized || vote.parentMsgKey.id : null;
@@ -967,7 +973,7 @@ client.on('message', async (msg) => {
     }
 
     const config = loadConfig();
-    if (config.chatbot_enabled === false) return;
+    if (config.wa_master_enabled === false || config.chatbot_enabled === false) return;
 
     const identities = await resolveIdentities(msg);
     const sender = identities.phone || identities.lid || msg.from.replace('@c.us', '').replace('@lid', '');
@@ -1298,6 +1304,15 @@ app.post('/send', async (req, res) => {
         return res.status(400).json({
             success: false,
             error: 'Missing phone or message'
+        });
+    }
+
+    const config = loadConfig();
+    if (config.wa_master_enabled === false) {
+        return res.json({
+            success: true,
+            skipped: true,
+            message: 'WhatsApp sending skipped (wa_master_enabled is false)'
         });
     }
 
