@@ -484,6 +484,10 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                         cancelled = True
                         break
 
+                with state_transitions_lock:
+                    tracker = state_transitions.get(ent, {})
+                    is_running_flag = tracker.get("wa_start_sent", False) or (tracker.get("last_state") == "Running (Offline)")
+
                 # Smooth 1-second local decrement from end_dt
                 remaining = max(0, (end_dt - datetime.now()).total_seconds())
 
@@ -534,10 +538,6 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
 
                 cust_info = get_customer_info(ent)
                 cust_name_str = cust_info.get("name") if cust_info else "-"
-
-                with state_transitions_lock:
-                    tracker = state_transitions.get(ent, {})
-                    is_running_flag = tracker.get("wa_start_sent", False) or (tracker.get("last_state") == "Running (Offline)")
 
                 if is_lg and not is_degraded_or_bypass:
                     # Check if LG machine is currently reporting active wash cycle sensor data from ThinQ cloud
