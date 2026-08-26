@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../database/models/user_model.dart';
 import 'screens/machines/cuci_screen.dart';
 import 'screens/machines/pengering_screen.dart';
+import 'screens/machines/machine_label_dialog.dart';
 import 'screens/customers/customer_screen.dart';
 import 'screens/admin/hubungi_pelanggan_screen.dart';
 import 'screens/settings/settings_screen.dart';
@@ -608,6 +609,39 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
 
           const Spacer(),
+
+          // Standalone Label Maker Button
+          Tooltip(
+            message: 'Buat & Cetak Label Mesin Manual',
+            child: InkWell(
+              onTap: () => MachineLabelDialog.show(context),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: StyleConstants.primaryColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: StyleConstants.primaryColor.withValues(alpha: 0.25)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.label_important_rounded, size: 15, color: StyleConstants.primaryColor),
+                    SizedBox(width: 6),
+                    Text(
+                      'Cetak Label',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: StyleConstants.primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
 
           // Hardware & Gateway Connectivity Pills
           _buildNetworkStatusBar(),

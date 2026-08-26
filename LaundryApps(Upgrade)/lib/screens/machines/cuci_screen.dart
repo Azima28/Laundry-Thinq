@@ -10,6 +10,8 @@ import '../../database/models/machine_model.dart';
 import '../../services/notification_service.dart';
 import '../../utils/style_constants.dart';
 import '../../utils/tub_note_helper.dart';
+import '../../services/printer_service.dart';
+import 'machine_label_dialog.dart';
 
 class CuciScreen extends StatelessWidget {
   final int items;
@@ -298,6 +300,20 @@ class _CuciContentState extends State<CuciContent> {
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    OutlinedButton.icon(
+                      onPressed: () => MachineLabelDialog.show(
+                        context,
+                        machineName: 'Mesin Cuci 1',
+                        serviceType: 'Cuci Saja',
+                      ),
+                      icon: const Icon(Icons.label_important_outline_rounded, size: 16),
+                      label: const Text('Cetak Label Manual', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                     const Spacer(),
@@ -2423,38 +2439,351 @@ class _CuciContentState extends State<CuciContent> {
         ? ' (Tabung ${selCycleIdx + 1}/$selTotalCycles${selTubNote.isNotEmpty ? " • ⚖️ $selTubNote" : ""})'
         : (selTubNote.isNotEmpty ? ' (⚖️ $selTubNote)' : '');
 
+    // Auto-detect service type from order
+    bool hasCuci = false;
+    bool hasKering = false;
+    bool hasGosok = false;
+    for (var it in order.items) {
+      final name = it.itemName.toLowerCase();
+      final mType = (it.machineType ?? '').toLowerCase();
+      if (mType == 'cuci' || name.contains('cuci') || name.contains('wash')) hasCuci = true;
+      if (mType == 'pengering' || name.contains('kering') || name.contains('dry')) hasKering = true;
+      if (mType == 'gosok' || mType == 'iron' || name.contains('gosok') || name.contains('setrika') || name.contains('lipat')) hasGosok = true;
+    }
+
+    String defaultService = 'Cuci Kering';
+    if (hasCuci && hasKering && hasGosok) {
+      defaultService = 'Cuci Kering Lipat';
+    } else if (hasCuci && hasKering) {
+      defaultService = 'Cuci Kering';
+    } else if (hasCuci) {
+      defaultService = 'Cuci Saja';
+    } else if (hasKering) {
+      defaultService = 'Kering Saja';
+    }
+
+    bool printLabel = false;
+    String selectedService = defaultService;
+    final TextEditingController labelMachineCtrl = TextEditingController(text: machineName);
+    final TextEditingController labelCustomerCtrl = TextEditingController(text: order.customerName);
+    final TextEditingController customServiceCtrl = TextEditingController();
+
+    final List<String> serviceOptions = [
+      'Cuci Kering',
+      'Cuci Saja',
+      'Cuci Kering Lipat',
+      'Kering Saja',
+      'Lainnya (Ketik Custom)',
+    ];
+    if (!serviceOptions.contains(selectedService)) {
+      selectedService = 'Lainnya (Ketik Custom)';
+      customServiceCtrl.text = defaultService;
+    }
+
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'Konfirmasi Pemakaian Mesin',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: Text(
-            'Apakah Anda yakin memulai $machineName untuk "${order.customerName}$cycleInfo"?',
-            style: const TextStyle(fontSize: 14),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Batal'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+        return StatefulBuilder(
+          builder: (dialogCtx, setModalState) {
+            final now = DateTime.now();
+            final dateStr = '${now.day} ${['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][now.month - 1]}';
+            final String effectiveService = selectedService == 'Lainnya (Ketik Custom)'
+                ? (customServiceCtrl.text.trim().isNotEmpty ? customServiceCtrl.text.trim() : 'Cuci Kering')
+                : selectedService;
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+              elevation: 20,
+              backgroundColor: Colors.white,
+              child: Container(
+                width: printLabel ? 540 : 460,
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.local_laundry_service_rounded, color: primaryColor, size: 24),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Konfirmasi Pemakaian Mesin',
+                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF0F172A)),
+                              ),
+                              Text(
+                                '$machineName • ${order.customerName}$cycleInfo',
+                                style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    const SizedBox(height: 14),
+
+                    // Label Print Toggle Switch Card
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: printLabel ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: printLabel ? const Color(0xFF93C5FD) : const Color(0xFFE2E8F0),
+                          width: printLabel ? 1.5 : 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: printLabel ? StyleConstants.primaryColor : const Color(0xFFCBD5E1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.label_important_rounded, size: 16, color: Colors.white),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Cetak Label Mesin (Thermal)',
+                                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A)),
+                                ),
+                                Text(
+                                  'Cetak tiket tempel pakaian saat mesin dinyalakan',
+                                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch.adaptive(
+                            value: printLabel,
+                            activeThumbColor: StyleConstants.primaryColor,
+                            onChanged: (val) => setModalState(() => printLabel = val),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Expanded Label Customizer & Visual Preview
+                    if (printLabel) ...[
+                      const SizedBox(height: 14),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Left Form Inputs
+                          Expanded(
+                            flex: 52,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('JENIS LAYANAN:', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: Color(0xFF475569))),
+                                const SizedBox(height: 4),
+                                Container(
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: selectedService,
+                                      isExpanded: true,
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                                      items: serviceOptions.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))).toList(),
+                                      onChanged: (val) {
+                                        if (val != null) setModalState(() => selectedService = val);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                if (selectedService == 'Lainnya (Ketik Custom)') ...[
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: StyleConstants.primaryColor),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    child: TextField(
+                                      controller: customServiceCtrl,
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                                      decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 8), hintText: 'Nama layanan custom...'),
+                                      onChanged: (_) => setModalState(() {}),
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 10),
+
+                                const Text('NAMA MESIN:', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: Color(0xFF475569))),
+                                const SizedBox(height: 4),
+                                Container(
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  child: TextField(
+                                    controller: labelMachineCtrl,
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                                    decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 8)),
+                                    onChanged: (_) => setModalState(() {}),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+
+                                const Text('NAMA PELANGGAN:', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: Color(0xFF475569))),
+                                const SizedBox(height: 4),
+                                Container(
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  child: TextField(
+                                    controller: labelCustomerCtrl,
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                                    decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 8)),
+                                    onChanged: (_) => setModalState(() {}),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+
+                          // Right Label Preview (Exact User Ticket Outline)
+                          Expanded(
+                            flex: 48,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('PREVIEW TIKET:', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: StyleConstants.textMuted)),
+                                const SizedBox(height: 4),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.black, width: 2.5),
+                                    boxShadow: [
+                                      BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 6, offset: const Offset(0, 2)),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        labelMachineCtrl.text.isNotEmpty ? labelMachineCtrl.text : machineName,
+                                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Colors.black),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Center(
+                                        child: Text(
+                                          labelCustomerCtrl.text.isNotEmpty ? labelCustomerCtrl.text.toUpperCase() : order.customerName.toUpperCase(),
+                                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.black, letterSpacing: 0.5),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Center(
+                                        child: Container(width: 110, height: 2.5, color: Colors.black),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Center(
+                                        child: Text(
+                                          effectiveService,
+                                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.black),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      Align(
+                                        alignment: Alignment.bottomRight,
+                                        child: Text(
+                                          dateStr,
+                                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Colors.black),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+
+                    // Actions
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                            ),
+                            child: const Text('Batal', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton.icon(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            icon: Icon(printLabel ? Icons.print_rounded : Icons.play_arrow_rounded, size: 18),
+                            label: Text(
+                              printLabel ? 'Mulai & Cetak Label' : 'Ya, Mulai Mesin',
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              elevation: 1,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              child: const Text('Ya, Mulai', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
+            );
+          },
         );
       },
     );
@@ -2465,6 +2794,23 @@ class _CuciContentState extends State<CuciContent> {
     setState(() {
       _selectedOrderItem = null;
     });
+
+    // If print label was requested, execute print job directly
+    if (printLabel) {
+      final String effectiveService = selectedService == 'Lainnya (Ketik Custom)'
+          ? (customServiceCtrl.text.trim().isNotEmpty ? customServiceCtrl.text.trim() : 'Cuci Kering')
+          : selectedService;
+      PrinterService.printMachineLabel(
+        machineName: labelMachineCtrl.text.trim().isNotEmpty ? labelMachineCtrl.text.trim() : machineName,
+        customerName: labelCustomerCtrl.text.trim().isNotEmpty ? labelCustomerCtrl.text.trim() : order.customerName,
+        serviceType: effectiveService,
+        date: DateTime.now(),
+      ).then((printed) {
+        if (printed) {
+          Globals.showSuccessSnackBar('Label mesin berhasil dicetak ke printer thermal.');
+        }
+      });
+    }
 
     // Call start monitoring via Python API in the background
     _startMonitoring(

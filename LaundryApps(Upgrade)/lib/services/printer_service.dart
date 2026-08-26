@@ -198,6 +198,285 @@ class PrinterService {
     }
   }
 
+  /// Main Print Machine Label Method: Dispatches to USB or Bluetooth based on settings
+  static Future<bool> printMachineLabel({
+    required String machineName,
+    required String customerName,
+    required String serviceType,
+    DateTime? date,
+    String? note,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final connectionType = prefs.getString('printer_connection_type') ?? 'usb';
+
+    if (connectionType == 'usb') {
+      return await _printMachineLabelUsb(
+        machineName: machineName,
+        customerName: customerName,
+        serviceType: serviceType,
+        date: date ?? DateTime.now(),
+        note: note,
+      );
+    } else {
+      return await _printMachineLabelBluetooth(
+        machineName: machineName,
+        customerName: customerName,
+        serviceType: serviceType,
+        date: date ?? DateTime.now(),
+        note: note,
+      );
+    }
+  }
+
+  /// Prints a laundry machine label to USB / Windows System Printer directly
+  static Future<bool> _printMachineLabelUsb({
+    required String machineName,
+    required String customerName,
+    required String serviceType,
+    required DateTime date,
+    String? note,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final targetPrinterName = prefs.getString('printer_usb_name') ?? '';
+      final receiptWidth = prefs.getInt('receipt_width') ?? 58;
+
+      final printers = await Printing.listPrinters();
+      if (printers.isEmpty) {
+        debugPrint('[PrinterService] Tidak ada printer terdeteksi di Windows.');
+        return false;
+      }
+
+      Printer? selectedPrinter;
+      if (targetPrinterName.isNotEmpty) {
+        try {
+          selectedPrinter = printers.firstWhere((p) => p.name == targetPrinterName);
+        } catch (_) {}
+      }
+
+      selectedPrinter ??= printers.firstWhere((p) => p.isDefault, orElse: () => printers.first);
+
+      final config = ReceiptLayoutConfig.forWidth(receiptWidth);
+      final pageFormat = PdfPageFormat(
+        config.pageWidthMm * PdfPageFormat.mm,
+        double.infinity,
+        marginLeft: config.marginLeftMm * PdfPageFormat.mm,
+        marginRight: config.marginRightMm * PdfPageFormat.mm,
+        marginTop: 2 * PdfPageFormat.mm,
+        marginBottom: 4 * PdfPageFormat.mm,
+      );
+
+      final pdfBytes = await _generateMachineLabelPdf(
+        machineName: machineName,
+        customerName: customerName,
+        serviceType: serviceType,
+        date: date,
+        note: note,
+        config: config,
+        pageFormat: pageFormat,
+      );
+
+      final result = await Printing.directPrintPdf(
+        printer: selectedPrinter,
+        onLayout: (format) => pdfBytes,
+        name: 'Label_${machineName}_$customerName',
+        format: pageFormat,
+      );
+
+      return result;
+    } catch (e) {
+      debugPrint('[PrinterService] Error printing machine label via USB: $e');
+      return false;
+    }
+  }
+
+  /// Generates crisp, framed PDF bytes for Machine Label matching the requested thermal box format
+  static Future<Uint8List> _generateMachineLabelPdf({
+    required String machineName,
+    required String customerName,
+    required String serviceType,
+    required DateTime date,
+    String? note,
+    required ReceiptLayoutConfig config,
+    required PdfPageFormat pageFormat,
+  }) async {
+    final doc = pw.Document();
+    final dateStr = DateFormat('dd MMM').format(date);
+
+    doc.addPage(
+      pw.Page(
+        pageFormat: pageFormat,
+        build: (pw.Context ctx) {
+          return pw.Container(
+            padding: const pw.EdgeInsets.all(6),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.black, width: 1.8),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              mainAxisSize: pw.MainAxisSize.min,
+              children: [
+                // Top Left: Machine Name
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text(
+                      machineName,
+                      style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold,
+                        fontSize: config.bodyTextSize + 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 8),
+
+                // Center: Customer Name (LARGE BOLD)
+                pw.Center(
+                  child: pw.Text(
+                    customerName.toUpperCase(),
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: config.headerTitleSize + 4.5,
+                    ),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+                pw.SizedBox(height: 3),
+
+                // Center: Solid Horizontal Separator Bar
+                pw.Center(
+                  child: pw.Container(
+                    width: 120,
+                    height: 2.2,
+                    color: PdfColors.black,
+                  ),
+                ),
+                pw.SizedBox(height: 5),
+
+                // Center: Service Type
+                pw.Center(
+                  child: pw.Text(
+                    serviceType,
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: config.headerTitleSize + 0.5,
+                    ),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+                if (note != null && note.trim().isNotEmpty) ...[
+                  pw.SizedBox(height: 3),
+                  pw.Center(
+                    child: pw.Text(
+                      note.trim(),
+                      style: pw.TextStyle(
+                        fontStyle: pw.FontStyle.italic,
+                        fontSize: config.smallTextSize,
+                      ),
+                    ),
+                  ),
+                ],
+                pw.SizedBox(height: 10),
+
+                // Bottom Right: Date
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.end,
+                  children: [
+                    pw.Text(
+                      dateStr,
+                      style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold,
+                        fontSize: config.smallTextSize + 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    return await doc.save();
+  }
+
+  /// Prints a machine label via Bluetooth thermal printer
+  static Future<bool> _printMachineLabelBluetooth({
+    required String machineName,
+    required String customerName,
+    required String serviceType,
+    required DateTime date,
+    String? note,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final address = prefs.getString('printer_mac') ?? prefs.getString('printer_bt_address') ?? '';
+    if (address.isEmpty) return false;
+
+    bool connected = await PrintBluetoothThermal.connectionStatus;
+    if (!connected) {
+      connected = await PrintBluetoothThermal.connect(macPrinterAddress: address);
+      if (!connected) return false;
+    }
+
+    try {
+      final dateStr = DateFormat('dd MMM').format(date);
+      List<int> bytes = [];
+
+      // Init printer
+      bytes += [0x1B, 0x40];
+
+      // Border top
+      bytes += [0x1B, 0x61, 0x01]; // Center
+      bytes += '================================\n'.codeUnits;
+
+      // Machine Name Left
+      bytes += [0x1B, 0x61, 0x00]; // Left
+      bytes += [0x1B, 0x45, 0x01]; // Bold
+      bytes += '$machineName\n\n'.codeUnits;
+      bytes += [0x1B, 0x45, 0x00];
+
+      // Customer Name Center Double Size
+      bytes += [0x1B, 0x61, 0x01]; // Center
+      bytes += [0x1D, 0x21, 0x11]; // Double height & width
+      bytes += [0x1B, 0x45, 0x01]; // Bold
+      bytes += '${customerName.toUpperCase()}\n'.codeUnits;
+      bytes += [0x1D, 0x21, 0x00]; // Normal size
+      bytes += '----------------\n'.codeUnits;
+
+      // Service Type Center Bold
+      bytes += [0x1B, 0x45, 0x01];
+      bytes += '$serviceType\n'.codeUnits;
+      bytes += [0x1B, 0x45, 0x00];
+
+      if (note != null && note.trim().isNotEmpty) {
+        bytes += '($note)\n'.codeUnits;
+      }
+      bytes += '\n'.codeUnits;
+
+      // Date Right
+      bytes += [0x1B, 0x61, 0x02]; // Right
+      bytes += [0x1B, 0x45, 0x01];
+      bytes += '$dateStr\n'.codeUnits;
+      bytes += [0x1B, 0x45, 0x00];
+
+      // Border bottom
+      bytes += [0x1B, 0x61, 0x01]; // Center
+      bytes += '================================\n'.codeUnits;
+
+      // Feed & cut
+      bytes += '\n\n\n'.codeUnits;
+      bytes += [0x1D, 0x56, 0x00];
+
+      return await PrintBluetoothThermal.writeBytes(bytes);
+    } catch (e) {
+      debugPrint('[PrinterService] Bluetooth Label Exception: $e');
+      return false;
+    }
+  }
+
   /// Prints an order receipt to USB / Windows System Printer directly
   static Future<bool> _printOrderUsb(Order order) async {
     try {

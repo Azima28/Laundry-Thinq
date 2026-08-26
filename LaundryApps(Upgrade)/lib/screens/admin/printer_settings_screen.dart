@@ -5,6 +5,7 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:printing/printing.dart';
 import '../../services/printer_service.dart';
 import '../../utils/style_constants.dart';
+import '../machines/machine_label_dialog.dart';
 
 class PrinterSettingsScreen extends StatefulWidget {
   const PrinterSettingsScreen({Key? key}) : super(key: key);
@@ -29,12 +30,10 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
 
   // Bluetooth Printers State
   List<BluetoothInfo> _btDevices = [];
-  String _selectedBtName = '';
   String _selectedBtAddress = '';
   bool _isLoadingBt = false;
   bool _isConnectingBt = false;
   bool _isBtConnected = false;
-  bool _btEnabled = false;
 
   bool _isTestingPrint = false;
   bool _isClearingSpooler = false;
@@ -70,7 +69,6 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       _receiptWidth = prefs.getInt('receipt_width') ?? 58;
       _selectedUsbPrinter = prefs.getString('printer_usb_name') ?? '';
       _selectedBtAddress = prefs.getString('printer_mac') ?? '';
-      _selectedBtName = prefs.getString('printer_name') ?? '';
     });
   }
 
@@ -99,7 +97,6 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     if (!Platform.isAndroid) return;
     final hasPermission = await PrinterService.requestPermissions();
     final enabled = await PrintBluetoothThermal.bluetoothEnabled;
-    if (mounted) setState(() => _btEnabled = enabled);
     if (enabled && hasPermission) _loadBtDevices();
   }
 
@@ -147,7 +144,6 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
           _isConnectingBt = false;
           _isBtConnected = result;
           if (result) {
-            _selectedBtName = name;
             _selectedBtAddress = mac;
           }
         });
@@ -179,7 +175,6 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       setState(() {
         _isBtConnected = false;
         _selectedBtAddress = '';
-        _selectedBtName = '';
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -462,6 +457,18 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                           backgroundColor: const Color(0xFFFFF1F2),
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: () => MachineLabelDialog.show(context),
+                        icon: const Icon(Icons.label_important_rounded, size: 18, color: Colors.white),
+                        label: const Text('Tes Label Mesin', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
                         ),
                       ),
                       const SizedBox(width: 12),
