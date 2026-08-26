@@ -2441,6 +2441,7 @@ class _PengeringContentState extends State<PengeringContent> {
     String selectedService = defaultService;
     final TextEditingController labelMachineCtrl = TextEditingController(text: machineName);
     final TextEditingController labelCustomerCtrl = TextEditingController(text: order.customerName);
+    final TextEditingController labelNoteCtrl = TextEditingController(text: selTubNote);
     final TextEditingController customServiceCtrl = TextEditingController();
 
     final List<String> serviceOptions = [
@@ -2448,6 +2449,7 @@ class _PengeringContentState extends State<PengeringContent> {
       'Cuci Saja',
       'Cuci Kering Lipat',
       'Kering Saja',
+      'Setrika',
       'Lainnya (Ketik Custom)',
     ];
     if (!serviceOptions.contains(selectedService)) {
@@ -2646,6 +2648,30 @@ class _PengeringContentState extends State<PengeringContent> {
                                     onChanged: (_) => setModalState(() {}),
                                   ),
                                 ),
+                                const SizedBox(height: 10),
+
+                                const Text('CATATAN (OPSIONAL):', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: Color(0xFF475569))),
+                                const SizedBox(height: 4),
+                                Container(
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  child: TextField(
+                                    controller: labelNoteCtrl,
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                    decoration: const InputDecoration(
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                      hintText: 'Misal: Pisah luntur / Jangan dicampur...',
+                                    ),
+                                    onChanged: (_) => setModalState(() {}),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -2681,8 +2707,13 @@ class _PengeringContentState extends State<PengeringContent> {
                                       const SizedBox(height: 12),
                                       Center(
                                         child: Text(
-                                          labelCustomerCtrl.text.isNotEmpty ? labelCustomerCtrl.text.toUpperCase() : order.customerName.toUpperCase(),
-                                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.black, letterSpacing: 0.5),
+                                          labelCustomerCtrl.text.isNotEmpty ? labelCustomerCtrl.text.toUpperCase() : 'NAMA PELANGGAN',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 16,
+                                            color: labelCustomerCtrl.text.isNotEmpty ? Colors.black : Colors.grey[400],
+                                            letterSpacing: 0.5,
+                                          ),
                                           textAlign: TextAlign.center,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
@@ -2700,6 +2731,18 @@ class _PengeringContentState extends State<PengeringContent> {
                                           textAlign: TextAlign.center,
                                         ),
                                       ),
+                                      if (labelNoteCtrl.text.trim().isNotEmpty) ...[
+                                        const SizedBox(height: 5),
+                                        Center(
+                                          child: Text(
+                                            'Catatan: ${labelNoteCtrl.text.trim()}',
+                                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 10.5, fontStyle: FontStyle.italic, color: Colors.black),
+                                            textAlign: TextAlign.center,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
                                       const SizedBox(height: 14),
                                       Align(
                                         alignment: Alignment.bottomRight,
@@ -2780,6 +2823,7 @@ class _PengeringContentState extends State<PengeringContent> {
         customerName: labelCustomerCtrl.text.trim().isNotEmpty ? labelCustomerCtrl.text.trim() : order.customerName,
         serviceType: effectiveService,
         date: DateTime.now(),
+        note: labelNoteCtrl.text.trim().isNotEmpty ? labelNoteCtrl.text.trim() : null,
       ).then((printed) {
         if (printed) {
           Globals.showSuccessSnackBar('Label mesin berhasil dicetak ke printer thermal.');

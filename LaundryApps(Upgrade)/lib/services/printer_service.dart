@@ -370,11 +370,13 @@ class PrinterService {
                   pw.SizedBox(height: 3),
                   pw.Center(
                     child: pw.Text(
-                      note.trim(),
+                      'Catatan: ${note.trim()}',
                       style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold,
                         fontStyle: pw.FontStyle.italic,
-                        fontSize: config.smallTextSize,
+                        fontSize: config.smallTextSize + 0.5,
                       ),
+                      textAlign: pw.TextAlign.center,
                     ),
                   ),
                 ],
@@ -452,7 +454,7 @@ class PrinterService {
       bytes += [0x1B, 0x45, 0x00];
 
       if (note != null && note.trim().isNotEmpty) {
-        bytes += '($note)\n'.codeUnits;
+        bytes += 'Catatan: ${note.trim()}\n'.codeUnits;
       }
       bytes += '\n'.codeUnits;
 

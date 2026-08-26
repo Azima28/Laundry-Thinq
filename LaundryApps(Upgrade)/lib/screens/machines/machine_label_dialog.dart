@@ -54,6 +54,7 @@ class _MachineLabelDialogState extends State<MachineLabelDialog> {
     'Cuci Saja',
     'Cuci Kering Lipat',
     'Kering Saja',
+    'Setrika',
     'Lainnya (Ketik Custom)',
   ];
 
@@ -66,7 +67,7 @@ class _MachineLabelDialogState extends State<MachineLabelDialog> {
   void initState() {
     super.initState();
     _machineNameCtrl.text = widget.initialMachineName ?? 'Mesin Cuci 1';
-    _customerNameCtrl.text = widget.initialCustomerName ?? 'YANTO';
+    _customerNameCtrl.text = widget.initialCustomerName ?? '';
     _noteCtrl.text = widget.initialNote ?? '';
 
     final initialType = widget.initialServiceType ?? 'Cuci Kering';
@@ -380,6 +381,34 @@ class _MachineLabelDialogState extends State<MachineLabelDialog> {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 12),
+
+                      // Catatan (Opsional) Input
+                      const Text(
+                        'CATATAN (OPSIONAL):',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: StyleConstants.textHeading, letterSpacing: 0.4),
+                      ),
+                      const SizedBox(height: 5),
+                      Container(
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: StyleConstants.borderLight),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: TextField(
+                          controller: _noteCtrl,
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(vertical: 9),
+                            hintText: 'Misal: Jangan dicampur / Pisah luntur...',
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -419,7 +448,7 @@ class _MachineLabelDialogState extends State<MachineLabelDialog> {
                           children: [
                             // Top Left Machine Name
                             Text(
-                              _machineNameCtrl.text.isNotEmpty ? _machineNameCtrl.text : 'Mesin Cuci 5',
+                              _machineNameCtrl.text.isNotEmpty ? _machineNameCtrl.text : 'Mesin Cuci 1',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 13,
@@ -431,11 +460,11 @@ class _MachineLabelDialogState extends State<MachineLabelDialog> {
                             // Center Customer Name (LARGE ALL CAPS)
                             Center(
                               child: Text(
-                                _customerNameCtrl.text.isNotEmpty ? _customerNameCtrl.text.toUpperCase() : 'YANTO',
-                                style: const TextStyle(
+                                _customerNameCtrl.text.isNotEmpty ? _customerNameCtrl.text.toUpperCase() : 'NAMA PELANGGAN',
+                                style: TextStyle(
                                   fontWeight: FontWeight.w900,
                                   fontSize: 20,
-                                  color: Colors.black,
+                                  color: _customerNameCtrl.text.isNotEmpty ? Colors.black : Colors.grey[400],
                                   letterSpacing: 0.8,
                                 ),
                                 textAlign: TextAlign.center,
@@ -467,7 +496,24 @@ class _MachineLabelDialogState extends State<MachineLabelDialog> {
                                 textAlign: TextAlign.center,
                               ),
                             ),
-                            const SizedBox(height: 22),
+                            if (_noteCtrl.text.trim().isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Center(
+                                child: Text(
+                                  'Catatan: ${_noteCtrl.text.trim()}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 11.5,
+                                    fontStyle: FontStyle.italic,
+                                    color: Colors.black,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 20),
 
                             // Bottom Right Date
                             Align(
@@ -518,7 +564,7 @@ class _MachineLabelDialogState extends State<MachineLabelDialog> {
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : const Icon(Icons.print_rounded, size: 18),
                     label: Text(
-                      _isPrinting ? 'Mencetak Label...' : 'Cetak Label Thermal Sekarang',
+                      _isPrinting ? 'Mencetak Label...' : 'Cetak Label Sekarang',
                       style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5),
                     ),
                     style: ElevatedButton.styleFrom(
