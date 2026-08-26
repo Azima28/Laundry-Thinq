@@ -808,13 +808,15 @@ class DatabaseHelper {
           int lifetimeIron = (custMap['iron_count_lifetime'] as num?)?.toInt() ?? 0;
           int lifetimeSpent = (custMap['total_spent_lifetime'] as num?)?.toInt() ?? 0;
 
+          final int paidWashQty = order.loyaltyClaimed ? (washQty - 1).clamp(0, 999999) : washQty;
+
           if (order.loyaltyClaimed) {
             activeStamps = (activeStamps - order.stampsUsed).clamp(0, 999999);
             rewardsClaimed += 1;
           }
 
-          activeStamps += washQty;
-          lifetimeWash += washQty;
+          activeStamps += paidWashQty;
+          lifetimeWash += paidWashQty;
           lifetimeDry += dryQty;
           lifetimeStore += storeQty;
           lifetimeIron += ironQty;
@@ -835,7 +837,8 @@ class DatabaseHelper {
             whereArgs: [custId],
           );
         } else {
-          int activeStamps = washQty;
+          final int paidWashQty = order.loyaltyClaimed ? (washQty - 1).clamp(0, 999999) : washQty;
+          int activeStamps = paidWashQty;
           int rewardsClaimed = 0;
           if (order.loyaltyClaimed) {
             activeStamps = (activeStamps - order.stampsUsed).clamp(0, 999999);
@@ -848,7 +851,7 @@ class DatabaseHelper {
             'address': null,
             'created_at': DateTime.now().toIso8601String(),
             'wash_count_active': activeStamps,
-            'wash_count_lifetime': washQty,
+            'wash_count_lifetime': paidWashQty,
             'rewards_claimed_count': rewardsClaimed,
             'dry_count_lifetime': dryQty,
             'store_item_count_lifetime': storeQty,

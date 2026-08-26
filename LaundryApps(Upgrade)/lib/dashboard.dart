@@ -188,18 +188,54 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  int _getActiveMachinesCount() {
-    int count = 0;
-    _statusService.states.forEach((key, val) {
-      if (!key.startsWith('sensor.') && val is Map) {
+  int _getActiveWashersCount() {
+    final Set<String> activeWashers = {};
+    _statusService.states.forEach((rawKey, val) {
+      if (val is Map) {
+        final String name = (val['name'] ?? rawKey).toString().trim();
+        final String keyType = (val['key'] ?? '').toString().toLowerCase();
+        final norm = name.toLowerCase().replaceAll(' ', '_').replaceAll('sensor.', '');
+
+        final bool isWash = keyType == 'cuci' || norm.contains('cuci') || norm.contains('wash');
+        if (!isWash) return;
+
         final status = (val['status'] ?? '').toString().toLowerCase();
         final state = (val['state'] ?? '').toString().toLowerCase();
-        if (status == 'run' || status == 'running' || status == 'on' || status == 'unready' || state == 'on' || state == 'run') {
-          count++;
+        final runState = (val['run_state'] ?? '').toString().toLowerCase();
+        final isRunning = state == 'running' || state == 'run' || (runState.isNotEmpty && runState != 'idle' && runState != 'completed' && runState != 'ready' && runState != '-');
+        final isBooking = status == 'unready' || state.contains('booking') || runState.contains('booking');
+
+        if (isRunning || isBooking) {
+          activeWashers.add(norm);
         }
       }
     });
-    return count;
+    return activeWashers.length;
+  }
+
+  int _getActiveDryersCount() {
+    final Set<String> activeDryers = {};
+    _statusService.states.forEach((rawKey, val) {
+      if (val is Map) {
+        final String name = (val['name'] ?? rawKey).toString().trim();
+        final String keyType = (val['key'] ?? '').toString().toLowerCase();
+        final norm = name.toLowerCase().replaceAll(' ', '_').replaceAll('sensor.', '');
+
+        final bool isDry = keyType == 'pengering' || norm.contains('kering') || norm.contains('dry') || norm.contains('pengering');
+        if (!isDry) return;
+
+        final status = (val['status'] ?? '').toString().toLowerCase();
+        final state = (val['state'] ?? '').toString().toLowerCase();
+        final runState = (val['run_state'] ?? '').toString().toLowerCase();
+        final isRunning = state == 'running' || state == 'run' || (runState.isNotEmpty && runState != 'idle' && runState != 'completed' && runState != 'ready' && runState != 'relay on' && runState != 'standby' && runState != '-');
+        final isBooking = status == 'unready' || state.contains('booking') || runState.contains('booking');
+
+        if (isRunning || isBooking) {
+          activeDryers.add(norm);
+        }
+      }
+    });
+    return activeDryers.length;
   }
 
   @override
@@ -356,10 +392,15 @@ class _DashboardPageState extends State<DashboardPage> {
                   1,
                   Icons.local_laundry_service_rounded,
                   'Mesin Cuci',
-                  _getActiveMachinesCount() > 0 ? '${_getActiveMachinesCount()} On' : null,
+                  _getActiveWashersCount() > 0 ? '${_getActiveWashersCount()} On' : null,
                 ),
                 const SizedBox(height: 4),
-                _sidebarMenuItem(2, Icons.wb_sunny_rounded, 'Mesin Pengering', null),
+                _sidebarMenuItem(
+                  2,
+                  Icons.wb_sunny_rounded,
+                  'Mesin Pengering',
+                  _getActiveDryersCount() > 0 ? '${_getActiveDryersCount()} On' : null,
+                ),
                 const SizedBox(height: 4),
                 _sidebarMenuItem(3, Icons.people_alt_rounded, 'Data Pelanggan', null),
                 const SizedBox(height: 4),
@@ -1017,7 +1058,7 @@ class _DashboardPageState extends State<DashboardPage> {
         Expanded(
           child: _buildKpiCard(
             title: 'UTILISASI MESIN CUCI',
-            value: '${_getActiveMachinesCount()} Unit Aktif',
+            value: '${_getActiveWashersCount()} Unit Aktif',
             icon: Icons.sync_rounded,
             color: const Color(0xFF6366F1),
           ),
@@ -1284,7 +1325,7 @@ class _DashboardPageState extends State<DashboardPage> {
   // Machine Utilization Widget
   Widget _buildMachineUtilizationWidget() {
     int total = _statusService.thinqDeviceCount;
-    int active = _getActiveMachinesCount();
+    int active = _getActiveWashersCount();
     if (total == 0) total = 5;
     double percent = total > 0 ? (active / total) : 0.0;
 
