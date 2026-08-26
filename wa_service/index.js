@@ -52,6 +52,9 @@ function markAuthenticated(auth) {
     }
 }
 
+// Track service start time to filter out stale/historical messages on relog
+let serviceStartTime = Math.floor(Date.now() / 1000);
+
 // Maps to track chatbot cooldown states
 const welcomePollCooldown = new Map();
 const staffChatCooldown = new Map();
@@ -343,6 +346,7 @@ client.on('ready', async () => {
     isInitializing = false;
     currentQR = null;
     clientInfo = client.info;
+    serviceStartTime = Math.floor(Date.now() / 1000);
     markAuthenticated(true);
     const phoneNumber = clientInfo?.wid?.user || 'unknown';
     console.log('\n========================================');
@@ -919,11 +923,25 @@ client.on('vote_update', async (vote) => {
 
 // Incoming message listener (Trigger Welcome Poll or status commands)
 client.on('message', async (msg) => {
-    // Ignore groups or self messages
+    // 1. Ignore old/historical messages synced during startup / reconnect / relog
+    if (msg.timestamp && msg.timestamp < (serviceStartTime - 10)) {
+        return;
+    }
+
+    // 2. Ignore groups, status broadcasts, and self messages
     if (msg.from.endsWith('@g.us')) return;
+    if (msg.from.endsWith('@broadcast')) return;
     if (msg.fromMe) return;
 
-    openChatWindowSafely(msg.from);
+    const myWid = clientInfo?.wid?.user || '';
+    if (myWid && (msg.from.includes(myWid) || (msg.author && msg.author.includes(myWid)))) {
+        return;
+    }
+
+    // 3. Ignore non-chat system types (poll creations, receipts, security notices)
+    if (['poll_creation', 'poll_response', 'e2ebuffer', 'notification_template', 'protocol', 'ciphertext'].includes(msg.type)) {
+        return;
+    }
 
     const config = loadConfig();
     if (config.chatbot_enabled === false) return;
@@ -932,13 +950,12 @@ client.on('message', async (msg) => {
     const sender = identities.phone || identities.lid || msg.from.replace('@c.us', '').replace('@lid', '');
 
     // Use msg.from directly as chatId — for LID contacts this is @lid format which is required
-    // (attempting to use @c.us for LID users causes "No LID for user" error)
     const chatId = msg.from;
-    
+
     // Custom check: status [order_id]
     const msgText = msg.body ? msg.body.trim() : '';
     const msgTextLower = msgText.toLowerCase();
-    
+
     // Check if we are waiting for an order ID from this user
     let state = getUserState(identities);
     if (state && state.waitingForOrderId) {
@@ -948,17 +965,17 @@ client.on('message', async (msg) => {
             await sendWelcomePoll(chatId, sender, config);
             return;
         }
-        
+
         const numMatch = msgText.match(/\d+/);
         if (numMatch) {
             const orderId = parseInt(numMatch[0], 10);
             const port = config.api_port || 5001;
             const url = `http://localhost:${port}/api/wa/chatbot/status-cucian?order_id=${orderId}`;
-            
+
             // Reset waiting state
             state.waitingForOrderId = false;
             saveUserState(identities, state);
-            
+
             http.get(url, (res) => {
                 let data = '';
                 res.on('data', (chunk) => {
@@ -988,7 +1005,7 @@ client.on('message', async (msg) => {
         const orderId = parseInt(statusMatch[1], 10);
         const port = config.api_port || 5001;
         const url = `http://localhost:${port}/api/wa/chatbot/status-cucian?order_id=${orderId}`;
-        
+
         http.get(url, (res) => {
             let data = '';
             res.on('data', (chunk) => {
@@ -1021,7 +1038,7 @@ client.on('message', async (msg) => {
     if (state && state.currentOptions && state.currentOptions.length > 0) {
         let matchedOption = null;
         const cleanMsgText = msgTextLower.replace(/[^a-z0-9]/g, '');
-        
+
         const numMatch = msgText.trim().match(/^(\d+)$/);
         if (numMatch) {
             const selectedIndex = parseInt(numMatch[1], 10) - 1;
@@ -1037,7 +1054,7 @@ client.on('message', async (msg) => {
                 }
                 return cleanMsgText.includes(cleanOptLabel) || cleanOptLabel.includes(cleanMsgText);
             });
-            
+
             // Global keyphrase checks if no label matched directly
             if (!matchedOption) {
                 if (cleanMsgText.length >= 3) {
@@ -1055,16 +1072,22 @@ client.on('message', async (msg) => {
         if (matchedOption) {
             console.log(`[Chatbot] Text input matched option: "${matchedOption.label}" for sender ${sender}`);
             const choiceIndex = matchedOption.index !== undefined ? matchedOption.index : 0;
-            
+
             await executeMenuItem(chatId, sender, matchedOption.item, choiceIndex, config);
             return; // Skip sending welcome poll
         }
     }
 
-    // Check if welcome poll already sent recently (cooldown from config, default 15 min)
+    // Cooldown logic (default 30 minutes if not configured or set to <= 0)
+    const configuredCooldown = config.chatbot_welcome_cooldown;
+    const cooldownMinutes = (configuredCooldown !== undefined && configuredCooldown > 0) ? configuredCooldown : 30;
+    const welcomeCooldownMs = cooldownMinutes * 60 * 1000;
     const lastWelcomePoll = welcomePollCooldown.get(sender) || 0;
-    const welcomeCooldownMs = (config.chatbot_welcome_cooldown !== undefined ? config.chatbot_welcome_cooldown : 0) * 60 * 1000;
-    if (Date.now() - lastWelcomePoll < welcomeCooldownMs) {
+
+    const isExplicitGreeting = ['halo', 'hi', 'hai', 'menu', 'p', 'bantuan', 'start', 'mulai', 'info', 'selamat pagi', 'selamat siang', 'selamat sore', 'selamat malam', 'assalamualaikum'].some(greet => msgTextLower === greet || msgTextLower.startsWith(greet + ' ') || msgTextLower.endsWith(' ' + greet));
+
+    // If cooldown active and not an explicit greeting request, don't spam welcome poll
+    if (Date.now() - lastWelcomePoll < welcomeCooldownMs && !isExplicitGreeting) {
         return;
     }
 
@@ -1382,9 +1405,15 @@ app.get('/test-poll', async (req, res) => {
             phone = phone + '@c.us';
         }
         
+        const config = loadConfig();
+        const menu = config.chatbot_menu || [];
+        const options = menu.map(item => item.label);
+        const welcomeTitle = config.chatbot_welcome_message || 'Halo! Selamat datang di Azima Laundry. 😊 Ada yang bisa kami bantu?';
+        const pollOptions = options.length > 0 ? options : ['🧺 Cek Status Cucian Saya', '💰 Daftar Harga & Layanan', '📅 Jam Operasional & Lokasi', '📞 Hubungi Staff (Kasir)'];
+
         const poll = new Poll(
-            'Selamat datang kakak di toko kami, ada yang bisa kami bantu?',
-            ['Jam buka', 'Status cucian', 'harga cucian'],
+            welcomeTitle,
+            pollOptions,
             { allowMultipleAnswers: false } // Only select one answer
         );
         await sendBotMessage(phone, poll);
