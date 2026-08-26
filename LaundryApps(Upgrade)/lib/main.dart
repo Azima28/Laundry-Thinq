@@ -268,10 +268,46 @@ class MyApp extends StatelessWidget {
             return Container();
           },
         ),
-        '/laundry_settings': (context) => const LaundrySettingsScreen(),
+        '/laundry_settings': (context) => FutureBuilder(
+          future: _checkAdminAccess(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            }
+            if (snapshot.data == true) {
+              return const LaundrySettingsScreen();
+            }
+            // Redirect to dashboard if not admin
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Navigator.of(context).pushReplacementNamed('/dashboard');
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Akses ditolak: Hanya untuk admin')),
+              );
+            });
+            return Container();
+          },
+        ),
         '/printer_settings': (context) => PrinterSettingsScreen(),
         '/payment_settings': (context) => PaymentSettingsScreen(),
-        '/backup_settings': (context) => const BackupSettingsScreen(),
+        '/backup_settings': (context) => FutureBuilder(
+          future: _checkAdminAccess(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            }
+            if (snapshot.data == true) {
+              return const BackupSettingsScreen();
+            }
+            // Redirect to dashboard if not admin
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Navigator.of(context).pushReplacementNamed('/dashboard');
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Akses ditolak: Hanya untuk admin')),
+              );
+            });
+            return Container();
+          },
+        ),
         '/customers': (context) => const CustomerScreen(),
         '/hubungi_pelanggan': (context) => const HubungiPelangganScreen(),
         '/pengeluaran': (context) => const PengeluaranScreen(),

@@ -136,24 +136,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 12),
                 _buildCardsGrid([
-                  _SettingsItemData(
-                    title: 'Tarif Layanan & Waktu Standby',
-                    description: 'Konfigurasi harga default & durasi countdown standby mesin',
-                    icon: Icons.local_laundry_service_rounded,
-                    color: primaryColor,
-                    statusBadge: 'Katalog Layanan',
-                    statusColor: primaryColor,
-                    route: '/laundry_settings',
-                  ),
-                  _SettingsItemData(
-                    title: 'Backup & Restore Database',
-                    description: 'Cadangkan data transaksi ke file .db dan pulihkan database',
-                    icon: Icons.storage_rounded,
-                    color: const Color(0xFF0D9488),
-                    statusBadge: 'SQLite Terenkripsi',
-                    statusColor: const Color(0xFF0D9488),
-                    route: '/backup_settings',
-                  ),
+                  if (_isAdmin)
+                    _SettingsItemData(
+                      title: 'Tarif Layanan & Program Kupon',
+                      description: 'Atur program cuci gratis 5x, target kupon, dan kelola mesin pengering',
+                      icon: Icons.card_giftcard_rounded,
+                      color: const Color(0xFFD97706),
+                      statusBadge: 'Admin Only',
+                      statusColor: const Color(0xFFD97706),
+                      route: '/laundry_settings',
+                    ),
+                  if (_isAdmin)
+                    _SettingsItemData(
+                      title: 'Backup & Restore Database',
+                      description: 'Cadangkan data transaksi ke file .db dan pulihkan database',
+                      icon: Icons.storage_rounded,
+                      color: const Color(0xFF0D9488),
+                      statusBadge: 'SQLite Terenkripsi',
+                      statusColor: const Color(0xFF0D9488),
+                      route: '/backup_settings',
+                    ),
                   _SettingsItemData(
                     title: 'Tentang Aplikasi & Diagnostik',
                     description: 'Status server kasir, lisensi aplikasi, dan informasi versi',
