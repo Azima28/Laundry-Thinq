@@ -28,8 +28,33 @@ let latestVote = {
     timestamp: null
 };
 
-// File-based flag to track authentication state for background auto-reconnect
-const FLAG_PATH = path.join(__dirname, '.wwebjs_auth', 'authenticated.flag');
+// Centralized AppData resolver to ensure 100% full read/write permission on Windows without UAC blocks
+function resolveAppDataDir(subDir = '') {
+    if (process.env.APPDATA) {
+        const d = path.join(process.env.APPDATA, 'SmartLaundry', subDir);
+        if (!fs.existsSync(d)) {
+            try { fs.mkdirSync(d, { recursive: true }); } catch (_) {}
+        }
+        return d;
+    }
+    return path.join(__dirname, subDir);
+}
+
+const AUTH_DATA_PATH = resolveAppDataDir('wa_auth');
+const FLAG_PATH = path.join(AUTH_DATA_PATH, 'authenticated.flag');
+
+// Migrate legacy auth from __dirname if it exists and AppData is empty
+try {
+    const legacyAuth = path.join(__dirname, '.wwebjs_auth');
+    if (fs.existsSync(legacyAuth) && !fs.existsSync(path.join(AUTH_DATA_PATH, 'session'))) {
+        console.log('[WA] Migrating legacy session to AppData...');
+        if (fs.cpSync) {
+            fs.cpSync(legacyAuth, AUTH_DATA_PATH, { recursive: true });
+        }
+    }
+} catch (e) {
+    console.error('[WA] Session migration notice:', e.message);
+}
 
 function hasSavedSession() {
     return fs.existsSync(FLAG_PATH);
@@ -38,7 +63,6 @@ function hasSavedSession() {
 function markAuthenticated(auth) {
     try {
         if (auth) {
-            // Ensure parent directory exists
             const dir = path.dirname(FLAG_PATH);
             if (!fs.existsSync(dir)) {
                 fs.mkdirSync(dir, { recursive: true });
@@ -209,7 +233,9 @@ function xorDecrypt(encodedStr, key = "AzimaSecretKey2026") {
 // Helper to load config.json dynamically
 function loadConfig() {
     try {
-        const configPath = path.join(__dirname, '..', 'config.json');
+        const appDataConfig = path.join(process.env.APPDATA || '', 'SmartLaundry', 'config.json');
+        const localConfig = path.join(__dirname, '..', 'config.json');
+        const configPath = fs.existsSync(appDataConfig) ? appDataConfig : localConfig;
         if (fs.existsSync(configPath)) {
             const raw = fs.readFileSync(configPath, 'utf8').trim();
             if (!raw) {
@@ -232,7 +258,7 @@ function fetchStatusCucian(phone, serviceType, callback) {
     const config = loadConfig();
     const port = config.api_port || 5001;
     const url = `http://localhost:${port}/api/wa/chatbot/status-cucian?phone=${phone}&service_type=${serviceType}`;
-    
+
     http.get(url, (res) => {
         let data = '';
         res.on('data', (chunk) => {
@@ -261,10 +287,12 @@ if (parentPidArg) {
             try {
                 process.kill(parentPid, 0);
             } catch (e) {
-                console.log("[Watchdog] Proses induk tidak ditemukan/keluar. Mengakhiri Node...");
-                process.exit(0);
+                if (e.code === 'ESRCH') {
+                    console.log("[Watchdog] Proses induk tidak ditemukan/keluar. Mengakhiri Node...");
+                    process.exit(0);
+                }
             }
-        }, 1000);
+        }, 2000);
     }
 }
 
@@ -287,9 +315,16 @@ function findBrowserExecutable() {
         'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
         'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
         'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
+        'C:\\Program Files (x86)\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
         (process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe') : null),
+        (process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Microsoft', 'Edge', 'Application', 'msedge.exe') : null),
         (process.env.PROGRAMFILES ? path.join(process.env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe') : null),
+        (process.env.PROGRAMFILES ? path.join(process.env.PROGRAMFILES, 'Microsoft', 'Edge', 'Application', 'msedge.exe') : null),
+        (process.env['ProgramFiles(x86)'] ? path.join(process.env['ProgramFiles(x86)'], 'Microsoft', 'Edge', 'Application', 'msedge.exe') : null),
+        (process.env['ProgramFiles(x86)'] ? path.join(process.env['ProgramFiles(x86)'], 'Google', 'Chrome', 'Application', 'chrome.exe') : null),
         (process.env['PROGRAMFILES(X86)'] ? path.join(process.env['PROGRAMFILES(X86)'], 'Microsoft', 'Edge', 'Application', 'msedge.exe') : null),
+        (process.env['PROGRAMFILES(X86)'] ? path.join(process.env['PROGRAMFILES(X86)'], 'Google', 'Chrome', 'Application', 'chrome.exe') : null),
     ].filter(Boolean);
 
     for (const p of candidatePaths) {
@@ -305,7 +340,7 @@ const browserExecutable = findBrowserExecutable();
 
 const client = new Client({
     authStrategy: new LocalAuth({
-        dataPath: path.join(__dirname, '.wwebjs_auth')
+        dataPath: AUTH_DATA_PATH
     }),
     qrMaxRetries: 0,
     authTimeoutMs: 60000,
