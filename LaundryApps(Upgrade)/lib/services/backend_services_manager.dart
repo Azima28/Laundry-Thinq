@@ -57,36 +57,56 @@ class BackendServicesManager {
     return validDirs;
   }
 
-  Future<bool> isBackendReady({Duration timeout = const Duration(seconds: 4)}) async {
+  Future<bool> isPythonReady({Duration timeout = const Duration(seconds: 2)}) async {
     final stopwatch = Stopwatch()..start();
     while (stopwatch.elapsed < timeout) {
       try {
-        final resp = await http.get(Uri.parse('http://127.0.0.1:5001/')).timeout(const Duration(milliseconds: 800));
+        final resp = await http.get(Uri.parse('http://127.0.0.1:5001/')).timeout(const Duration(milliseconds: 600));
         if (resp.statusCode >= 200 && resp.statusCode < 500) {
           return true;
         }
-      } catch (_) {
-        // Backend still booting
-      }
-      await Future.delayed(const Duration(milliseconds: 300));
+      } catch (_) {}
+      await Future.delayed(const Duration(milliseconds: 200));
     }
     return false;
   }
 
+  Future<bool> isNodeReady({Duration timeout = const Duration(seconds: 2)}) async {
+    final stopwatch = Stopwatch()..start();
+    while (stopwatch.elapsed < timeout) {
+      try {
+        final resp = await http.get(Uri.parse('http://127.0.0.1:3000/status')).timeout(const Duration(milliseconds: 600));
+        if (resp.statusCode >= 200 && resp.statusCode < 500) {
+          return true;
+        }
+      } catch (_) {}
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+    return false;
+  }
+
+  Future<bool> isBackendReady({Duration timeout = const Duration(seconds: 3)}) async {
+    return isPythonReady(timeout: timeout);
+  }
+
   Future<void> ensureServicesRunning() async {
-    final ready = await isBackendReady(timeout: const Duration(milliseconds: 800));
-    if (!ready && !_isStarting) {
-      debugPrint('[ServicesManager] Backend not responding. Starting background services...');
+    if (_isStarting) return;
+    final pythonOk = await isPythonReady(timeout: const Duration(milliseconds: 500));
+    final nodeOk = await isNodeReady(timeout: const Duration(milliseconds: 500));
+    if (!pythonOk || !nodeOk) {
+      debugPrint('[ServicesManager] Services check: Python=$pythonOk, Node=$nodeOk. Running startServices...');
       await startServices();
     }
   }
 
   void startWatchdog() {
     _watchdogTimer?.cancel();
-    _watchdogTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
-      final ready = await isBackendReady(timeout: const Duration(seconds: 1));
-      if (!ready && !_isStarting) {
-        debugPrint('[ServicesManager Watchdog] Backend offline. Auto-recovering services...');
+    _watchdogTimer = Timer.periodic(const Duration(seconds: 12), (_) async {
+      if (_isStarting) return;
+      final pythonOk = await isPythonReady(timeout: const Duration(milliseconds: 800));
+      final nodeOk = await isNodeReady(timeout: const Duration(milliseconds: 800));
+      if (!pythonOk || !nodeOk) {
+        debugPrint('[ServicesManager Watchdog] Service offline: Python=$pythonOk, Node=$nodeOk. Auto-recovering...');
         await startServices();
       }
     });
@@ -102,80 +122,76 @@ class BackendServicesManager {
     final candidateDirs = _getCandidateDirectories();
     debugPrint('[ServicesManager] Candidate search dirs: $candidateDirs');
 
-    // Check if backend is ALREADY running and responding on port 5001
-    final alreadyReady = await isBackendReady(timeout: const Duration(milliseconds: 600));
-    if (alreadyReady) {
-      debugPrint('[ServicesManager] Backend is already active and responding on port 5001.');
-      _isStarting = false;
-      startWatchdog();
-      return;
-    }
+    // 1. Start Python server if not already responding
+    final pythonAlreadyReady = await isPythonReady(timeout: const Duration(milliseconds: 400));
+    if (!pythonAlreadyReady) {
+      File? pythonExe;
+      File? pythonScript;
+      String pythonWorkingDir = candidateDirs.isNotEmpty ? candidateDirs.first : Directory.current.path;
 
-    // 1. Find Python backend executable/script
-    File? pythonExe;
-    File? pythonScript;
-    String pythonWorkingDir = candidateDirs.isNotEmpty ? candidateDirs.first : Directory.current.path;
-
-    for (final dir in candidateDirs) {
-      final exe = File('$dir\\main.exe');
-      if (exe.existsSync() && pythonExe == null) {
-        pythonExe = exe;
-        pythonWorkingDir = dir;
+      for (final dir in candidateDirs) {
+        final exe = File('$dir\\main.exe');
+        if (exe.existsSync() && pythonExe == null) {
+          pythonExe = exe;
+          pythonWorkingDir = dir;
+        }
+        final script = File('$dir\\main.py');
+        if (script.existsSync() && pythonScript == null) {
+          pythonScript = script;
+          if (pythonExe == null) pythonWorkingDir = dir;
+        }
       }
-      final script = File('$dir\\main.py');
-      if (script.existsSync() && pythonScript == null) {
-        pythonScript = script;
-        if (pythonExe == null) pythonWorkingDir = dir;
-      }
-    }
 
-    // 2. Start Python server: main.exe (compiled) or main.py (dev)
-    try {
-      if (_pythonProcess == null) {
-        if (pythonExe != null) {
-          debugPrint('[ServicesManager] Starting compiled Python server: ${pythonExe.path} (cwd: $pythonWorkingDir)...');
-          try {
+      try {
+        if (_pythonProcess == null) {
+          if (pythonExe != null) {
+            debugPrint('[ServicesManager] Starting compiled Python server: ${pythonExe.path} (cwd: $pythonWorkingDir)...');
+            try {
+              _pythonProcess = await Process.start(
+                pythonExe.path,
+                ['--parent-pid', '$parentPid'],
+                workingDirectory: pythonWorkingDir,
+                environment: {'PYTHONUNBUFFERED': '1'},
+              );
+            } catch (exeError) {
+              debugPrint('[ServicesManager] Failed to launch main.exe: $exeError. Falling back to python script...');
+            }
+          }
+
+          if (_pythonProcess == null && pythonScript != null) {
+            debugPrint('[ServicesManager] Starting Python script: ${pythonScript.path} (cwd: $pythonWorkingDir)...');
             _pythonProcess = await Process.start(
-              pythonExe.path,
-              ['--parent-pid', '$parentPid'],
+              'python',
+              ['-u', pythonScript.path, '--parent-pid', '$parentPid'],
               workingDirectory: pythonWorkingDir,
-              environment: {'PYTHONUNBUFFERED': '1'},
             );
-          } catch (exeError) {
-            debugPrint('[ServicesManager] Failed to launch main.exe: $exeError. Falling back to python script...');
+          }
+
+          _pythonProcess?.exitCode.then((code) {
+            debugPrint('[ServicesManager] Python backend process terminated with exit code: $code');
+            _pythonProcess = null;
+          });
+
+          if (_pythonProcess != null) {
+            _pythonProcess!.stdout.transform(const SystemEncoding().decoder).listen((data) {
+              debugPrint('[Python STDOUT] ${data.trim()}');
+            });
+            _pythonProcess!.stderr.transform(const SystemEncoding().decoder).listen((data) {
+              debugPrint('[Python STDERR] ${data.trim()}');
+            });
+            debugPrint('[ServicesManager] Python server process spawned.');
           }
         }
-
-        if (_pythonProcess == null && pythonScript != null) {
-          debugPrint('[ServicesManager] Starting Python script: ${pythonScript.path} (cwd: $pythonWorkingDir)...');
-          _pythonProcess = await Process.start(
-            'python',
-            ['-u', pythonScript.path, '--parent-pid', '$parentPid'],
-            workingDirectory: pythonWorkingDir,
-          );
-        }
-
-        _pythonProcess?.exitCode.then((code) {
-          debugPrint('[ServicesManager] Python backend process terminated with exit code: $code');
-          _pythonProcess = null;
-        });
-
-        if (_pythonProcess != null) {
-          _pythonProcess!.stdout.transform(const SystemEncoding().decoder).listen((data) {
-            debugPrint('[Python STDOUT] ${data.trim()}');
-          });
-          _pythonProcess!.stderr.transform(const SystemEncoding().decoder).listen((data) {
-            debugPrint('[Python STDERR] ${data.trim()}');
-          });
-          debugPrint('[ServicesManager] Python server process spawned.');
-        }
+      } catch (e) {
+        debugPrint('[ServicesManager] Error starting Python server: $e');
       }
-    } catch (e) {
-      debugPrint('[ServicesManager] Error starting Python server: $e');
+    } else {
+      debugPrint('[ServicesManager] Python server is already active on port 5001.');
     }
 
-    // 3. Start Node.js WhatsApp microservice
-    try {
+    // 2. Start Node.js WhatsApp microservice if not already responding
+    final nodeAlreadyReady = await isNodeReady(timeout: const Duration(milliseconds: 400));
+    if (!nodeAlreadyReady) {
       File? nodeExe;
       File? nodeScript;
       String nodeWorkingDir = candidateDirs.isNotEmpty ? candidateDirs.first : Directory.current.path;
@@ -193,49 +209,53 @@ class BackendServicesManager {
         }
       }
 
-      if (_nodeProcess == null) {
-        if (nodeExe != null) {
-          debugPrint('[ServicesManager] Starting compiled Node.js WA microservice: ${nodeExe.path}...');
-          _nodeProcess = await Process.start(
-            nodeExe.path,
-            ['--parent-pid=$parentPid'],
-            workingDirectory: nodeWorkingDir,
-          );
-        } else if (nodeScript != null) {
-          String runtimeNode = 'node';
-          for (final dir in candidateDirs) {
-            final localNode = File('$dir\\wa_service\\node.exe');
-            if (localNode.existsSync()) {
-              runtimeNode = localNode.path;
-              break;
+      try {
+        if (_nodeProcess == null) {
+          if (nodeExe != null) {
+            debugPrint('[ServicesManager] Starting compiled Node.js WA microservice: ${nodeExe.path}...');
+            _nodeProcess = await Process.start(
+              nodeExe.path,
+              ['--parent-pid=$parentPid'],
+              workingDirectory: nodeWorkingDir,
+            );
+          } else if (nodeScript != null) {
+            String runtimeNode = 'node';
+            for (final dir in candidateDirs) {
+              final localNode = File('$dir\\wa_service\\node.exe');
+              if (localNode.existsSync()) {
+                runtimeNode = localNode.path;
+                break;
+              }
             }
+
+            debugPrint('[ServicesManager] Starting Node.js WA microservice with ($runtimeNode): ${nodeScript.path}...');
+            _nodeProcess = await Process.start(
+              runtimeNode,
+              [nodeScript.path, '--parent-pid=$parentPid'],
+              workingDirectory: nodeWorkingDir,
+            );
           }
 
-          debugPrint('[ServicesManager] Starting Node.js WA microservice with ($runtimeNode): ${nodeScript.path}...');
-          _nodeProcess = await Process.start(
-            runtimeNode,
-            [nodeScript.path, '--parent-pid=$parentPid'],
-            workingDirectory: nodeWorkingDir,
-          );
-        }
-
-        _nodeProcess?.exitCode.then((code) {
-          debugPrint('[ServicesManager] Node.js WA process terminated with exit code: $code');
-          _nodeProcess = null;
-        });
-
-        if (_nodeProcess != null) {
-          _nodeProcess!.stdout.transform(const SystemEncoding().decoder).listen((data) {
-            debugPrint('[Node STDOUT] ${data.trim()}');
+          _nodeProcess?.exitCode.then((code) {
+            debugPrint('[ServicesManager] Node.js WA process terminated with exit code: $code');
+            _nodeProcess = null;
           });
-          _nodeProcess!.stderr.transform(const SystemEncoding().decoder).listen((data) {
-            debugPrint('[Node STDERR] ${data.trim()}');
-          });
-          debugPrint('[ServicesManager] Node.js WhatsApp microservice spawned.');
+
+          if (_nodeProcess != null) {
+            _nodeProcess!.stdout.transform(const SystemEncoding().decoder).listen((data) {
+              debugPrint('[Node STDOUT] ${data.trim()}');
+            });
+            _nodeProcess!.stderr.transform(const SystemEncoding().decoder).listen((data) {
+              debugPrint('[Node STDERR] ${data.trim()}');
+            });
+            debugPrint('[ServicesManager] Node.js WhatsApp microservice spawned.');
+          }
         }
+      } catch (e) {
+        debugPrint('[ServicesManager] Error starting Node.js server: $e');
       }
-    } catch (e) {
-      debugPrint('[ServicesManager] Error starting Node.js server: $e');
+    } else {
+      debugPrint('[ServicesManager] Node.js WhatsApp service is already active on port 3000.');
     }
 
     _isStarting = false;

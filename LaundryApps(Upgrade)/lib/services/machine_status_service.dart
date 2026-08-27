@@ -329,6 +329,9 @@ class MachineStatusService {
   /// v2: Open/Focus the live WhatsApp Web GUI window on desktop
   Future<Map<String, dynamic>> openWhatsAppWebGUI() async {
     try {
+      // Ensure backend services are running before requesting
+      await BackendServicesManager.instance.ensureServicesRunning();
+
       final cleanBase = _dashboardUrl.endsWith('/') ? _dashboardUrl.substring(0, _dashboardUrl.length - 1) : _dashboardUrl;
       final uri = Uri.parse('$cleanBase/api/wa/open-gui');
       final resp = await http.get(uri).timeout(const Duration(seconds: 15));
@@ -336,9 +339,15 @@ class MachineStatusService {
       if (resp.statusCode == 200) {
         return {'success': true, 'message': data['message'] ?? 'Jendela WhatsApp Web telah dibuka.'};
       } else {
+        final rawErr = (data['error'] ?? '').toString();
+        if (rawErr.contains('port=3000') || rawErr.contains('actively refused') || rawErr.contains('belum siap')) {
+          BackendServicesManager.instance.ensureServicesRunning();
+          return {'success': false, 'message': 'Layanan WhatsApp sedang dinyalakan otomatis di latar belakang. Mohon tunggu 3-5 detik lalu klik kembali.'};
+        }
         return {'success': false, 'message': data['error'] ?? 'Gagal membuka WA: HTTP ${resp.statusCode}'};
       }
     } catch (e) {
+      BackendServicesManager.instance.ensureServicesRunning();
       return {'success': false, 'message': _formatFriendlyError(e)};
     }
   }
