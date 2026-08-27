@@ -488,10 +488,10 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                     tracker = state_transitions.get(ent, {})
                     is_running_flag = tracker.get("wa_start_sent", False) or (tracker.get("last_state") == "Running (Offline)")
 
-                # Smooth 1-second local decrement from end_dt
+                # Smooth 1-second wall-clock decrement from locked end_dt
                 remaining = max(0, (end_dt - datetime.now()).total_seconds())
 
-                # Periodic hardware verification every 5 seconds for Tuya smartplugs
+                # Periodic hardware switch verification every 5 seconds for Tuya smartplugs
                 if is_tuya and (loop_tick % 5 == 0):
                     try:
                         status = tuya_manager.get_cached_dryer_status(ent)
@@ -501,11 +501,6 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                             if not status.get("switch", False) and (is_running_flag or dur_min > 5):
                                 print(f"[Tuya] Active dryer {ent} switch turned OFF. Stopping countdown.")
                                 break
-                            tuya_cd = status.get("countdown", 0)
-                            if tuya_cd > 0 and abs(tuya_cd - remaining) > 3:
-                                # Resync end_dt gently if hardware timer drifted
-                                end_dt = datetime.now() + timedelta(seconds=tuya_cd)
-                                remaining = tuya_cd
                     except Exception:
                         pass
 

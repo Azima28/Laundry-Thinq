@@ -10,6 +10,8 @@ class MachineStatusService {
   static final MachineStatusService instance = MachineStatusService._init();
 
   Timer? _timer;
+  Timer? _tickerTimer;
+  final Map<String, int> _targetEndEpochs = {};
   String _baseUrl = 'http://127.0.0.1:5001/';
   String _dashboardUrl = 'http://127.0.0.1:5001';
   final Map<String, dynamic> _states = {};
@@ -19,6 +21,79 @@ class MachineStatusService {
   final Set<int> _activatingIds = {};
   final Set<String> _processingOrderKeys = {};
   final Set<String> _failedOrderKeys = {};
+
+  int? _parseRemainSeconds(String remainStr) {
+    if (remainStr.isEmpty || remainStr == '--:--' || !remainStr.contains(':')) return null;
+    final parts = remainStr.split(':');
+    if (parts.length == 2) {
+      final m = int.tryParse(parts[0].trim());
+      final s = int.tryParse(parts[1].trim());
+      if (m != null && s != null) {
+        return (m * 60) + s;
+      }
+    }
+    return null;
+  }
+
+  void _syncTargetEndEpoch(String key, String remainStr) {
+    final sec = _parseRemainSeconds(remainStr);
+    if (sec != null && sec > 0) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final existingEnd = _targetEndEpochs[key];
+      if (existingEnd == null) {
+        _targetEndEpochs[key] = now + (sec * 1000);
+      } else {
+        final currentRemain = (existingEnd - now) ~/ 1000;
+        // Only resync if drift exceeds 3 seconds
+        if ((currentRemain - sec).abs() > 3) {
+          _targetEndEpochs[key] = now + (sec * 1000);
+        }
+      }
+    } else {
+      _targetEndEpochs.remove(key);
+    }
+  }
+
+  void _startTicker() {
+    _tickerTimer?.cancel();
+    _tickerTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      bool hasChanges = false;
+
+      final keys = _targetEndEpochs.keys.toList();
+      for (final key in keys) {
+        final end = _targetEndEpochs[key];
+        if (end == null) continue;
+
+        final remainSec = (end - now + 999) ~/ 1000;
+        if (remainSec <= 0) {
+          _targetEndEpochs.remove(key);
+          if (_states.containsKey(key)) {
+            final entry = Map<String, dynamic>.from(_states[key] is Map ? _states[key] : {});
+            entry['remain_time'] = '--:--';
+            _states[key] = entry;
+            hasChanges = true;
+          }
+        } else {
+          final m = remainSec ~/ 60;
+          final s = remainSec % 60;
+          final timeStr = '$m:${s.toString().padLeft(2, '0')}';
+          if (_states.containsKey(key)) {
+            final entry = Map<String, dynamic>.from(_states[key] is Map ? _states[key] : {});
+            if (entry['remain_time'] != timeStr) {
+              entry['remain_time'] = timeStr;
+              _states[key] = entry;
+              hasChanges = true;
+            }
+          }
+        }
+      }
+
+      if (hasChanges) {
+        _notifier.value++;
+      }
+    });
+  }
 
   // Safe JSON decoding helper to prevent FormatException on HTML error pages
   Map<String, dynamic> _safeJsonDecode(String body, {int statusCode = 200}) {
@@ -151,6 +226,13 @@ class MachineStatusService {
     _states['sensor.$machineName'] = newEntry;
     _states['sensor.$underscoreName'] = newEntry;
     _states['sensor.$spaceName'] = newEntry;
+
+    if (newEntry['remain_time'] != null) {
+      final rem = newEntry['remain_time'].toString();
+      _syncTargetEndEpoch(machineName, rem);
+      _syncTargetEndEpoch(underscoreName, rem);
+      _syncTargetEndEpoch(spaceName, rem);
+    }
     _notifier.value++;
   }
 
@@ -176,6 +258,7 @@ class MachineStatusService {
       _dashboardUrl = 'http://127.0.0.1:5001';
     }
 
+    _startTicker();
     await _fetch();
     _fetchConnectivity(); // Initial connectivity check
     _timer = Timer.periodic(const Duration(seconds: 10), (_) {
@@ -187,6 +270,9 @@ class MachineStatusService {
   Future<void> stop() async {
     _timer?.cancel();
     _timer = null;
+    _tickerTimer?.cancel();
+    _tickerTimer = null;
+    _targetEndEpochs.clear();
   }
 
   Future<void> setBaseUrl(String url) async {
@@ -215,8 +301,15 @@ class MachineStatusService {
         _states.clear();
         data.forEach((k, v) {
           _states[k] = v;
+          if (v is Map && v['remain_time'] != null) {
+            _syncTargetEndEpoch(k, v['remain_time'].toString());
+          }
           if (k.startsWith('sensor.')) {
-            _states[k.replaceFirst('sensor.', '')] = v;
+            final rawKey = k.replaceFirst('sensor.', '');
+            _states[rawKey] = v;
+            if (v is Map && v['remain_time'] != null) {
+              _syncTargetEndEpoch(rawKey, v['remain_time'].toString());
+            }
           }
         });
         _lastFetchFailed = false;
