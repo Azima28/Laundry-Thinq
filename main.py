@@ -192,7 +192,7 @@ def api_system():
 def api_config():
     """Get or save editable config settings."""
     if request.method == 'POST':
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         config = lg_manager.load_lg_config()
         
         # Update editable fields
@@ -385,11 +385,9 @@ def api_machine_start():
         "bypass_cooldown": false           // optional
     }
     """
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON body"}), 400
-
-    entity = machine_manager.resolve_entity(data.get('entity_id', ''))
+    data = request.get_json(silent=True) or {}
+    entity_id_raw = data.get('entity_id') or ''
+    entity = machine_manager.resolve_entity(entity_id_raw)
     if not entity:
         return jsonify({"error": "Invalid machine"}), 400
 
@@ -427,11 +425,9 @@ def api_machine_stop():
         "entity_id": "Mesin_Cuci_2"
     }
     """
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON body"}), 400
-
-    entity = machine_manager.resolve_entity(data.get('entity_id', ''))
+    data = request.get_json(silent=True) or {}
+    entity_id_raw = data.get('entity_id') or ''
+    entity = machine_manager.resolve_entity(entity_id_raw)
     if not entity:
         return jsonify({"error": "Invalid machine"}), 400
 
@@ -454,11 +450,9 @@ def api_machine_replace():
         "wa_message": null
     }
     """
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON body"}), 400
-
-    entity = machine_manager.resolve_entity(data.get('entity_id', ''))
+    data = request.get_json(silent=True) or {}
+    entity_id_raw = data.get('entity_id') or ''
+    entity = machine_manager.resolve_entity(entity_id_raw)
     if not entity:
         return jsonify({"error": "Invalid machine"}), 400
 
@@ -492,11 +486,9 @@ def api_machine_finish():
         "customer_phone": "08123456789"
     }
     """
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON body"}), 400
-
-    entity = machine_manager.resolve_entity(data.get('entity_id', ''))
+    data = request.get_json(silent=True) or {}
+    entity_id_raw = data.get('entity_id') or ''
+    entity = machine_manager.resolve_entity(entity_id_raw)
     if not entity:
         return jsonify({"error": "Invalid machine"}), 400
 
