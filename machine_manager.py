@@ -473,16 +473,9 @@ def on_thinq_state_change(entity_id, new_run_state, remain_time_str, is_complete
                 
     # Update SSE display state if ThinQ completed
     if is_completed:
-        # Clear the active timer from memory so status becomes 'ready'
-        with machine_status_lock:
-            if entity_id in machine_status:
-                del machine_status[entity_id]
-        
-        output = f"{entity_id}|Ready|Completed|--:--|-|-|1"
-        existing = lg_manager.latest_state.get(entity_id, "")
-        existing_parts = existing.split("|") if existing else []
-        if len(existing_parts) > 7 and existing_parts[7] != "-" and existing_parts[7] != "":
-            output = f"{output}|{existing_parts[7]}"
+        # Clear the active timer from memory and release online machine back to Ready / Idle
+        _release_machine(entity_id)
+        output = f"{entity_id}|Ready|Idle|--:--|-|-|0|-"
         lg_manager.latest_state[entity_id] = output
         broadcast(output)
     
@@ -655,11 +648,30 @@ def _start_countdown_broadcast(entity_id, end_time, duration_minutes=5):
                 else:
                     print(f"[Tuya] Booking window expired for {ent}. Setting Ready without WA selesai.")
                     _expire_booking(ent)
+            elif is_lg:
+                # If it was an OFFLINE washer cycle (dur_min > 5 or is_running_flag), set to Completed (Selesai) for cashier to take action:
+                if is_running_flag or dur_min > 5:
+                    print(f"[LG Offline] Offline wash cycle countdown ended for {ent}. Setting status to Completed (Menunggu Tindakan).")
+                    with machine_status_lock:
+                        if ent in machine_status:
+                            del machine_status[ent]
+                    state = f"{ent}|Ready|Completed|--:--|-|-|1|{cust_name_str}"
+                    lg_manager.latest_state[ent] = state
+                    broadcast(state)
+                else:
+                    print(f"[LG] Booking window expired for {ent}. Setting Ready without WA selesai.")
+                    _expire_booking(ent)
             else:
                 # Clean up memory status for manual machines
-                with machine_status_lock:
-                    if ent in machine_status:
-                        del machine_status[ent]
+                if is_running_flag or dur_min > 5:
+                    with machine_status_lock:
+                        if ent in machine_status:
+                            del machine_status[ent]
+                    state = f"{ent}|Ready|Completed|--:--|-|-|1|{cust_name_str}"
+                    lg_manager.latest_state[ent] = state
+                    broadcast(state)
+                else:
+                    _expire_booking(ent)
         finally:
             with machine_status_lock:
                 if countdown_generation.get(ent) == my_gen:
