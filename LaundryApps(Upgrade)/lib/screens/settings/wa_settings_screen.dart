@@ -28,7 +28,6 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
   bool _waMachineNotificationsEnabled = true;
 
   // Templates controllers
-  final TextEditingController _bookingController = TextEditingController();
   final TextEditingController _cucianMasukController = TextEditingController();
   final TextEditingController _cucianMulaiController = TextEditingController();
   final TextEditingController _cucianSelesaiController = TextEditingController();
@@ -127,7 +126,6 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
   @override
   void dispose() {
     _qrRefreshTimer?.cancel();
-    _bookingController.dispose();
     _cucianMasukController.dispose();
     _cucianMulaiController.dispose();
     _cucianSelesaiController.dispose();
@@ -184,7 +182,6 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
         final data = json.decode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
         final templates = data['wa_templates'] as Map<String, dynamic>?;
         if (templates != null) {
-          _bookingController.text = templates['booking'] ?? '';
           _cucianMasukController.text = templates['cucian_masuk'] ?? '';
           _cucianMulaiController.text = templates['cucian_mulai'] ?? '';
           _cucianSelesaiController.text = templates['cucian_selesai'] ?? '';
@@ -216,7 +213,6 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
           'wa_master_enabled': _waMasterEnabled,
           'wa_machine_notifications_enabled': _waMachineNotificationsEnabled,
           'wa_templates': {
-            'booking': _bookingController.text,
             'cucian_masuk': _cucianMasukController.text,
             'cucian_mulai': _cucianMulaiController.text,
             'cucian_selesai': _cucianSelesaiController.text,
@@ -234,7 +230,6 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('wa_master_enabled', _waMasterEnabled);
         await prefs.setBool('wa_machine_notifications_enabled', _waMachineNotificationsEnabled);
-        await prefs.setString('wa_booking_template', _bookingController.text);
         await prefs.setString('wa_cucian_masuk_template', _cucianMasukController.text);
         await prefs.setString('wa_cucian_mulai_template', _cucianMulaiController.text);
         await prefs.setString('wa_cucian_selesai_template', _cucianSelesaiController.text);
@@ -678,7 +673,7 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
                                                   const SizedBox(height: 2),
                                                   Text(
                                                     _waMachineNotificationsEnabled
-                                                        ? 'Kirim pesan otomatis saat cucian booking, masuk, mulai berputar, atau selesai.'
+                                                        ? 'Kirim pesan otomatis saat cucian masuk, mulai berputar, atau selesai.'
                                                         : 'Notifikasi mesin dinonaktifkan (pesan otomatis mesin tidak akan dikirim).',
                                                     style: TextStyle(
                                                       fontSize: 11.5,
@@ -714,25 +709,19 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
                                         ),
                                         const SizedBox(height: 24),
                                         _templateField(
-                                          label: '1. Pesan Saat Booking (Batas 5 Menit)',
-                                          controller: _bookingController,
-                                          hint: 'Contoh: Halo Kak {name}, mesin cuci {mesin} sudah siap digunakan...',
-                                        ),
-                                        const SizedBox(height: 20),
-                                        _templateField(
-                                          label: '2. Pesan Saat Cucian Masuk (Sebelum Mulai)',
+                                          label: '1. Pesan Saat Cucian Masuk (Sebelum Mulai)',
                                           controller: _cucianMasukController,
                                           hint: 'Contoh: Halo Kak {name}, cucian anda sudah masuk ke mesin cuci...',
                                         ),
                                         const SizedBox(height: 20),
                                         _templateField(
-                                          label: '3. Pesan Saat Cucian Mulai Berputar (Running)',
+                                          label: '2. Pesan Saat Cucian Mulai Berputar (Running)',
                                           controller: _cucianMulaiController,
                                           hint: 'Contoh: Halo Kak {name}, cucianmu di {mesin} sudah mulai diproses, estimasi selesai {estimasi}...',
                                         ),
                                         const SizedBox(height: 20),
                                         _templateField(
-                                          label: '4. Pesan Saat Cucian Selesai',
+                                          label: '3. Pesan Saat Cucian Selesai',
                                           controller: _cucianSelesaiController,
                                           hint: 'Contoh: Halo Kak {name}, cucianmu di {mesin} sudah selesai! Silakan diambil...',
                                         ),

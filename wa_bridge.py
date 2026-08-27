@@ -16,7 +16,6 @@ WA_MACHINE_NOTIFICATIONS_ENABLED = True
 
 # WA message templates (default)
 WA_TEMPLATES = {
-    "booking": "Halo Kak {name}, mesin cuci {mesin} sudah siap digunakan. Silakan masukkan pakaian dan tekan tombol START di mesin ya. Batas waktu tunggu adalah 5 menit.",
     "cucian_masuk": "Halo Kak {name}, cucian anda sudah masuk ke mesin cuci.",
     "cucian_mulai": "Halo Kak {name}, cucianmu di {mesin} sudah mulai diproses ya. Estimasi selesai sekitar {estimasi} (± jam {jam_selesai}). Kami akan kirim pesan lagi kalau sudah selesai!",
     "cucian_selesai": "Halo Kak {name}, cucianmu sudah selesai! Silakan diambil ya. Terima kasih!",
@@ -121,21 +120,6 @@ def send_wa_message(phone, message, save_to_outbox=True):
         return {"success": False, "error": str(e)}
 
 
-def send_wa_booking(phone, nama, mesin):
-    """Send WA notification: machine is booked and ready to use."""
-    if not phone or not WA_MASTER_ENABLED or not WA_MACHINE_NOTIFICATIONS_ENABLED:
-        return {"success": True, "skipped": True}
-    sequence = database.get_current_wash_sequence(phone, nama)
-    if sequence > 1:
-        print(f"[WA] Skipping 'booking' WA for {mesin} because sequence is {sequence} (> 1)")
-        return {"success": True, "skipped": True}
-    template = WA_TEMPLATES.get("booking", "")
-    if not template or not template.strip():
-        template = "{sequence} Cucian mu sudah di proses"
-    message = template.replace("{name}", nama).replace("{mesin}", mesin.replace("_", " ")).replace("{sequence}", str(sequence))
-    return send_wa_message(phone, message)
-
-
 def send_wa_cucian_masuk(phone, nama, mesin):
     """Send WA notification: machine cycle has been set/started in dashboard.
 
@@ -157,9 +141,7 @@ def send_wa_cucian_masuk(phone, nama, mesin):
 
     template = WA_TEMPLATES.get("cucian_masuk", "")
     if not template or not template.strip():
-        template = WA_TEMPLATES.get("booking", "")
-    if not template or not template.strip():
-        template = "{sequence} Cucian mu sudah di proses"
+        template = "Halo Kak {name}, cucian anda sudah masuk ke mesin cuci."
 
     message = template.replace("{name}", nama).replace("{mesin}", mesin.replace("_", " ")).replace("{sequence}", str(sequence))
 
