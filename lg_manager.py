@@ -615,11 +615,11 @@ async def lg_polling_loop():
                             interval = 15  # Active load weighing -> poll every 15s to get calculated wash time immediately!
                         elif is_running:
                             if "Offline" in run_state:
-                                interval = 15  # Fallback offline mode -> check every 15s to see if machine comes online!
+                                interval = 30  # Mesin offline -> 30 detik
                             elif remain_minutes <= 4:
-                                interval = 10  # Running <= 4 minutes -> tight 10s check so <= 3 min WA is triggered immediately!
+                                interval = 15  # Menit Kritis Akhir (<= 4 Menit) -> 15 detik
                             elif remain_minutes <= 8:
-                                interval = 60  # Running 4-8 minutes (e.g. 60s)
+                                interval = 30  # Fase Pengawasan (4 s/d 8 Menit) -> 30 detik
                             else:
                                 interval = cfg_run_high  # Running > 8 minutes (e.g. 180s-300s)
                         elif run_state in ("Standby", "Initial") or raw_state_str in ["INITIAL", "INIT"]:
@@ -638,7 +638,7 @@ async def lg_polling_loop():
                             latest_state[target_name] = f"{target_name}|OFFLINE|-|-|-|-|-"
                             broadcast(latest_state[target_name])
                         with per_machine_next_poll_lock:
-                            per_machine_next_poll[target_name] = current_time + 15  # Retry offline machine in 15s
+                            per_machine_next_poll[target_name] = current_time + 30  # Retry offline machine in 30s
                         register_failure()
                 except Exception as ex:
                     print(f"[LG PAT] Error polling {target_name}: {ex}")
@@ -647,6 +647,8 @@ async def lg_polling_loop():
                     if not _update_running_machine_fallback(target_name, status_ready, cust_name):
                         latest_state[target_name] = f"{target_name}|ERROR|-|-|-|-|-"
                         broadcast(latest_state[target_name])
+                    with per_machine_next_poll_lock:
+                        per_machine_next_poll[target_name] = current_time + 30  # Retry offline machine in 30s
                     with per_machine_next_poll_lock:
                         per_machine_next_poll[target_name] = current_time + 15  # Retry offline machine in 15s
             

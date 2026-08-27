@@ -129,11 +129,46 @@ def has_pending_items_in_orders(phone, name):
         return False
 
 
+def is_machine_actively_running(eid):
+    """Check if a specific machine is currently in an active running cycle (not completed/idle/stopped)."""
+    try:
+        # Check LG ThinQ state
+        import lg_manager
+        st = lg_manager.latest_state.get(eid, "")
+        if st:
+            parts = st.split("|")
+            if len(parts) >= 3:
+                state_val = parts[1].strip().upper()
+                run_st_val = parts[2].strip().lower()
+                is_comp = parts[6].strip() if len(parts) > 6 else "0"
+                if is_comp == "1" or run_st_val in ("completed", "end", "idle", "-", "unknown"):
+                    return False
+                with state_transitions_lock:
+                    tracker = state_transitions.get(eid, {})
+                    if tracker.get("wa_completion_sent", False):
+                        return False
+                if state_val in ("RUNNING", "RUN") or run_st_val in ("washing", "rinsing", "spinning", "drying", "running", "pause", "detecting"):
+                    return True
+
+        # Check countdown / timer for Tuya or manual offline machine
+        rem_sec = get_remaining_seconds(eid)
+        with state_transitions_lock:
+            tracker = state_transitions.get(eid, {})
+            wa_done = tracker.get("wa_completion_sent", False)
+            last_st = tracker.get("last_state", "")
+        if rem_sec > 0 and not wa_done:
+            if "Running" in last_st or "Offline" in last_st or "Menit" in last_st:
+                return True
+    except Exception as e:
+        print(f"[Monitor] Error checking active running state for {eid}: {e}")
+    return False
+
+
 def is_last_machine_for_customer(entity_id):
     """Check if this is the last active machine for the customer.
 
     Returns True if there are no OTHER machines for this customer that are
-    currently occupied/active (i.e. not yet released by kasir or still running/booking),
+    currently actively running (i.e. still in the middle of a wash/dry cycle),
     and there are no other pending laundry/drying runs in active orders.
     """
     info = get_customer_info(entity_id)
@@ -164,9 +199,9 @@ def is_last_machine_for_customer(entity_id):
                         match = True
 
                 if match:
-                    # As long as this other machine is still holding the customer info
-                    # (running, booking, or finished waiting for action), it's not the last machine
-                    return False
+                    # Check if this other machine is STILL ACTIVELY RUNNING
+                    if is_machine_actively_running(eid):
+                        return False
     return True
 
 
@@ -364,16 +399,7 @@ def on_thinq_state_change(entity_id, new_run_state, remain_time_str, is_complete
                 countdown_generation[entity_id] = countdown_generation.get(entity_id, 0) + 1
                 print(f"[Countdown] Cancelled booking countdown for {entity_id} as physical cycle started ({new_run_state}).")
 
-    if is_running and not wa_start_sent and customer_phone:
-        print(f"[WA] Detected machine {entity_id} started running, sending WA to {customer_phone}")
-
-        # Send WA "cucian mulai" in background thread to not block polling
-        threading.Thread(
-            target=wa_bridge.send_wa_cucian_mulai,
-            args=(customer_phone, customer_name or "Pelanggan", entity_id, remain_time_str),
-            daemon=True
-        ).start()
-
+    if is_running and not wa_start_sent:
         with state_transitions_lock:
             if entity_id in state_transitions:
                 state_transitions[entity_id]["wa_start_sent"] = True
@@ -928,18 +954,10 @@ def start_machine_monitoring(entity_id, customer_name=None, customer_phone=None,
         else:
             poll_interval = 60
     elif is_currently_offline:
-        poll_interval = 15
+        poll_interval = 30
     else:
         poll_interval = 180
     lg_manager.set_next_poll_time(entity_id, poll_interval)
-
-    # Send cucian masuk WA notification (in background)
-    if customer_phone:
-        threading.Thread(
-            target=wa_bridge.send_wa_cucian_masuk,
-            args=(customer_phone, customer_name or "Pelanggan", entity_id),
-            daemon=True
-        ).start()
 
     return "monitoring_started", 200
 
