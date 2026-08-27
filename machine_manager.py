@@ -402,9 +402,22 @@ def on_thinq_state_change(entity_id, new_run_state, remain_time_str, is_complete
     try:
         parts = remain_time_str.split(":")
         if len(parts) >= 2:
-            remain_minutes = int(parts[0]) * 60 + int(parts[1])
+            p0 = int(parts[0].strip())
+            p1 = int(parts[1].strip())
+            if p0 == 0:
+                remain_minutes = p1
+            elif p0 in (1, 2, 3) and p1 == 0:
+                remain_minutes = p0
+            elif p0 <= 3 and p1 <= 59:
+                remain_minutes = p0
+            else:
+                remain_minutes = p0 * 60 + p1
     except:
         pass
+
+    rem_sec = get_remaining_seconds(entity_id)
+    if rem_sec > 0 and rem_sec <= 180:
+        remain_minutes = min(remain_minutes, (rem_sec + 59) // 60)
 
     should_send_completion = False
     if not wa_completion_sent:
@@ -415,17 +428,17 @@ def on_thinq_state_change(entity_id, new_run_state, remain_time_str, is_complete
             should_send_completion = is_last
             if is_last:
                 print(f"[WA] Machine {entity_id} has <=3 min remaining ({remain_time_str}), sending early completion WA (last machine)")
-    
+
     if should_send_completion and customer_phone:
         print(f"[WA] Sending completion WA for {entity_id} to {customer_phone}")
-        
+
         # Send WA "cucian selesai" in background thread
         threading.Thread(
             target=wa_bridge.send_wa_cucian_selesai,
             args=(customer_phone, customer_name or "Pelanggan", entity_id),
             daemon=True
         ).start()
-        
+
         # Mark as WA sent — do NOT release machine
         # Machine stays with customer name + "wa_sent" badge until kasir replaces
         with state_transitions_lock:
@@ -889,7 +902,14 @@ def start_machine_monitoring(entity_id, customer_name=None, customer_phone=None,
         state = f"{entity_id}|Running|Running (Offline)|{control_time}|-|-|0|{cust_name_str}"
     else:
         if is_lg_machine:
-            state = f"{entity_id}|Ready|Idle|{control_time}|-|-|0|{cust_name_str}"
+            existing_parts = existing_state.split("|") if existing_state else []
+            if len(existing_parts) >= 4 and existing_parts[1] in ("Running", "RUNNING", "Run"):
+                curr_state = existing_parts[1]
+                curr_run_st = existing_parts[2]
+                curr_remain = existing_parts[3]
+                state = f"{entity_id}|{curr_state}|{curr_run_st}|{curr_remain}|-|-|0|{cust_name_str}"
+            else:
+                state = f"{entity_id}|Ready|Idle|{control_time}|-|-|0|{cust_name_str}"
         else:
             siklus_label = f"{duration_minutes} Menit"
             state = f"{entity_id}|Ready|{siklus_label}|{control_time}|-|-|0|{cust_name_str}"
@@ -900,8 +920,17 @@ def start_machine_monitoring(entity_id, customer_name=None, customer_phone=None,
     # Start countdown broadcast with periodic checkpointing
     _start_countdown_broadcast(entity_id, end_time, duration_minutes)
 
-    # Set smart polling next time (15s for offline machine to auto-detect online, or 180s for booking)
-    poll_interval = 15 if is_currently_offline else 180
+    # Set smart polling next time
+    if is_lg_machine and not is_currently_offline:
+        existing_parts = existing_state.split("|") if existing_state else []
+        if len(existing_parts) >= 4 and existing_parts[1] in ("Running", "RUNNING", "Run"):
+            poll_interval = 5  # Force instant poll within 5s to process live run state
+        else:
+            poll_interval = 60
+    elif is_currently_offline:
+        poll_interval = 15
+    else:
+        poll_interval = 180
     lg_manager.set_next_poll_time(entity_id, poll_interval)
 
     # Send cucian masuk WA notification (in background)
@@ -958,11 +987,15 @@ def finish_and_notify(entity_id, send_wa=True, wa_message=None, customer_phone=N
                 daemon=True
             ).start()
         else:
-            threading.Thread(
-                target=wa_bridge.send_wa_cucian_selesai,
-                args=(target_phone, customer_name, entity_id),
-                daemon=True
-            ).start()
+            is_last = is_last_machine_for_customer(entity_id)
+            if is_last:
+                threading.Thread(
+                    target=wa_bridge.send_wa_cucian_selesai,
+                    args=(target_phone, customer_name, entity_id),
+                    daemon=True
+                ).start()
+            else:
+                print(f"[Monitor] Skipping automated WA selesai for {entity_id} because customer {customer_name} still has other active/pending machines.")
 
     database.log_usage(entity_id, "MONITOR_STOP", source='kasir')
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1006,11 +1039,15 @@ def replace_customer(entity_id, new_customer_name, new_customer_phone=None,
                 daemon=True
             ).start()
         else:
-            threading.Thread(
-                target=wa_bridge.send_wa_cucian_selesai,
-                args=(prev_phone, prev_name or "Pelanggan", entity_id),
-                daemon=True
-            ).start()
+            is_last = is_last_machine_for_customer(entity_id)
+            if is_last:
+                threading.Thread(
+                    target=wa_bridge.send_wa_cucian_selesai,
+                    args=(prev_phone, prev_name or "Pelanggan", entity_id),
+                    daemon=True
+                ).start()
+            else:
+                print(f"[Monitor] Skipping automated WA selesai for previous customer {prev_name} on {entity_id} because they still have other active/pending machines.")
 
     database.log_usage(entity_id, "CUSTOMER_REPLACE", source='kasir')
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

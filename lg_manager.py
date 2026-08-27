@@ -608,27 +608,26 @@ async def lg_polling_loop():
                         cfg_run_low = int(config.get("interval_running_low", 120))
                         
                         # Calculate and set dynamic interval
+                        is_running = run_state not in ("Idle", "-", "", "Ready", "Standby", "Initial") and "OFFLINE" not in state
                         if "PAUSE" in raw_state_str or run_state.lower() == "pause":
                             interval = 30  # Machine paused -> poll every 30s to quickly detect when resumed/unpaused!
                         elif run_state == "Detecting" or raw_state_str == "DETECTING":
                             interval = 15  # Active load weighing -> poll every 15s to get calculated wash time immediately!
+                        elif is_running:
+                            if "Offline" in run_state:
+                                interval = 15  # Fallback offline mode -> check every 15s to see if machine comes online!
+                            elif remain_minutes <= 4:
+                                interval = 10  # Running <= 4 minutes -> tight 10s check so <= 3 min WA is triggered immediately!
+                            elif remain_minutes <= 8:
+                                interval = 60  # Running 4-8 minutes (e.g. 60s)
+                            else:
+                                interval = cfg_run_high  # Running > 8 minutes (e.g. 180s-300s)
                         elif run_state in ("Standby", "Initial") or raw_state_str in ["INITIAL", "INIT"]:
                             interval = 60  # Initial / Standby state -> 1 menit (60 detik)
-                        elif status_ready == "ready":
-                            interval = cfg_idle  # Idle / Off state -> 300s (5 menit)
+                        elif status_ready == "unready":
+                            interval = 60  # Booking window -> 60 detik
                         else:
-                            is_running = run_state not in ("Idle", "-", "", "Ready", "Standby", "Initial")
-                            if not is_running:
-                                interval = 60  # Waiting in Standby/Initial -> 1 menit (60 detik)
-                            else:
-                                if "Offline" in run_state:
-                                    interval = 15  # Fallback offline mode -> check every 15s to see if machine comes online!
-                                elif remain_minutes > 8:
-                                    interval = cfg_run_high  # Running > 8 minutes (e.g. 180s-300s)
-                                elif remain_minutes > 4:
-                                    interval = cfg_run_low  # Running 4-8 minutes (e.g. 60s-120s)
-                                else:
-                                    interval = 30  # Running <= 4 minutes (tight 30s check for exact completion)
+                            interval = cfg_idle  # Idle / Off state -> 300s (5 menit)
 
                         with per_machine_next_poll_lock:
                             per_machine_next_poll[target_name] = current_time + interval
