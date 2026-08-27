@@ -21,6 +21,52 @@ class MachineStatusService {
   final Set<int> _activatingIds = {};
   final Set<String> _processingOrderKeys = {};
   final Set<String> _failedOrderKeys = {};
+  final Map<String, int> _bookingPriorityEndEpochs = {};
+
+  void setBookingPriority(String machineName, {int durationSeconds = 300}) {
+    final norm = machineName.toLowerCase().replaceAll(' ', '_');
+    final space = machineName.toLowerCase().replaceAll('_', ' ');
+    final end = DateTime.now().millisecondsSinceEpoch + (durationSeconds * 1000);
+    _bookingPriorityEndEpochs[machineName.toLowerCase()] = end;
+    _bookingPriorityEndEpochs[norm] = end;
+    _bookingPriorityEndEpochs[space] = end;
+    _bookingPriorityEndEpochs['sensor.$norm'] = end;
+  }
+
+  void clearBookingPriority(String machineName) {
+    final norm = machineName.toLowerCase().replaceAll(' ', '_');
+    final space = machineName.toLowerCase().replaceAll('_', ' ');
+    _bookingPriorityEndEpochs.remove(machineName.toLowerCase());
+    _bookingPriorityEndEpochs.remove(norm);
+    _bookingPriorityEndEpochs.remove(space);
+    _bookingPriorityEndEpochs.remove('sensor.$norm');
+  }
+
+  bool isBookingPriorityActive(String machineName) {
+    final norm = machineName.toLowerCase().replaceAll(' ', '_');
+    final end = _bookingPriorityEndEpochs[machineName.toLowerCase()] ??
+        _bookingPriorityEndEpochs[norm];
+    if (end == null) return false;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return now < end;
+  }
+
+  int getBookingPriorityRemainingSeconds(String machineName) {
+    final norm = machineName.toLowerCase().replaceAll(' ', '_');
+    final end = _bookingPriorityEndEpochs[machineName.toLowerCase()] ??
+        _bookingPriorityEndEpochs[norm];
+    if (end == null) return 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final diff = (end - now + 999) ~/ 1000;
+    return diff > 0 ? diff : 0;
+  }
+
+  String getBookingPriorityRemainingFormatted(String machineName) {
+    final sec = getBookingPriorityRemainingSeconds(machineName);
+    final m = sec ~/ 60;
+    final s = sec % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
 
   int? _parseRemainSeconds(String remainStr) {
     if (remainStr.isEmpty || remainStr == '--:--' || !remainStr.contains(':')) return null;

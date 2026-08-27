@@ -1331,6 +1331,8 @@ class _PengeringContentState extends State<PengeringContent> {
             state.toUpperCase().contains('BOOKING') ||
             runState.toLowerCase().contains('booking'));
 
+    final service = MachineStatusService.instance;
+
     // 1. If machine is empty (no customer assigned)
     if (customerName.isEmpty) {
       if (_selectedOrderItem != null) {
@@ -1339,17 +1341,22 @@ class _PengeringContentState extends State<PengeringContent> {
       return;
     }
 
-    // 2. If machine is in 5-minute BOOKING window (before physical start) -> LOCKED
-    if (isBooking) {
+    // 2. If machine is in 5-minute BOOKING window / Priority Booking -> LOCKED
+    final bool isPriorityBooking = service.isBookingPriorityActive(machine.name) ||
+        service.isBookingPriorityActive(displayName);
+
+    if (isBooking || (isPriorityBooking && customerName.isNotEmpty)) {
       final remainStr = (entry?['remain_time'] ?? '').toString();
-      final String timeInfo = remainStr.isNotEmpty && remainStr != '--:--' ? ' ($remainStr tersisa)' : '';
+      final String timeInfo = isPriorityBooking
+          ? ' (${service.getBookingPriorityRemainingFormatted(machine.name)} tersisa)'
+          : (remainStr.isNotEmpty && remainStr != '--:--' ? ' ($remainStr tersisa)' : '');
       Globals.showWarningSnackBar(
-        'Mesin $displayName sedang dalam masa Booking$timeInfo untuk $customerName. Mesin terkunci selama periode 5 menit untuk dinyalakan di outlet.',
+        'Mesin $displayName sedang dalam masa Prioritas Booking$timeInfo untuk $customerName. Mesin terkunci selama periode 5 menit untuk persiapan.',
       );
       return;
     }
 
-    // 3. Otherwise (Machine is RUNNING, DETECTING, COMPLETED, or OCCUPIED) -> trigger action dialog
+    // 3. Otherwise (Machine is RUNNING, DETECTING, COMPLETED, or OCCUPIED after 5 min) -> trigger action dialog
     _showActionDialog(machine, displayName, machineStatus, state, entry);
   }
 
@@ -2277,6 +2284,7 @@ class _PengeringContentState extends State<PengeringContent> {
                                   });
 
                                   // Call replaceCustomer in background
+                                  service.setBookingPriority(machine.name, durationSeconds: 300);
                                   service.replaceCustomer(
                                     entityId: machine.name,
                                     newCustomerName: newOrder.customerName,
@@ -2296,6 +2304,7 @@ class _PengeringContentState extends State<PengeringContent> {
                                   });
                                 } else {
                                   // Just finish the monitoring (Selesaikan) immediately
+                                  service.clearBookingPriority(machine.name);
                                   Globals.showSuccessSnackBar(
                                     'Mesin pengering ${machine.name} berhasil diselesaikan!',
                                   );
@@ -2394,6 +2403,7 @@ class _PengeringContentState extends State<PengeringContent> {
     }
 
     // 2. Fire-and-forget the API call in the background (uses admin configured dryer duration or Always ON)
+    service.setBookingPriority(machine.name, durationSeconds: 300);
     service.startMachineMonitoring(
       entityId: machine.name,
       customerName: name.isNotEmpty ? name : 'Pelanggan',
