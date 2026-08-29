@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/models/database_helper.dart';
 import '../../database/models/order_model.dart';
 import '../../database/models/db_encryption_helper.dart';
@@ -277,9 +278,15 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
       return;
     }
 
-    final defaultMessage = "Halo Kak ${order.customerName},\n\nPesanan Laundry Anda dengan Nota #${order.id} telah *SELESAI* dan siap untuk diambil/diantarkan.\n\nTerima kasih banyak telah mencuci di Smart Laundry!";
+    final prefs = await SharedPreferences.getInstance();
+    final bizName = prefs.getString('biz_name')?.trim();
+    final displayBizName = (bizName != null && bizName.isNotEmpty) ? bizName : 'Smart Laundry';
+
+    final defaultMessage = "Halo Kak ${order.customerName},\n\nPesanan Laundry Anda dengan Nota #${order.id} telah *SELESAI* dan siap untuk diambil/diantarkan.\n\nTerima kasih banyak telah mencuci di $displayBizName!";
     final msgCtrl = TextEditingController(text: defaultMessage);
     bool isProcessing = false;
+
+    if (!mounted) return;
 
     showDialog(
       context: context,

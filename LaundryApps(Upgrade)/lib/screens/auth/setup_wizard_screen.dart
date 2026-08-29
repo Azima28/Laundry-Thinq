@@ -210,6 +210,21 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
       await prefs.setString('biz_phone', _bizPhoneCtrl.text.trim());
       await prefs.setInt('receipt_width', 58);
 
+      // Sync Biz Profile to Backend API config.json
+      try {
+        final base = MachineStatusService.instance.dashboardUrl;
+        final cleanBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+        await http.post(
+          Uri.parse('$cleanBase/api/config'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'biz_name': _bizNameCtrl.text.trim(),
+            'biz_address': _bizAddressCtrl.text.trim(),
+            'biz_phone': _bizPhoneCtrl.text.trim(),
+          }),
+        ).timeout(const Duration(seconds: 4));
+      } catch (_) {}
+
       // 2. Create Admin Account in SQLite database
       final userRepo = UserRepository();
       final adminExists = await userRepo.checkAdminExists();

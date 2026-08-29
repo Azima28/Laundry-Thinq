@@ -1024,9 +1024,13 @@ class _PesanGosokPageState extends State<PesanGosokPage> {
       statusBayar = 'BELUM LUNAS (Telah Dibayar DP: ${formatRp(paidAmount)})';
     }
 
+    final prefs = await SharedPreferences.getInstance();
+    final bizName = prefs.getString('biz_name')?.trim();
+    final displayBizName = (bizName != null && bizName.isNotEmpty) ? bizName : 'Smart Laundry';
+
     final buffer = StringBuffer();
     buffer.writeln("=========================");
-    buffer.writeln("   *AZIMA GOSOK & SETRIKA*");
+    buffer.writeln("   *${displayBizName.toUpperCase()}*");
     buffer.writeln("=========================");
     buffer.writeln("Halo Kak *$name*, berikut adalah rincian nota setrika Kakak:\n");
     buffer.writeln("*Nota #$orderId* - _($dateStr)_");

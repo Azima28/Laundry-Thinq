@@ -187,13 +187,14 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
           _cucianSelesaiController.text = templates['cucian_selesai'] ?? '';
         }
         final prefs = await SharedPreferences.getInstance();
+        final bizName = prefs.getString('biz_name')?.trim() ?? 'Smart Laundry';
         if (mounted) {
           setState(() {
             _testPhoneCtrl.text = prefs.getString('wa_test_phone') ?? '6289522584477';
             _waMasterEnabled = data['wa_master_enabled'] ?? true;
             _waMachineNotificationsEnabled = data['wa_machine_notifications_enabled'] ?? true;
             _chatbotEnabled = data['chatbot_enabled'] ?? true;
-            _chatbotWelcomeController.text = data['chatbot_welcome_message'] ?? 'Halo! Selamat datang di Smart Laundry. Ada yang bisa kami bantu?';
+            _chatbotWelcomeController.text = data['chatbot_welcome_message'] ?? 'Halo! Selamat datang di $bizName. Ada yang bisa kami bantu?';
             _chatbotWelcomeCooldown = data['chatbot_welcome_cooldown'] ?? 0;
             _chatbotStaffCooldown = data['chatbot_staff_cooldown'] ?? 30;
             _chatbotMenu = List<dynamic>.from(data['chatbot_menu'] ?? []);
@@ -791,7 +792,7 @@ class _WaSettingsScreenState extends State<WaSettingsScreen> {
                                         _templateField(
                                           label: 'Pesan Sambutan (Judul Welcome Poll):',
                                           controller: _chatbotWelcomeController,
-                                          hint: 'Halo! Selamat datang di Azima Laundry...',
+                                          hint: 'Halo! Selamat datang di Toko Laundry kami...',
                                         ),
                                         const SizedBox(height: 20),
                                         Row(

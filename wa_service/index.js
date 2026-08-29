@@ -454,7 +454,8 @@ async function sendWelcomePoll(chatId, sender, config) {
             return;
         }
 
-        const welcomeTitle = config.chatbot_welcome_message || 'Halo! Selamat datang di Azima Laundry. 😊 Ada yang bisa kami bantu?';
+        const storeName = config.biz_name || config.store_name || 'Smart Laundry';
+        const welcomeTitle = config.chatbot_welcome_message || `Halo! Selamat datang di ${storeName}. 😊 Ada yang bisa kami bantu?`;
         const welcomePoll = new Poll(
             welcomeTitle,
             options,
@@ -1483,7 +1484,8 @@ app.get('/test-poll', async (req, res) => {
         const config = loadConfig();
         const menu = config.chatbot_menu || [];
         const options = menu.map(item => item.label);
-        const welcomeTitle = config.chatbot_welcome_message || 'Halo! Selamat datang di Azima Laundry. 😊 Ada yang bisa kami bantu?';
+        const storeName = config.biz_name || config.store_name || 'Smart Laundry';
+        const welcomeTitle = config.chatbot_welcome_message || `Halo! Selamat datang di ${storeName}. 😊 Ada yang bisa kami bantu?`;
         const pollOptions = options.length > 0 ? options : ['🧺 Cek Status Cucian Saya', '💰 Daftar Harga & Layanan', '📅 Jam Operasional & Lokasi', '📞 Hubungi Staff (Kasir)'];
 
         const poll = new Poll(

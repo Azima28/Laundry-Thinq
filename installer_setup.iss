@@ -2,7 +2,7 @@
 ; Standard Windows Installer Generator
 
 #define MyAppName "Smart Laundry POS"
-#define MyAppVersion "2.4.8"
+#define MyAppVersion "2.4.9"
 #define MyAppPublisher "Smart Laundry Team"
 #define MyAppURL "https://smartlaundry.local"
 #define MyAppExeName "flutter_application_1.exe"

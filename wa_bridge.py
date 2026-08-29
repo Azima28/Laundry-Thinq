@@ -13,6 +13,7 @@ import database
 WA_SERVICE_URL = "http://localhost:3000"
 WA_MASTER_ENABLED = True
 WA_MACHINE_NOTIFICATIONS_ENABLED = True
+STORE_NAME = "Smart Laundry"
 
 # WA message templates (default)
 WA_TEMPLATES = {
@@ -28,18 +29,31 @@ _outbox_running = False
 
 def load_wa_config():
     """Load WA configuration from config.json."""
-    global WA_SERVICE_URL, WA_TEMPLATES, WA_MASTER_ENABLED, WA_MACHINE_NOTIFICATIONS_ENABLED
+    global WA_SERVICE_URL, WA_TEMPLATES, WA_MASTER_ENABLED, WA_MACHINE_NOTIFICATIONS_ENABLED, STORE_NAME
     try:
         import lg_manager
         config = lg_manager.load_lg_config()
         WA_SERVICE_URL = config.get("wa_service_url", WA_SERVICE_URL)
         WA_MASTER_ENABLED = config.get("wa_master_enabled", True)
         WA_MACHINE_NOTIFICATIONS_ENABLED = config.get("wa_machine_notifications_enabled", True)
+        STORE_NAME = config.get("biz_name") or config.get("store_name") or "Smart Laundry"
         templates = config.get("wa_templates", {})
         if templates:
             WA_TEMPLATES.update(templates)
     except Exception as e:
         print(f"[WA] Error loading WA config: {e}")
+
+
+def _format_template(template, **kwargs):
+    """Format template replacing standard variables and store name."""
+    msg = template or ""
+    for k, v in kwargs.items():
+        msg = msg.replace(f"{{{k}}}", str(v))
+    msg = msg.replace("{toko}", STORE_NAME)
+    msg = msg.replace("{laundry}", STORE_NAME)
+    msg = msg.replace("{store_name}", STORE_NAME)
+    msg = msg.replace("{nama_laundry}", STORE_NAME)
+    return msg
 
 
 def get_wa_status():
@@ -143,7 +157,12 @@ def send_wa_cucian_masuk(phone, nama, mesin):
     if not template or not template.strip():
         template = "Halo Kak {name}, cucian anda sudah masuk ke mesin cuci."
 
-    message = template.replace("{name}", nama).replace("{mesin}", mesin.replace("_", " ")).replace("{sequence}", str(sequence))
+    message = _format_template(
+        template,
+        name=nama,
+        mesin=mesin.replace("_", " "),
+        sequence=str(sequence)
+    )
 
     result = send_wa_message(phone, message)
     if result and result.get("success"):
@@ -182,11 +201,13 @@ def send_wa_cucian_mulai(phone, nama, mesin, estimasi_waktu):
         jam_selesai = "—"
 
     template = WA_TEMPLATES.get("cucian_mulai", "")
-    message = (template
-               .replace("{name}", nama)
-               .replace("{mesin}", mesin.replace("_", " "))
-               .replace("{estimasi}", estimasi_waktu)
-               .replace("{jam_selesai}", jam_selesai))
+    message = _format_template(
+        template,
+        name=nama,
+        mesin=mesin.replace("_", " "),
+        estimasi=estimasi_waktu,
+        jam_selesai=jam_selesai
+    )
 
     # Check if we already sent a 'start' notification for this machine recently
     if database.has_wa_been_sent(mesin, "start", phone, cooldown_seconds=300):
@@ -210,9 +231,11 @@ def send_wa_cucian_selesai(phone, nama, mesin):
         return
 
     template = WA_TEMPLATES.get("cucian_selesai", "")
-    message = (template
-               .replace("{name}", nama)
-               .replace("{mesin}", mesin.replace("_", " ")))
+    message = _format_template(
+        template,
+        name=nama,
+        mesin=mesin.replace("_", " ")
+    )
 
     result = send_wa_message(phone, message)
     if result and result.get("success"):

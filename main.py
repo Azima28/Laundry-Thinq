@@ -195,6 +195,14 @@ def api_config():
         data = request.get_json(silent=True) or {}
         config = lg_manager.load_lg_config()
         
+        # Business Profile configuration
+        if 'biz_name' in data:
+            config['biz_name'] = str(data['biz_name']).strip()
+        if 'biz_address' in data:
+            config['biz_address'] = str(data['biz_address']).strip()
+        if 'biz_phone' in data:
+            config['biz_phone'] = str(data['biz_phone']).strip()
+
         # Update editable fields
         if 'monitoring_interval' in data:
             config['monitoring_interval'] = int(data['monitoring_interval'])
@@ -244,6 +252,10 @@ def api_config():
     
     # GET - return current config
     config = lg_manager.load_lg_config()
+    current_biz_name = config.get("biz_name") or config.get("store_name") or "Smart Laundry"
+    current_biz_address = config.get("biz_address") or "Jl. Raya Laundry No. 123"
+    current_biz_phone = config.get("biz_phone") or "08123456789"
+
     default_prices = (
         "Daftar harga laundry kami:\n"
         "- Cuci Kering Setrika: Rp 8.000/kg\n"
@@ -254,10 +266,10 @@ def api_config():
     default_hours = (
         "Jam buka toko kami:\n"
         "Setiap Hari: 07:00 - 21:00 WIB\n\n"
-        "Alamat: Jl. Raya Laundry No. 123 (Dekat Indomaret)\n"
-        "Google Maps: https://maps.google.com/?q=Azima+Laundry"
+        f"Alamat: {current_biz_address}\n"
+        f"Telepon/WhatsApp: {current_biz_phone}"
     )
-    default_welcome = "Halo! Selamat datang di Azima Laundry. 😊 Ada yang bisa kami bantu?"
+    default_welcome = f"Halo! Selamat datang di {current_biz_name}. 😊 Ada yang bisa kami bantu?"
     default_menu = [
         {
             "id": "status_cucian",
@@ -306,6 +318,9 @@ def api_config():
     ]
     
     return jsonify({
+        "biz_name": current_biz_name,
+        "biz_address": current_biz_address,
+        "biz_phone": current_biz_phone,
         "monitoring_interval": config.get("monitoring_interval", 30),
         "request_timeout": config.get("request_timeout", 5),
         "worker_threads": config.get("worker_threads", 32),

@@ -1547,8 +1547,12 @@ class _CuciContentState extends State<CuciContent> {
     bool sendWa = isFinalCycle && !waSent;
     bool isCustomMessage = false;
 
+    final prefs = await SharedPreferences.getInstance();
+    final bizName = prefs.getString('biz_name')?.trim();
+    final displayBizName = (bizName != null && bizName.isNotEmpty) ? bizName : 'Smart Laundry';
+
     final String defaultTemplate =
-        "Halo Kak $customerName, cucian Anda di Smart Laundry sudah selesai dan siap diambil! Silakan mampir untuk pengambilan ya. Terima kasih! 😊";
+        "Halo Kak $customerName, cucian Anda di $displayBizName sudah selesai dan siap diambil! Silakan mampir untuk pengambilan ya. Terima kasih! 😊";
 
     final TextEditingController activePhoneCtrl = TextEditingController(
       text: customerPhone.startsWith('+62')

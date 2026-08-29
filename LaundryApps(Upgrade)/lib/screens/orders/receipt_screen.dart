@@ -36,7 +36,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   int _maxDuration = 0;
   final TransactionRepository _transRepo = TransactionRepository();
 
-  String _bizName = 'SMART LAUNDRY PRO';
+  String _bizName = 'Smart Laundry';
   String _bizAddress = 'Layanan Cuci & Setrika Profesional';
   String _bizPhone = '';
   String _customerKuponStr = '';
@@ -101,9 +101,11 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     } catch (_) {}
 
     if (mounted) {
+      final savedBizName = prefs.getString('biz_name')?.trim();
+      final savedBizAddress = prefs.getString('biz_address')?.trim();
       setState(() {
-        _bizName = prefs.getString('biz_name') ?? 'SMART LAUNDRY PRO';
-        _bizAddress = prefs.getString('biz_address') ?? 'Layanan Cuci & Setrika Profesional';
+        _bizName = (savedBizName != null && savedBizName.isNotEmpty) ? savedBizName : 'Smart Laundry';
+        _bizAddress = (savedBizAddress != null && savedBizAddress.isNotEmpty) ? savedBizAddress : 'Layanan Cuci & Setrika Profesional';
         _bizPhone = prefs.getString('biz_phone') ?? '';
         _customerKuponStr = kuponStr;
       });

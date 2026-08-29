@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/models/database_helper.dart';
 import '../../database/models/customer_model.dart';
 import '../../database/models/order_model.dart';
@@ -420,7 +421,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
   }
 
   /// Open WhatsApp Studio / Custom Message Dialog
-  void _openWhatsAppDialog(Customer customer, {String? defaultTemplate}) {
+  Future<void> _openWhatsAppDialog(Customer customer, {String? defaultTemplate}) async {
     if (customer.phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -434,13 +435,19 @@ class _CustomerScreenState extends State<CustomerScreen> {
     final latestOrder = _selectedCustomerOrders.isNotEmpty ? _selectedCustomerOrders.first : null;
     final orderNote = latestOrder != null ? ' (Nota #${latestOrder.id})' : '';
 
-    final templateSelesai = "Halo Kak ${customer.name},\n\nPemberitahuan dari Smart Laundry:\nCucian Anda$orderNote telah *SELESAI* dan siap untuk diambil / diantarkan.\n\nTerima kasih telah mencuci di Smart Laundry!";
-    final templateDiambil = "Halo Kak ${customer.name},\n\nLaundry Anda$orderNote sudah rapi, bersih, dan wangi! Silakan diambil di outlet Smart Laundry pada jam operasional kami ya Kak.\n\nTerima kasih!";
-    final templateProses = "Halo Kak ${customer.name},\n\nPesanan Laundry Anda$orderNote saat ini sedang kami proses dengan cermat dan higienis. Kami akan mengabari kembali saat cucian selesai.\n\nSalam hangat, Smart Laundry.";
+    final prefs = await SharedPreferences.getInstance();
+    final bizName = prefs.getString('biz_name')?.trim();
+    final displayBizName = (bizName != null && bizName.isNotEmpty) ? bizName : 'Smart Laundry';
+
+    final templateSelesai = "Halo Kak ${customer.name},\n\nPemberitahuan dari $displayBizName:\nCucian Anda$orderNote telah *SELESAI* dan siap untuk diambil / diantarkan.\n\nTerima kasih telah mencuci di $displayBizName!";
+    final templateDiambil = "Halo Kak ${customer.name},\n\nLaundry Anda$orderNote sudah rapi, bersih, dan wangi! Silakan diambil di outlet $displayBizName pada jam operasional kami ya Kak.\n\nTerima kasih!";
+    final templateProses = "Halo Kak ${customer.name},\n\nPesanan Laundry Anda$orderNote saat ini sedang kami proses dengan cermat dan higienis. Kami akan mengabari kembali saat cucian selesai.\n\nSalam hangat, $displayBizName.";
 
     final msgController = TextEditingController(text: defaultTemplate ?? templateSelesai);
     String selectedPreset = defaultTemplate != null ? 'Kustom' : 'Selesai';
     bool isSending = false;
+
+    if (!mounted) return;
 
     showDialog(
       context: context,

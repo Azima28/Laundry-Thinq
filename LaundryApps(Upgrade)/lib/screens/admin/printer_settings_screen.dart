@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:printing/printing.dart';
 import '../../services/printer_service.dart';
+import '../../services/machine_status_service.dart';
 import '../../utils/style_constants.dart';
 import '../machines/machine_label_dialog.dart';
 
@@ -195,6 +198,21 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     await prefs.setString('biz_address', _businessAddressController.text.trim());
     await prefs.setString('biz_phone', _businessPhoneController.text.trim());
     await prefs.setString('biz_footer', _footerNoteController.text.trim());
+
+    // Sync Biz Profile to Backend API config.json
+    try {
+      final base = MachineStatusService.instance.dashboardUrl;
+      final cleanBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+      await http.post(
+        Uri.parse('$cleanBase/api/config'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'biz_name': _businessNameController.text.trim(),
+          'biz_address': _businessAddressController.text.trim(),
+          'biz_phone': _businessPhoneController.text.trim(),
+        }),
+      ).timeout(const Duration(seconds: 4));
+    } catch (_) {}
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
