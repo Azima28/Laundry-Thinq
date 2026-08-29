@@ -54,11 +54,11 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
 
     try {
       final allOrders = await _orderRepo.getAllOrders();
-      // Filter out completed and cancelled orders
-      final activeOrders = allOrders.where((o) => 
-        o.status.toLowerCase() != 'completed' && 
-        o.status.toLowerCase() != 'cancelled'
-      ).toList();
+      // Filter out completed, cancelled, and bypass clear orders
+      final activeOrders = allOrders.where((o) {
+        final st = o.status.toLowerCase();
+        return st != 'completed' && st != 'cancelled' && st != 'bypass clear';
+      }).toList();
 
       List<Order> readyOrders = [];
       final db = await _db.database;
@@ -100,7 +100,7 @@ class _HubungiPelangganScreenState extends State<HubungiPelangganScreen> {
 
         // Washing/Drying orders check machine history
         final usageResult = await db.rawQuery(
-          "SELECT COUNT(*) as cnt FROM machine_usage_history WHERE order_id = ? AND status = 'Success'",
+          "SELECT COUNT(*) as cnt FROM machine_usage_history WHERE order_id = ? AND (status = 'Success' OR status = 'Bypass Clear')",
           [order.id],
         );
         int usedQty = usageResult.isNotEmpty ? (usageResult[0]['cnt'] as int) : 0;

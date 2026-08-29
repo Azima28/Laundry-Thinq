@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import '../../services/machine_status_service.dart';
 import '../../transactions/order_repository.dart';
+import '../../transactions/user_repository.dart';
 import '../../utils/globals.dart';
 import '../../database/models/order_model.dart';
 import '../../database/models/database_helper.dart';
@@ -63,6 +64,7 @@ class CuciContent extends StatefulWidget {
 
 class _CuciContentState extends State<CuciContent> {
   final OrderRepository _orderRepo = OrderRepository();
+  final UserRepository _userRepo = UserRepository();
   final DatabaseHelper _db = DatabaseHelper.instance;
   List<Map<String, dynamic>> _activeOrders = [];
   List<MachineModel> _machines = [];
@@ -133,13 +135,16 @@ class _CuciContentState extends State<CuciContent> {
 
       final List<Order> washingOrders = orders.where((order) {
         final items = order.items;
+        final st = order.status.toLowerCase();
         return items.any((item) {
               final name = item.itemName.toLowerCase();
               return item.machineType == 'cuci' ||
                   name.contains('cuci') ||
                   name.contains('wash');
             }) &&
-            order.status.toLowerCase() != 'completed';
+            st != 'completed' &&
+            st != 'bypass clear' &&
+            st != 'cancelled';
       }).toList();
 
       washingOrders.sort((a, b) {
@@ -177,7 +182,14 @@ class _CuciContentState extends State<CuciContent> {
             SELECT COUNT(*) as cnt
             FROM machine_usage_history muh
             LEFT JOIN machines m ON muh.machine_id = m.id
-            WHERE muh.order_id = ? AND muh.status = 'Success' AND (m.machine_type = 'cuci' OR muh.machine_name LIKE '%cuci%' OR muh.machine_name LIKE '%wash%')
+            WHERE muh.order_id = ?
+              AND (muh.status = 'Success' OR muh.status = 'Bypass Clear')
+              AND (
+                (m.id IS NOT NULL AND m.machine_type = 'cuci')
+                OR muh.machine_name LIKE '%cuci%'
+                OR muh.machine_name LIKE '%wash%'
+                OR muh.machine_name LIKE '%Bypass Clear (Cuci)%'
+              )
             ''',
             [order.id],
           );
@@ -222,6 +234,436 @@ class _CuciContentState extends State<CuciContent> {
     }
   }
 
+  /// Modal Dialog: Clear Antrean (Bypass Clear) dengan proteksi Password Admin & Multi-Select
+  Future<void> _showClearQueueDialog() async {
+    if (_activeOrders.isEmpty) return;
+
+    final Set<String> selectedKeys = _activeOrders.map((e) => e['key'] as String).toSet();
+    final passwordCtrl = TextEditingController();
+    bool isObscure = true;
+    String? errorMessage;
+    bool isProcessing = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final int totalItems = _activeOrders.length;
+            final int selectedCount = selectedKeys.length;
+            final bool isAllSelected = selectedCount == totalItems && totalItems > 0;
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+              actionsPadding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.cleaning_services_rounded, color: Color(0xFFDC2626), size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Clear Antrean Cuci (Bypass Clear)',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16.5, color: Color(0xFF0F172A)),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Pilih antrean yang ingin dibersihkan & masukkan password admin',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: isProcessing ? null : () => Navigator.pop(dialogCtx),
+                    icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 20),
+                    tooltip: 'Tutup',
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 540,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    const SizedBox(height: 14),
+
+                    // Toolbar: Counter & Select All / Unselect All
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: selectedCount > 0 ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: selectedCount > 0 ? const Color(0xFFBFDBFE) : const Color(0xFFCBD5E1)),
+                          ),
+                          child: Text(
+                            'Terpilih: $selectedCount dari $totalItems antrean',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: selectedCount > 0 ? const Color(0xFF1D4ED8) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: isProcessing
+                              ? null
+                              : () {
+                                  setModalState(() {
+                                    if (isAllSelected) {
+                                      selectedKeys.clear();
+                                    } else {
+                                      selectedKeys.addAll(_activeOrders.map((e) => e['key'] as String));
+                                    }
+                                  });
+                                },
+                          icon: Icon(
+                            isAllSelected ? Icons.deselect_rounded : Icons.select_all_rounded,
+                            size: 16,
+                            color: const Color(0xFF4E80EE),
+                          ),
+                          label: Text(
+                            isAllSelected ? 'Batal Pilih Semua' : 'Pilih Semua',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4E80EE)),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // List of Queue Items with Checkboxes
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 220),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.all(8),
+                        itemCount: _activeOrders.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 6),
+                        itemBuilder: (ctx, idx) {
+                          final item = _activeOrders[idx];
+                          final key = item['key'] as String;
+                          final order = item['order'] as Order;
+                          final cycleIdx = (item['cycle_index'] as int? ?? 0) + 1;
+                          final totalCycles = item['total_cycles'] as int? ?? 1;
+                          final isChecked = selectedKeys.contains(key);
+                          final tubNote = item['tub_note'] as String? ?? '';
+
+                          return InkWell(
+                            onTap: isProcessing
+                                ? null
+                                : () {
+                                    setModalState(() {
+                                      if (isChecked) {
+                                        selectedKeys.remove(key);
+                                      } else {
+                                        selectedKeys.add(key);
+                                      }
+                                    });
+                                  },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isChecked ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isChecked ? const Color(0xFF93C5FD) : const Color(0xFFE2E8F0),
+                                  width: isChecked ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Checkbox(
+                                    value: isChecked,
+                                    onChanged: isProcessing
+                                        ? null
+                                        : (val) {
+                                            setModalState(() {
+                                              if (val == true) {
+                                                selectedKeys.add(key);
+                                              } else {
+                                                selectedKeys.remove(key);
+                                              }
+                                            });
+                                          },
+                                    activeColor: const Color(0xFFDC2626),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              order.customerName,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFEFF6FF),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                'Nota #${order.id}',
+                                                style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                                              ),
+                                            ),
+                                            if (totalCycles > 1) ...[
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '• Siklus $cycleIdx/$totalCycles',
+                                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        if (tubNote.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Catatan: $tubNote',
+                                            style: const TextStyle(fontSize: 11, color: Color(0xFFD97706), fontStyle: FontStyle.italic),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Admin Password Input
+                    TextField(
+                      controller: passwordCtrl,
+                      obscureText: isObscure,
+                      enabled: !isProcessing,
+                      decoration: InputDecoration(
+                        labelText: 'Password Admin untuk Konfirmasi',
+                        hintText: 'Masukkan password admin...',
+                        prefixIcon: const Icon(Icons.lock_outline_rounded, color: Color(0xFF64748B), size: 20),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            isObscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                            color: const Color(0xFF64748B),
+                            size: 20,
+                          ),
+                          onPressed: () => setModalState(() => isObscure = !isObscure),
+                        ),
+                        errorText: errorMessage,
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFDC2626), width: 2)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF64748B)),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Status antrean terpilih akan diubah menjadi Bypass Clear. Riwayat pesanan & data keuangan tetap aman.',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B), height: 1.3),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                OutlinedButton(
+                  onPressed: isProcessing ? null : () => Navigator.pop(dialogCtx),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                ),
+                ElevatedButton.icon(
+                  onPressed: isProcessing
+                      ? null
+                      : () async {
+                          if (selectedKeys.isEmpty) {
+                            setModalState(() {
+                              errorMessage = 'Pilih minimal 1 antrean untuk dibersihkan';
+                            });
+                            return;
+                          }
+
+                          final pwd = passwordCtrl.text.trim();
+                          if (pwd.isEmpty) {
+                            setModalState(() {
+                              errorMessage = 'Password admin tidak boleh kosong';
+                            });
+                            return;
+                          }
+
+                          setModalState(() {
+                            isProcessing = true;
+                            errorMessage = null;
+                          });
+
+                          final isVerified = await _userRepo.verifyAdminPassword(pwd);
+                          if (!isVerified) {
+                            setModalState(() {
+                              isProcessing = false;
+                              errorMessage = 'Password admin salah!';
+                            });
+                            return;
+                          }
+
+                          // Process Bypass Clear for all selected items
+                          try {
+                            final db = await _db.database;
+                            final now = DateTime.now().toIso8601String();
+                            final selectedItems = _activeOrders.where((it) => selectedKeys.contains(it['key'])).toList();
+                            final Set<int> affectedOrderIds = {};
+
+                            for (final item in selectedItems) {
+                              final order = item['order'] as Order;
+                              if (order.id != null) {
+                                affectedOrderIds.add(order.id!);
+                              }
+
+                              await db.insert('machine_usage_history', {
+                                'order_id': order.id ?? 0,
+                                'machine_id': 0,
+                                'machine_name': 'Bypass Clear (Cuci)',
+                                'customer_name': order.customerName,
+                                'status': 'Bypass Clear',
+                                'error_message': 'Antrean dibersihkan secara manual oleh Admin (Bypass Clear)',
+                                'started_at': now,
+                                'created_at': now,
+                              });
+                            }
+
+                            // Check all affected orders if all cycles are completed/bypassed
+                            for (final orderId in affectedOrderIds) {
+                              final orderRes = await db.query('orders', where: 'id = ?', whereArgs: [orderId]);
+                              if (orderRes.isNotEmpty) {
+                                final currentStatus = (orderRes.first['status'] as String? ?? '').toLowerCase();
+                                if (currentStatus != 'completed') {
+                                  // Check total items vs total history
+                                  final orderItems = await db.query('order_items', where: 'order_id = ?', whereArgs: [orderId]);
+                                  int totalCycles = 0;
+                                  for (var oi in orderItems) {
+                                    final name = (oi['item_name'] as String? ?? '').toLowerCase();
+                                    final bool isWash = name.contains('cuci') || name.contains('wash');
+                                    final bool isDry = name.contains('kering') || name.contains('pengering') || name.contains('dry');
+                                    if (isWash && isDry) {
+                                      totalCycles += ((oi['quantity'] as int? ?? 1) * 2);
+                                    } else if (isWash || isDry) {
+                                      totalCycles += (oi['quantity'] as int? ?? 1);
+                                    }
+                                  }
+
+                                  final histRes = await db.rawQuery(
+                                    "SELECT COUNT(*) as cnt FROM machine_usage_history WHERE order_id = ? AND (status = 'Success' OR status = 'Bypass Clear')",
+                                    [orderId],
+                                  );
+                                  final totalResolved = histRes.isNotEmpty ? (histRes[0]['cnt'] as int) : 0;
+
+                                  if (totalResolved >= totalCycles) {
+                                    // Check if all were Bypass Clear
+                                    final successRes = await db.rawQuery(
+                                      "SELECT COUNT(*) as cnt FROM machine_usage_history WHERE order_id = ? AND status = 'Success'",
+                                      [orderId],
+                                    );
+                                    final successCount = successRes.isNotEmpty ? (successRes[0]['cnt'] as int) : 0;
+                                    final newStatus = successCount == 0 ? 'Bypass Clear' : 'Completed';
+
+                                    await db.update(
+                                      'orders',
+                                      {'status': newStatus},
+                                      where: 'id = ?',
+                                      whereArgs: [orderId],
+                                    );
+                                  }
+                                }
+                              }
+                            }
+
+                            if (dialogCtx.mounted) {
+                              Navigator.pop(dialogCtx);
+                            }
+
+                            await _loadActiveOrders();
+
+                            if (mounted) {
+                              Globals.showSuccessSnackBar('${selectedItems.length} antrean berhasil di-bypass clear!');
+                            }
+                          } catch (e) {
+                            setModalState(() {
+                              isProcessing = false;
+                              errorMessage = 'Gagal memproses: $e';
+                            });
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                  icon: isProcessing
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.cleaning_services_rounded, color: Colors.white, size: 18),
+                  label: Text(
+                    isProcessing ? 'Memproses...' : 'Clear (${selectedKeys.length}) Antrean',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -250,9 +692,47 @@ class _CuciContentState extends State<CuciContent> {
                         color: Color(0xFF0F172A),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh_rounded, size: 20),
-                      onPressed: _loadActiveOrders,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_activeOrders.isNotEmpty)
+                          Tooltip(
+                            message: 'Clear Antrean (Butuh Password Admin)',
+                            child: InkWell(
+                              onTap: _showClearQueueDialog,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEE2E2),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFFECACA)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.cleaning_services_rounded, size: 14, color: Color(0xFFDC2626)),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Clear',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFFDC2626),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          icon: const Icon(Icons.refresh_rounded, size: 20),
+                          tooltip: 'Muat Ulang Antrean',
+                          onPressed: _loadActiveOrders,
+                        ),
+                      ],
                     ),
                   ],
                 ),

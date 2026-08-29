@@ -751,10 +751,10 @@ def _is_order_fully_completed(order, all_timers, cursor):
             
     # Query history
     cursor.execute("""
-        SELECT h.machine_name, m.machine_type, h.started_at 
+        SELECT h.machine_name, m.machine_type, h.started_at
         FROM machine_usage_history h
         LEFT JOIN machines m ON h.machine_id = m.id
-        WHERE h.order_id = ? AND h.status = 'Success'
+        WHERE h.order_id = ? AND (h.status = 'Success' OR h.status = 'Bypass Clear')
     """, (oid,))
     history = cursor.fetchall()
     
@@ -916,7 +916,7 @@ def _get_total_runs_started(target_type, cursor):
         SELECT h.machine_name, m.machine_type
         FROM machine_usage_history h
         LEFT JOIN machines m ON h.machine_id = m.id
-        WHERE h.status = 'Success'
+        WHERE (h.status = 'Success' OR h.status = 'Bypass Clear')
     """)
     rows = cursor.fetchall()
     total = 0
@@ -1035,10 +1035,10 @@ def api_wa_chatbot_status_cucian():
             
             # Fetch usage history
             cursor.execute("""
-                SELECT h.machine_name, m.machine_type 
+                SELECT h.machine_name, m.machine_type
                 FROM machine_usage_history h
                 LEFT JOIN machines m ON h.machine_id = m.id
-                WHERE h.order_id = ? AND h.status = 'Success'
+                WHERE h.order_id = ? AND (h.status = 'Success' OR h.status = 'Bypass Clear')
             """, (order_id_digits,))
             usage_history = cursor.fetchall()
             

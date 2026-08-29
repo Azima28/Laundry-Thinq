@@ -1257,12 +1257,12 @@ class DatabaseHelper {
     final db = await database;
     if (type != null) {
       return await db.rawQuery('''
-        SELECT h.*, m.machine_type 
+        SELECT h.*, COALESCE(m.machine_type, CASE WHEN h.machine_name LIKE '%cuci%' OR h.machine_name LIKE '%wash%' THEN 'cuci' ELSE 'pengering' END) as machine_type
         FROM machine_usage_history h
-        JOIN machines m ON h.machine_id = m.id
-        WHERE m.machine_type = ?
+        LEFT JOIN machines m ON h.machine_id = m.id
+        WHERE (m.machine_type = ? OR (h.machine_id = 0 AND ((? = 'cuci' AND (h.machine_name LIKE '%cuci%' OR h.machine_name LIKE '%wash%')) OR (? = 'pengering' AND (h.machine_name LIKE '%pengering%' OR h.machine_name LIKE '%kering%' OR h.machine_name LIKE '%dry%')))))
         ORDER BY h.started_at DESC
-      ''', [type]);
+      ''', [type, type, type]);
     }
     return await db.query('machine_usage_history', orderBy: 'started_at DESC');
   }
